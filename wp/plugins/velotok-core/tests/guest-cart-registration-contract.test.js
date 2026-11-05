@@ -21,6 +21,7 @@ function includes(fragment, message) {
 includes('clarify-30af92ca', 'Contract must reference spec clarify-30af92ca');
 includes('ecommerce-store', 'Contract must reference parent spec ecommerce-store');
 includes('TESTEB-78', 'Contract must reference requirement TESTEB-78');
+includes('TESTEB-79', 'Contract must reference requirement TESTEB-79');
 includes('guest_cart_register_transfer_checkout', 'Contract must declare the guest cart operation');
 includes('velotok_core_guest_cart_registration_contract', 'Guest cart contract accessor is missing');
 includes('velotok_core_guest_cart_registration_stub_contract', 'Guest cart stub contract alias is missing');

@@ -265,7 +265,7 @@ node wp/plugins/velotok-core/tests/cart-contract.test.js
 
 = Гостевая корзина и перенос при регистрации (stub) =
 
-Единая точка доступа — `velotok_core_guest_cart_registration_contract()` в `includes/guest-cart-registration.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-30af92ca` и требование `TESTEB-78`, родительская спецификация — `ecommerce-store`.
+Единая точка доступа — `velotok_core_guest_cart_registration_contract()` в `includes/guest-cart-registration.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-30af92ca`, требования `TESTEB-78`/`TESTEB-79` (`requirement_ids`, `task => TESTEB-79`), родительская спецификация — `ecommerce-store`.
 
 Правила контракта:
 

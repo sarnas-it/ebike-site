@@ -13,7 +13,7 @@
  * authentication, WooCommerce customer creation and checkout routing are out
  * of scope for this iteration.
  *
- * Spec: clarify-30af92ca (requirement TESTEB-78).
+ * Spec: clarify-30af92ca (requirements TESTEB-78 and TESTEB-79).
  * Parent spec: ecommerce-store.
  *
  * @package Velotok_Core
@@ -59,6 +59,15 @@ function velotok_core_guest_cart_registration_contract() {
 		'spec'                    => 'clarify-30af92ca',
 		'parent_spec'             => 'ecommerce-store',
 		'requirement'             => 'TESTEB-78',
+		'task'                    => 'TESTEB-79',
+		'requirement_ids'         => array( 'TESTEB-78', 'TESTEB-79' ),
+		'requirement_aliases'     => array( 'TESTEB-79' ),
+		'requirement_tickets'     => array(
+			'guest_cart'            => 'TESTEB-78',
+			'register_on_buy'       => 'TESTEB-79',
+			'transfer_after_signup' => 'TESTEB-78',
+			'redirect_to_checkout'  => 'TESTEB-78',
+		),
 		'cart_spec'               => 'clarify-30af92ca',
 		'checkout_spec'           => 'clarify-096bb945',
 		'parent_relation'         => 'Сценарий гостевой корзины реализует требование родительской спецификации ecommerce-store без реальной интеграции с WooCommerce.',

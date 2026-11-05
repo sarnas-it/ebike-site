@@ -59,6 +59,8 @@ if ( ! function_exists( 'velotok_core_guest_cart_registration_contract' ) ) {
 	velotok_guest_cart_contract_assert( isset( $contract['spec'] ) && 'clarify-30af92ca' === $contract['spec'], 'Контракт ссылается на неверную спеку.' );
 	velotok_guest_cart_contract_assert( isset( $contract['parent_spec'] ) && 'ecommerce-store' === $contract['parent_spec'], 'Не зафиксирована родительская спецификация.' );
 	velotok_guest_cart_contract_assert( isset( $contract['requirement'] ) && 'TESTEB-78' === $contract['requirement'], 'Контракт ссылается на неверное требование.' );
+	velotok_guest_cart_contract_assert( isset( $contract['task'] ) && 'TESTEB-79' === $contract['task'], 'Контракт не помечен задачей TESTEB-79.' );
+	velotok_guest_cart_contract_assert( isset( $contract['requirement_ids'] ) && in_array( 'TESTEB-79', $contract['requirement_ids'], true ), 'Контракт не содержит требование TESTEB-79.' );
 	velotok_guest_cart_contract_assert( isset( $contract['mocked'] ) && true === $contract['mocked'], 'Контракт не помечен mocked: true.' );
 	velotok_guest_cart_contract_assert( isset( $contract['source'] ) && 'stub' === $contract['source'], 'Источником должна быть заглушка.' );
 	velotok_guest_cart_contract_assert( isset( $contract['network'] ) && false === $contract['network'], 'Заглушка не должна ходить в сеть.' );
