@@ -204,6 +204,10 @@ function velotok_core_validation_strlen( $value ) {
 		return (int) mb_strlen( $value, 'UTF-8' );
 	}
 
+	if ( preg_match_all( '/./us', $value, $matches ) ) {
+		return (int) count( $matches[0] );
+	}
+
 	return (int) strlen( $value );
 }
 
