@@ -31,6 +31,8 @@ docker compose run --rm --entrypoint wp wpcli --allow-root plugin list
 docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-contract-test.php
 docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-design-variants-contract-test.php
 docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-design-variants-rejected-contract-test.php
+docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/plugins/velotok-core/tests/content-approval-contract-test.php
+docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/plugins/velotok-core/tests/content-approval-wordpress-test.php
 bash wp/tests/smoke.sh
 php wp/themes/velotok/tests/theme-contract-test.php
 php wp/themes/velotok/tests/theme-design-variants-contract-test.php
@@ -54,6 +56,7 @@ php wp/plugins/velotok-core/tests/delivery-order-persistence-contract-test.php
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 php wp/plugins/velotok-core/tests/legal-requirements-contract-test.php
 php wp/plugins/velotok-core/tests/content-articles-contract-test.php
+php wp/plugins/velotok-core/tests/content-approval-contract-test.php
 php wp/plugins/velotok-core/tests/catalog-contract-test.php
 php wp/plugins/velotok-core/tests/cart-contract-test.php
 php wp/plugins/velotok-core/tests/guest-cart-registration-contract-test.php
@@ -80,6 +83,7 @@ node wp/plugins/velotok-core/tests/delivery-order-persistence-contract.test.js
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
 node wp/plugins/velotok-core/tests/legal-requirements-redgreen.test.js
 node wp/plugins/velotok-core/tests/content-articles-contract.test.js
+node wp/plugins/velotok-core/tests/content-approval-redgreen.test.js
 node wp/plugins/velotok-core/tests/catalog-contract.test.js
 node wp/plugins/velotok-core/tests/cart-contract.test.js
 node wp/plugins/velotok-core/tests/guest-cart-registration-contract.test.js
@@ -123,6 +127,7 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/plugins/pvs/` — mocked-проверка всех плагинов на уязвимости;
 * `wp/plugins/velotok-core/includes/legal-requirements.php` — mocked-контракт требований законодательства для зелёной энергетики (описание требования и ссылка на источник);
 * `wp/plugins/velotok-core/includes/content-articles.php` — mocked-контракт контентных статей о товарах и магазине;
+* `wp/plugins/velotok-core/includes/content-approval.php` — обязательная приёмка контента человеком с ролью руководителя проекта (TESTEB-68);
 * `wp/plugins/velotok-core/includes/catalog.php` — mocked-контракт каталога электровелосипедов;
 * `wp/plugins/velotok-core/includes/cart.php` — mocked-контракт корзины для оформления заказа;
 * `wp/plugins/velotok-core/includes/guest-cart-registration.php` — mocked-контракт гостевой корзины, регистрации при нажатии «Купить», переноса корзины и перехода к оформлению;

@@ -335,6 +335,26 @@ php wp/plugins/velotok-core/tests/payment-integration-contract-test.php
 node wp/plugins/velotok-core/tests/payment-integration-contract.test.js
 ```
 
+= Приёмка контента человеком =
+
+Правило реализовано в `includes/content-approval.php`, ссылается на спеку `clarify-096bb945` и требование `TESTEB-68`.
+
+Правила контракта:
+
+* контентные статьи (тип записи `post`) не публикуются без подтверждения человеком; попытка `publish` без приёмки откатывается в `pending`, включая обход через `update_post()` и REST API (`wp_insert_post_data`);
+* подтверждать контент может только человек с ролью `project_manager` («Руководитель проекта») или правом `approve_content`; при чужой роли возвращается `CONTENT_APPROVAL_ROLE_FORBIDDEN`;
+* ID подтвердившего сохраняется в мете `_content_approved_by`, статус приёмки — в `_content_approval_status`; после подтверждения запись публикуется (`publish`);
+* снятие чекбокса в метабоксе «Приёмка контента» отзывает подтверждение: мета `_content_approved_by` удаляется, статья возвращается в `pending`;
+* без подтверждения при попытке публикации возвращается `CONTENT_APPROVAL_REQUIRED`.
+
+Запуск тестов:
+
+```bash
+php wp/plugins/velotok-core/tests/content-approval-contract-test.php
+node wp/plugins/velotok-core/tests/content-approval-redgreen.test.js
+wp eval-file wp-content/plugins/velotok-core/tests/content-approval-wordpress-test.php
+```
+
 == Installation ==
 
 1. Убедитесь, что установлен и активирован WooCommerce.
