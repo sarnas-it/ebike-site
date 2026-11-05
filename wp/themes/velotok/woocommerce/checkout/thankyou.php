@@ -50,8 +50,18 @@ do_action( 'woocommerce_before_thankyou', $order->get_id() );
 		?>
 	</p>
 
+	<?php
+	$velotok_delivery_total = function_exists( 'velotok_order_delivery_total' ) ? velotok_order_delivery_total( $order ) : array();
+	$velotok_delivery_line  = ! empty( $velotok_delivery_total['valid'] ) && isset( $velotok_delivery_total['lines']['delivery'] )
+		? $velotok_delivery_total['lines']['delivery']
+		: array();
+	?>
+
 	<ul class="order-summary">
 		<li><span><?php esc_html_e( 'Дата', 'velotok' ); ?></span><strong><?php echo esc_html( wc_format_datetime( $order->get_date_created() ) ); ?></strong></li>
+		<?php if ( ! empty( $velotok_delivery_line ) ) : ?>
+			<li class="order-summary-delivery" data-mocked="true" data-source="stub"><span><?php echo esc_html( $velotok_delivery_line['label'] ); ?></span><strong><?php echo esc_html( $velotok_delivery_line['formatted'] ); ?></strong></li>
+		<?php endif; ?>
 		<li><span><?php esc_html_e( 'Итого', 'velotok' ); ?></span><strong><?php echo wp_kses_post( $order->get_formatted_order_total() ); ?></strong></li>
 		<li><span><?php esc_html_e( 'Оплата', 'velotok' ); ?></span><strong><?php echo esc_html( $order->get_payment_method_title() ? $order->get_payment_method_title() : __( 'При получении', 'velotok' ) ); ?></strong></li>
 		<li><span><?php esc_html_e( 'Почта', 'velotok' ); ?></span><strong><?php echo esc_html( $order->get_billing_email() ); ?></strong></li>
