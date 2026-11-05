@@ -13,7 +13,7 @@
  * authentication, WooCommerce customer creation and checkout routing are out
  * of scope for this iteration.
  *
- * Spec: clarify-30af92ca (requirements TESTEB-78 and TESTEB-79).
+ * Spec: clarify-30af92ca (requirements TESTEB-78, TESTEB-79 and TESTEB-80).
  * Parent spec: ecommerce-store.
  *
  * @package Velotok_Core
@@ -59,13 +59,19 @@ function velotok_core_guest_cart_registration_contract() {
 		'spec'                    => 'clarify-30af92ca',
 		'parent_spec'             => 'ecommerce-store',
 		'requirement'             => 'TESTEB-78',
-		'task'                    => 'TESTEB-79',
-		'requirement_ids'         => array( 'TESTEB-78', 'TESTEB-79' ),
-		'requirement_aliases'     => array( 'TESTEB-79' ),
+		'task'                    => 'TESTEB-80',
+		'task_ids'                => array( 'TESTEB-78', 'TESTEB-79', 'TESTEB-80' ),
+		'previous_task'           => 'TESTEB-79',
+		'current_task'            => 'TESTEB-80',
+		'requirement_id'          => 'TESTEB-80',
+		'current_requirement'     => 'TESTEB-80',
+		'transfer_requirement'    => 'TESTEB-80',
+		'requirement_ids'         => array( 'TESTEB-78', 'TESTEB-79', 'TESTEB-80' ),
+		'requirement_aliases'     => array( 'TESTEB-79', 'TESTEB-80' ),
 		'requirement_tickets'     => array(
 			'guest_cart'            => 'TESTEB-78',
 			'register_on_buy'       => 'TESTEB-79',
-			'transfer_after_signup' => 'TESTEB-78',
+			'transfer_after_signup' => 'TESTEB-80',
 			'redirect_to_checkout'  => 'TESTEB-78',
 		),
 		'cart_spec'               => 'clarify-30af92ca',
@@ -141,6 +147,7 @@ function velotok_core_guest_cart_registration_contract() {
 		),
 		'transfer'                => array(
 			'enabled'                 => true,
+			'requirement'             => 'TESTEB-80',
 			'on_registration'         => true,
 			'on_login'                => true,
 			'source'                  => 'guest_cart',
@@ -150,6 +157,8 @@ function velotok_core_guest_cart_registration_contract() {
 			'preserve_user_cart'      => true,
 			'clear_guest_after_transfer' => true,
 			'max_quantity'            => 99,
+			'attaches_to_user_account' => true,
+			'requires_registration'   => true,
 			'persistent'              => false,
 			'mocked'                  => true,
 		),
@@ -476,6 +485,48 @@ function velotok_core_guest_cart_transfer( $guest_cart, $user_cart = array(), $u
 }
 
 /**
+ * Alias for callers that reserve a dedicated transfer contract accessor.
+ *
+ * The transfer rules live in the shared guest cart registration contract, so
+ * the full contract is returned with its mocked markers intact.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_transfer_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
+ * Alias for callers that use the stub contract wording for the transfer.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_transfer_stub_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
+ * Alias for callers that use the data contract wording for the transfer.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_transfer_data_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
+ * Transfer the guest cart into the registered user's account.
+ *
+ * @param mixed $guest_cart Guest cart array.
+ * @param mixed $user_cart  Existing user cart array.
+ * @param array $user       Registered user data.
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_transfer_after_registration( $guest_cart, $user_cart = array(), $user = array() ) {
+	return velotok_core_guest_cart_transfer( $guest_cart, $user_cart, $user );
+}
+
+/**
  * Build the mocked redirect to checkout after the guest cart transfer.
  *
  * @param mixed $cart    Cart after transfer.
@@ -639,6 +690,17 @@ if ( ! function_exists( 'guestCartRegistrationContract' ) ) {
 	 */
 	function guestCartRegistrationContract() {
 		return velotok_core_guest_cart_registration_contract();
+	}
+}
+
+if ( ! function_exists( 'guestCartTransferContract' ) ) {
+	/**
+	 * Short global alias for the guest cart transfer contract.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function guestCartTransferContract() {
+		return velotok_core_guest_cart_transfer_contract();
 	}
 }
 

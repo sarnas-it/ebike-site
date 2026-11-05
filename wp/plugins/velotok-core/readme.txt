@@ -269,13 +269,13 @@ node wp/plugins/velotok-core/tests/cart-contract.test.js
 
 = Гостевая корзина и перенос при регистрации (stub) =
 
-Единая точка доступа — `velotok_core_guest_cart_registration_contract()` в `includes/guest-cart-registration.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-30af92ca`, требования `TESTEB-78`/`TESTEB-79` (`requirement_ids`, `task => TESTEB-79`), родительская спецификация — `ecommerce-store`.
+Единая точка доступа — `velotok_core_guest_cart_registration_contract()` в `includes/guest-cart-registration.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-30af92ca`, требования `TESTEB-78`/`TESTEB-79`/`TESTEB-80` (`requirement_ids`, `task => TESTEB-80`, `transfer_requirement => TESTEB-80`), родительская спецификация — `ecommerce-store`.
 
 Правила контракта:
 
 * неавторизованный пользователь собирает корзину через `velotok_core_guest_cart_create()` и `velotok_core_guest_cart_add()`; повторное добавление товара суммирует количество;
 * нажатие «Купить» запускает `velotok_core_guest_cart_buy()`: сначала регистрирует пользователя по email через `velotok_core_guest_cart_register()`, затем переносит гостевую корзину в аккаунт через `velotok_core_guest_cart_transfer()`;
-* при переносе количество одинаковых товаров суммируется (`merge_quantities`, `merge_by => product_id`), существующая корзина пользователя сохраняется, гостевая после переноса очищается;
+* при переносе после регистрации (`TESTEB-80`, `transfer.on_registration => true`, `transfer.attaches_to_user_account => true`) количество одинаковых товаров суммируется (`merge_quantities`, `merge_by => product_id`), существующая корзина пользователя сохраняется, гостевая после переноса очищается;
 * после успешного переноса `velotok_core_guest_cart_checkout_redirect()` возвращает переход `/checkout/` с целью `checkout`; пустая корзина даёт `CART_EMPTY`, а ошибка регистрации сохраняет гостевую корзину;
 * заглушка не читает env, файлы, БД и не обращается к внешним сервисам; реальная регистрация, WooCommerce-аккаунт и маршрутизация оформления не выполняются (`network => false`, `persistent => false`).
 

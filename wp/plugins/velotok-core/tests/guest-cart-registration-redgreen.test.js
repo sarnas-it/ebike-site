@@ -57,6 +57,34 @@ try {
     'Contract test must fail when «Купить» no longer registers the user'
   );
 
+  const transferMutation = source.replace(
+    /'transfers_after_registration'\s*=>\s*true/,
+    "'transfers_after_registration' => false"
+  );
+  assert.notStrictEqual(transferMutation, source, 'Mutation must change the transfer-after-registration marker');
+  fs.writeFileSync(mutationTarget, transferMutation, 'utf8');
+
+  const transferBroken = runTest(mutationTarget);
+  assert.notStrictEqual(
+    transferBroken.status,
+    0,
+    'Contract test must fail when the guest cart is not transferred after registration'
+  );
+
+  const accountMutation = source.replace(
+    /'attaches_to_user_account'\s*=>\s*true/,
+    "'attaches_to_user_account' => false"
+  );
+  assert.notStrictEqual(accountMutation, source, 'Mutation must change the account attachment marker');
+  fs.writeFileSync(mutationTarget, accountMutation, 'utf8');
+
+  const accountBroken = runTest(mutationTarget);
+  assert.notStrictEqual(
+    accountBroken.status,
+    0,
+    'Contract test must fail when the cart is not attached to the user account'
+  );
+
   const missing = runTest(path.join(tmpDir, 'missing-stub.php'));
   assert.notStrictEqual(
     missing.status,
