@@ -116,6 +116,8 @@ function velotok_core_checkout_contract() {
 		'payment_system_slug' => 'yookassa',
 		'delivery'         => array(
 			'methods'        => $delivery_methods,
+			'tariffs'        => $delivery_tariffs,
+			'tariff_grid'    => $delivery_tariffs,
 			'default'        => 'russian_post',
 			'source'         => 'stub',
 			'provider'       => 'stub',
@@ -125,20 +127,43 @@ function velotok_core_checkout_contract() {
 			'future_source'  => 'provider_api',
 			'missing_method' => 'DELIVERY_METHOD_REQUIRED',
 			'invalid_method' => 'DELIVERY_METHOD_INVALID',
+			'currency'       => 'RUB',
+			'free_shipping_threshold' => 50000.0,
 			'tariffs'        => $delivery_tariffs,
 			'tariff_grid'    => $delivery_tariffs,
 			'cost'           => array(
 				'source'     => 'stub',
+				'provider'   => 'stub',
 				'mocked'     => true,
 				'amount'     => null,
 				'currency'   => 'RUB',
 				'calculated' => true,
+				'grid'       => 'tariff_grid',
 				'tariffs'    => $delivery_tariffs,
+			),
+			'order'          => array(
+				'source'     => 'stub',
+				'mocked'     => true,
+				'persisted'  => false,
+				'fields'     => array(
+					'delivery_method'       => 'string',
+					'delivery_method_label' => 'string',
+					'delivery_cost'         => 'float',
+					'delivery_currency'     => 'string',
+				),
+				'aliases'    => array(
+					'delivery_method'       => array( 'shipping_method', 'delivery_method_id' ),
+					'delivery_method_label' => array( 'shipping_method_label' ),
+					'delivery_cost'         => array( 'shipping_cost', 'delivery_cost_amount' ),
+					'delivery_currency'     => array( 'shipping_currency' ),
+				),
 			),
 		),
 		'delivery_methods'      => $delivery_methods,
 		'delivery_method_ids'   => array_keys( $delivery_methods ),
 		'delivery_options'      => array_values( $delivery_methods ),
+		'delivery_tariffs'      => $delivery_tariffs,
+		'delivery_tariff_grid'  => $delivery_tariffs,
 		'delivery_default'      => 'russian_post',
 		'delivery_required'     => true,
 		'content_acceptance'    => array(
@@ -295,6 +320,13 @@ function velotok_core_payment_env_name( $key ) {
 
 	return $contract['env'][ $key ];
 }
+
+/*
+ * The delivery helpers live in includes/delivery-options.php. The block below is
+ * kept only as a fallback for environments that load this file without the
+ * delivery stub; it is skipped when the stub helpers are already available.
+ */
+if ( ! function_exists( 'velotok_core_delivery_methods' ) ) {
 
 /**
  * Return every delivery method declared by the contract.
@@ -490,11 +522,10 @@ function velotok_core_validate_delivery_method( $method, $required = true ) {
 }
 
 /**
- * Return a mocked delivery cost for a method.
+ * Return the mocked delivery tariff grid keyed by method identifier.
  *
- * Without order data the legacy checkout stub keeps returning a zero amount.
- * When order data is provided, the dedicated delivery-options stub applies its
- * tariff grid (spec clarify-a8fe76a0) and returns the calculated amount.
+ * The result is deterministic and explicitly marked as mocked. No provider is
+ * contacted and no order is persisted.
  *
  * @param mixed               $method Delivery method identifier.
  * @param array<string,mixed> $order  Optional order data.
@@ -503,30 +534,146 @@ function velotok_core_validate_delivery_method( $method, $required = true ) {
 function velotok_core_delivery_cost( $method, $order = array() ) {
 	$contract = velotok_core_delivery_contract();
 	$resolved = velotok_core_delivery_method( $method );
-	$has_order = is_object( $order ) || is_numeric( $order ) || ( is_array( $order ) && ! empty( $order ) );
+	$tariff   = null === $resolved ? null : velotok_core_delivery_tariff( $resolved['id'] );
+	$total    = velotok_core_payment_order_amount( $order );
+	$tier     = null === $tariff ? null : velotok_core_delivery_tariff_tier( $tariff, $total );
+	$amount   = null;
 
-	if ( null !== $resolved && $has_order && function_exists( 'velotok_core_calculate_delivery_cost' ) ) {
-		$calculated = velotok_core_calculate_delivery_cost( $method, $order );
-
-		if ( ! empty( $calculated['valid'] ) ) {
-			$calculated['source'] = 'stub';
-
-			return $calculated;
+	if ( null !== $resolved && is_array( $tariff ) ) {
+		if ( null !== $tier && isset( $tier['amount'] ) && is_numeric( $tier['amount'] ) ) {
+			$amount = round( (float) $tier['amount'], 2 );
+		} elseif ( isset( $tariff['amount'] ) && is_numeric( $tariff['amount'] ) ) {
+			$amount = round( (float) $tariff['amount'], 2 );
 		}
 	}
 
 	return array(
-		'valid'    => null !== $resolved,
-		'code'     => null === $resolved ? $contract['invalid_method'] : null,
-		'error'    => null === $resolved ? $contract['invalid_method'] : null,
-		'method'   => null === $resolved ? '' : $resolved['id'],
-		'amount'   => null === $resolved ? null : 0.0,
-		'currency' => $contract['cost']['currency'],
-		'source'   => $contract['cost']['source'],
-		'mocked'   => true,
-		'order'    => is_array( $order ) ? $order : array(),
+		'valid'      => null !== $resolved,
+		'code'       => null === $resolved ? $contract['invalid_method'] : null,
+		'error'      => null === $resolved ? $contract['invalid_method'] : null,
+		'method'     => null === $resolved ? '' : $resolved['id'],
+		'label'      => null === $resolved ? '' : $resolved['label'],
+		'amount'     => $amount,
+		'cost'       => $amount,
+		'currency'   => $contract['currency'],
+		'source'     => 'stub',
+		'provider'   => 'stub',
+		'mocked'     => true,
+		'calculated' => true,
+		'free'       => null !== $amount && 0.0 === (float) $amount,
+		'order_total' => $total,
+		'tariff'     => $tariff,
+		'tier'       => $tier,
+		'order'      => is_array( $order ) ? $order : array(),
 	);
 }
+
+/**
+ * Alias for callers that prefer an explicit calculation name.
+ *
+ * @param mixed               $method Delivery method identifier.
+ * @param array<string,mixed> $order  Optional order data.
+ * @return array<string,mixed>
+ */
+function velotok_core_calculate_delivery_cost( $method, $order = array() ) {
+	return velotok_core_delivery_cost( $method, $order );
+}
+
+/**
+ * Short alias for delivery cost calculation.
+ *
+ * @param mixed               $method Delivery method identifier.
+ * @param array<string,mixed> $order  Optional order data.
+ * @return array<string,mixed>
+ */
+function velotok_core_calculate_delivery( $method, $order = array() ) {
+	return velotok_core_delivery_cost( $method, $order );
+}
+
+/**
+ * Apply the selected delivery method and calculated cost to order data.
+ *
+ * This is a mocked persistence contract: it returns an order-shaped array with
+ * the delivery fields filled in and never writes to the database.
+ *
+ * @param mixed $order  Order data (array or object).
+ * @param mixed $method Delivery method identifier.
+ * @return array<string,mixed>
+ */
+function velotok_core_delivery_apply_to_order( $order, $method ) {
+	$contract = velotok_core_delivery_contract();
+
+	if ( is_array( $method ) && ! is_array( $order ) ) {
+		$swap   = $order;
+		$order  = $method;
+		$method = $swap;
+	}
+
+	$order = is_array( $order ) ? $order : array();
+	$cost  = velotok_core_delivery_cost( $method, $order );
+	$label    = '' !== $cost['method'] ? velotok_core_delivery_method_labels()[ $cost['method'] ] : '';
+
+	$order['delivery_method']       = $cost['method'];
+	$order['delivery_method_id']    = $cost['method'];
+	$order['delivery_method_label'] = $label;
+	$order['shipping_method']       = $cost['method'];
+	$order['shipping_method_label'] = $label;
+	$order['delivery_cost']         = $cost['amount'];
+	$order['delivery_cost_amount']  = $cost['amount'];
+	$order['shipping_cost']         = $cost['amount'];
+	$order['delivery_currency']     = $cost['currency'];
+	$order['shipping_currency']     = $cost['currency'];
+	$order['delivery']              = array(
+		'method'   => $cost['method'],
+		'label'    => $label,
+		'cost'     => $cost['amount'],
+		'currency' => $cost['currency'],
+		'mocked'   => true,
+		'source'   => 'stub',
+	);
+	$order['delivery_options_saved'] = true;
+	$order['delivery_mocked']        = true;
+
+	return $order;
+}
+
+/**
+ * Save the selected delivery method and cost in an order.
+ *
+ * The stub returns the order-shaped result and does not persist anything.
+ *
+ * @param mixed $order  Order data (array or object).
+ * @param mixed $method Delivery method identifier.
+ * @return array<string,mixed>
+ */
+function velotok_core_save_delivery_option( $order, $method ) {
+	return velotok_core_delivery_apply_to_order( $order, $method );
+}
+
+/**
+ * Alias for callers that use an explicit selection name.
+ *
+ * @param mixed $order  Order data (array or object).
+ * @param mixed $method Delivery method identifier.
+ * @return array<string,mixed>
+ */
+function velotok_core_save_delivery_selection( $order, $method ) {
+	return velotok_core_delivery_apply_to_order( $order, $method );
+}
+
+/**
+ * Alias for callers that use an order-prefixed name.
+ *
+ * @param mixed $order  Order data (array or object).
+ * @param mixed $method Delivery method identifier.
+ * @return array<string,mixed>
+ */
+function velotok_core_order_delivery( $order, $method ) {
+	return velotok_core_delivery_apply_to_order( $order, $method );
+}
+
+}
+
 
 /**
  * Read an order total from an array or an object without external calls.

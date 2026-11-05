@@ -115,7 +115,8 @@ node wp/plugins/velotok-core/tests/product-extra-attributes-contract.test.js
 * без выбранного способа доставки возвращается `DELIVERY_METHOD_REQUIRED`, для неизвестного способа — `DELIVERY_METHOD_INVALID`;
 * контент требует приёмки человеком с ролью руководитель проекта (`project_manager`); без приёмки возвращается `CONTENT_ACCEPTANCE_REQUIRED`, при чужой роли — `CONTENT_ACCEPTANCE_ROLE_FORBIDDEN`;
 * платёжная система принимается по коду `yookassa` или названию `ЮKassa`, остальные значения дают `PAYMENT_PROVIDER_UNSUPPORTED`;
-* стоимость доставки в заглушке не рассчитывается: возвращается нулевая сумма с пометкой `mocked => true`;
+* стоимость доставки рассчитывается по тарифной сетке заглушки (`tiers` по сумме заказа), результат помечен `mocked => true`, `source = stub`; от порога `free_from` действует бесплатная доставка;
+* выбранный способ и рассчитанная стоимость сохраняются в заказе через `velotok_core_save_delivery_option()` (`delivery_method`, `delivery_method_label`, `delivery_cost`, `delivery_currency`), без записи в БД;
 * имена будущих env-переменных ЮKassa (`VELOTOK_YOOKASSA_SHOP_ID`, `VELOTOK_YOOKASSA_SECRET_KEY`, `VELOTOK_YOOKASSA_MODE`) только вычисляются, env не читается.
 
 Нерешённые вопросы по test/prod режимам ЮKassa, API Почты РФ и СДЭК и расчёту стоимости доставки перечислены в `velotok_core_checkout_open_questions()`.
@@ -131,17 +132,16 @@ node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
 
 Единая точка доступа — `velotok_core_delivery_options_contract()` в `includes/delivery-options.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-a8fe76a0` и родительскую спецификацию `clarify-096bb945`.
 
-Stub-провайдер отдаёт фиксированный список способов доставки:
+Правила контракта:
 
-* `russian_post` — «Почта РФ»;
-* `cdek` — «СДЭК»;
-* `other` — «Иной логист».
+* список способов доставки поставляет stub-провайдер: `russian_post` («Почта РФ»), `cdek` («СДЭК») и `other` («Иной логист»); получить его можно через `velotok_core_delivery_options()` / `velotok_core_get_delivery_options()`;
+* тарифная сетка задана для каждого способа в `tariffs` / `tariff_grid`; уровни `tiers` выбираются по сумме заказа, у каждого тарифа есть базовая стоимость `base`, ставка `per_kg`, валюта и порог бесплатной доставки `free_from`;
+* `velotok_core_delivery_options_cost()` применяет тарифную сетку по сумме заказа; `velotok_core_calculate_delivery_cost()` рассчитывает стоимость как `base + per_kg` с округлением веса вверх; оба результата помечены `mocked => true`, `source = stub`, `calculated => true`;
+* выбранный способ и стоимость сохраняются в форме заказа через `velotok_core_delivery_options_apply_to_order()` / `velotok_core_save_delivery_option()` / `velotok_core_save_delivery_selection()`; реальная запись в БД не выполняется (`persisted => false`);
+* заглушка не читает env, файлы, БД и не обращается к внешним сервисам; реальная интеграция со службами доставки не требуется.
 
-Каждый способ содержит тариф из тарифной сетки stub-провайдера (`velotok_core_delivery_tariffs()`): базовую стоимость, ставку за килограмм, порог бесплатной доставки и валюту. Стоимость рассчитывает `velotok_core_calculate_delivery_cost()` как базовая стоимость плюс ставка за килограмм с округлением веса вверх; при достижении порога по сумме заказа доставка бесплатная. Сетевые вызовы, env, файлы, БД и внешние сервисы не используются.
+Открытые вопросы о перечне реальных служб, правилах тарификации и интеграции (создание отправления, трекинг, ошибки, формат данных) перечислены в `velotok_core_delivery_options_open_questions()`.
 
-Выбранный способ и стоимость сохраняет `velotok_core_save_delivery_selection()`: для массива заказа возвращается обновлённый массив с `delivery_method`, `delivery_method_label`, `delivery_cost`, `delivery_currency`, `shipping_method`, `shipping_cost` и meta-полями; для объекта с методами WooCommerce (`update_meta_data`, `set_shipping_total`) значения записываются в объект. Неизвестный способ не сохраняется и даёт `DELIVERY_METHOD_INVALID`, пустой — `DELIVERY_METHOD_REQUIRED`.
-
-Реальные службы доставки, правила тарификации и интеграция (создание отправления, трекинг, ошибки, формат данных) остаются в открытых вопросах `velotok_core_delivery_open_questions()`.
 
 Запуск контрактного теста способов доставки:
 
