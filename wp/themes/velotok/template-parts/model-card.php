@@ -28,6 +28,9 @@ if ( empty( $velotok_model['name'] ) ) {
 			<span><?php echo esc_html( $velotok_model['number'] ); ?></span>
 		</div>
 		<h3><a href="<?php echo esc_url( $velotok_model['url'] ); ?>"><?php echo esc_html( $velotok_model['name'] ); ?></a></h3>
+		<?php if ( ! empty( $velotok_model['description'] ) ) : ?>
+			<p class="model-description"><?php echo esc_html( $velotok_model['description'] ); ?></p>
+		<?php endif; ?>
 		<ul class="specs">
 			<?php foreach ( $velotok_model['specs'] as $velotok_spec ) : ?>
 				<li><span><?php echo esc_html( $velotok_spec[0] ); ?></span><strong><?php echo esc_html( $velotok_spec[1] ); ?></strong></li>
