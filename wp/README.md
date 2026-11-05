@@ -39,6 +39,7 @@ php wp/themes/velotok/tests/catalog-display-test.php
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
+php wp/plugins/velotok-core/tests/product-card-required-attributes-contract-test.php
 php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
 php wp/plugins/velotok-core/tests/product-price-validation-contract-test.php
 php wp/plugins/velotok-core/tests/product-extra-attributes-contract-test.php
@@ -61,6 +62,7 @@ node wp/themes/velotok/tests/theme-design-variants-rejected-redgreen.test.js
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
 node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
+node wp/plugins/velotok-core/tests/product-card-required-attributes-contract.test.js
 node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
 node wp/plugins/velotok-core/tests/product-price-validation-contract.test.js
 node wp/plugins/velotok-core/tests/product-extra-attributes-contract.test.js

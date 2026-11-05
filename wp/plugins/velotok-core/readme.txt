@@ -69,6 +69,8 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 Правило цены вынесено в отдельную заглушку `velotok_core_price_validation_contract()` с пометкой `mocked => true`; `velotok_core_validate_product_price()` читает коды ошибок из этого правила, разрешает ноль (`allow_zero => true`) и запрещает отрицательные значения (`allow_negative => false`).
 
+Серверная проверка при сохранении карточки вынесена в mocked-сервис `velotok_core_save_product_card()` (алиас `saveProductCard()`): карточка сохраняется только при наличии и валидности фото, названия, описания и цены. Результат содержит `saved`, `blocked`, `missing_attributes` и `invalid_attributes`; контракт сервиса — `velotok_core_product_card_service_contract()`.
+
 Запуск контрактных тестов валидации:
 
 ```bash
@@ -76,6 +78,8 @@ php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
 php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
 node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
+php wp/plugins/velotok-core/tests/product-card-required-attributes-contract-test.php
+node wp/plugins/velotok-core/tests/product-card-required-attributes-contract.test.js
 php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
 php wp/plugins/velotok-core/tests/product-price-validation-contract-test.php
