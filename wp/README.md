@@ -47,6 +47,7 @@ php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
 php wp/plugins/velotok-core/tests/delivery-options-contract-test.php
 php wp/plugins/velotok-core/tests/delivery-order-total-contract-test.php
 php wp/plugins/velotok-core/tests/order-delivery-contract-test.php
+php wp/plugins/velotok-core/tests/delivery-order-persistence-contract-test.php
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 php wp/plugins/velotok-core/tests/content-articles-contract-test.php
 php wp/plugins/velotok-core/tests/catalog-contract-test.php
@@ -64,6 +65,7 @@ node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
 node wp/plugins/velotok-core/tests/delivery-options-contract.test.js
 node wp/plugins/velotok-core/tests/delivery-order-total-contract.test.js
 node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
+node wp/plugins/velotok-core/tests/delivery-order-persistence-contract.test.js
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
 node wp/plugins/velotok-core/tests/content-articles-contract.test.js
 node wp/plugins/velotok-core/tests/catalog-contract.test.js
