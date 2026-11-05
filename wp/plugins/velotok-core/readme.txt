@@ -47,6 +47,29 @@ php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 ```
 
+= Валидация карточки товара (stub) =
+
+Единая точка доступа — `velotok_core_product_validation_contract()` в `includes/product-validation.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-9e1a1acd`.
+
+Обязательные атрибуты карточки: `photo`, `title`, `description`, `price`. Перечень обязательных атрибутов категории возвращает `velotok_core_get_required_attributes()` (краткий алиас — `getRequiredAttributes()`).
+
+Правила валидации:
+
+* название — `TITLE_REQUIRED` для пустой строки и строки из пробелов, `TITLE_TOO_LONG` при превышении предельной длины;
+* описание — `DESCRIPTION_REQUIRED` для пустой строки и строки из пробелов;
+* цена — `PRICE_INVALID_FORMAT` для нечислового значения, `PRICE_NEGATIVE` для отрицательного, ноль и положительные числа валидны;
+* фото — `PHOTO_REQUIRED` без идентификатора, `PHOTO_INVALID_FORMAT` для MIME-типа вне конфигурации поддерживаемых форматов;
+* публикация блокируется, если хотя бы один обязательный атрибут отсутствует; результат содержит `missing_attributes`.
+
+Валидаторы не читают базу данных, файлы, медиатеку и внешние сервисы. Реальная интеграция с хранилищем изображений и справочником категорий не требуется.
+
+Запуск контрактного теста валидации:
+
+```bash
+php wp/plugins/velotok-core/tests/product-validation-contract-test.php
+node wp/plugins/velotok-core/tests/product-validation-contract.test.js
+```
+
 == Installation ==
 
 1. Убедитесь, что установлен и активирован WooCommerce.

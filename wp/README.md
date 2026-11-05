@@ -29,6 +29,8 @@ docker compose exec wordpress wp plugin list
 docker compose exec wordpress wp theme list
 docker compose run --rm wpcli plugin list
 bash wp/tests/smoke.sh
+php wp/plugins/velotok-core/tests/spec-data-contract-test.php
+php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 ```
 
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).

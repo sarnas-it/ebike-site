@@ -77,6 +77,8 @@ services:
         wp theme activate velotok --allow-root >/dev/null 2>&1 || true
         echo "Running specification data contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/spec-data-contract-test.php --allow-root
+        echo "Running product validation contract test:"
+        wp eval-file wp-content/plugins/velotok-core/tests/product-validation-contract-test.php --allow-root
         exec tail -f /dev/null
 
 volumes:
