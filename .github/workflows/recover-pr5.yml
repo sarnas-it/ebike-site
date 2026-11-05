@@ -1,0 +1,65 @@
+name: Recover PR #5 checks
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  checks: write
+  statuses: write
+  pull-requests: write
+
+concurrency:
+  group: recover-pr-5
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Recover PR #5 checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      REPO: ${{ github.repository }}
+      TARGET_PR: "5"
+      TARGET_SHA: a6f85f6d4f8bb7b71a49d5a72316bc208d188fdf
+
+    steps:
+      - name: Check out stale commit
+        uses: actions/checkout@v4
+        with:
+          ref: a6f85f6d4f8bb7b71a49d5a72316bc208d188fdf
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out CI tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          coverage: none
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run repository checks against stale commit
+        run: |
+          set -euo pipefail
+          mkdir -p target/scripts
+          cp tooling/scripts/ci-check.sh target/scripts/ci-check.sh
+          cd target
+          bash scripts/ci-check.sh
+
+      - name: Publish check results and complete deferred merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tooling/scripts/recover-pr5.sh
