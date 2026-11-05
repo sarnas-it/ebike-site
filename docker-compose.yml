@@ -17,7 +17,8 @@ services:
       retries: 30
 
   wordpress:
-    image: wordpress:php8.2-apache
+    build:
+      context: ./wp/docker/wordpress
     depends_on:
       db:
         condition: service_healthy
@@ -75,6 +76,8 @@ services:
         wp plugin install woocommerce --activate --allow-root >/dev/null 2>&1 || true
         wp plugin activate velotok-core --allow-root >/dev/null 2>&1 || true
         wp theme activate velotok --allow-root >/dev/null 2>&1 || true
+        echo "Running storefront theme contract test:"
+        wp eval-file wp-content/themes/velotok/tests/theme-contract-test.php --allow-root
         echo "Running specification data contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/spec-data-contract-test.php --allow-root
         echo "Running product validation contract test:"
