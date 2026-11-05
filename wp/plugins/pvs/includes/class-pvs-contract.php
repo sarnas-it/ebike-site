@@ -9,10 +9,10 @@ if ( ! function_exists( 'pvs_contract' ) ) {
 		}
 
 		$severity_levels = array(
-			'critical' => array( 'score' => 9.0, 'label' => 'Критическая', 'mocked' => true ),
-			'high'     => array( 'score' => 7.0, 'label' => 'Высокая', 'mocked' => true ),
-			'medium'   => array( 'score' => 4.0, 'label' => 'Средняя', 'mocked' => true ),
-			'low'      => array( 'score' => 1.0, 'label' => 'Низкая', 'mocked' => true ),
+			'critical' => array( 'score' => 9.0, 'label' => 'Критическая', 'color' => '#7f1d1d', 'background' => '#fee2e2', 'border' => '#dc2626', 'mocked' => true ),
+			'high'     => array( 'score' => 7.0, 'label' => 'Высокая', 'color' => '#9a3412', 'background' => '#ffedd5', 'border' => '#f97316', 'mocked' => true ),
+			'medium'   => array( 'score' => 4.0, 'label' => 'Средняя', 'color' => '#854d0e', 'background' => '#fef9c3', 'border' => '#eab308', 'mocked' => true ),
+			'low'      => array( 'score' => 1.0, 'label' => 'Низкая', 'color' => '#1e3a8a', 'background' => '#dbeafe', 'border' => '#3b82f6', 'mocked' => true ),
 		);
 
 		$coverage = array(
@@ -47,7 +47,15 @@ if ( ! function_exists( 'pvs_contract' ) ) {
 			'highlights_risks'      => true,
 			'highlight_risks'       => true,
 			'risk_levels'           => array_keys( $severity_levels ),
-			'risk_highlight_fields' => array( 'severity', 'severity_label', 'severity_class', 'risk', 'risk_level', 'highlight' ),
+			'risk_highlight_fields' => array( 'severity', 'severity_label', 'severity_class', 'risk', 'risk_level', 'highlight', 'highlight_color', 'highlight_background' ),
+			'risk_styles'           => array(
+				'critical' => array( 'class' => 'pvs-risk-critical', 'color' => $severity_levels['critical']['color'], 'background' => $severity_levels['critical']['background'], 'mocked' => true ),
+				'high'     => array( 'class' => 'pvs-risk-high', 'color' => $severity_levels['high']['color'], 'background' => $severity_levels['high']['background'], 'mocked' => true ),
+				'medium'   => array( 'class' => 'pvs-risk-medium', 'color' => $severity_levels['medium']['color'], 'background' => $severity_levels['medium']['background'], 'mocked' => true ),
+				'low'      => array( 'class' => 'pvs-risk-low', 'color' => $severity_levels['low']['color'], 'background' => $severity_levels['low']['background'], 'mocked' => true ),
+			),
+			'highest_risk_field'    => 'highest_risk',
+			'risk_summary_field'    => 'risk_summary',
 			'scan'                  => $coverage,
 			'coverage'              => $coverage,
 			'real_integration'      => array(
@@ -131,6 +139,8 @@ if ( ! function_exists( 'pvs_contract' ) ) {
 				'vulnerable_plugins',
 				'vulnerability_count',
 				'severity_counts',
+				'highest_risk',
+				'risk_summary',
 				'risk_highlighting',
 				'plugins',
 				'vulnerabilities',
@@ -245,6 +255,49 @@ if ( ! function_exists( 'pvs_severity_label' ) ) {
 	}
 }
 
+if ( ! function_exists( 'pvs_risk_highlight' ) ) {
+	function pvs_risk_highlight( $severity ) {
+		$severity = is_scalar( $severity ) ? strtolower( trim( (string) $severity ) ) : '';
+		$levels   = pvs_severity_levels();
+
+		if ( ! isset( $levels[ $severity ] ) ) {
+			return array(
+				'severity'            => 'none',
+				'label'               => '',
+				'score'               => 0,
+				'severity_class'      => '',
+				'risk_class'          => '',
+				'highlight'           => '',
+				'highlight_color'     => '',
+				'highlight_background'=> '',
+				'highlight_border'    => '',
+				'highlighted'         => false,
+				'mocked'              => true,
+				'network'             => false,
+				'source'              => 'stub',
+			);
+		}
+
+		$level = $levels[ $severity ];
+
+		return array(
+			'severity'             => $severity,
+			'label'                => $level['label'],
+			'score'                => isset( $level['score'] ) ? $level['score'] : 0,
+			'severity_class'       => 'pvs-severity-' . $severity,
+			'risk_class'           => 'pvs-risk-' . $severity,
+			'highlight'            => 'pvs-risk-' . $severity,
+			'highlight_color'      => isset( $level['color'] ) ? $level['color'] : '',
+			'highlight_background' => isset( $level['background'] ) ? $level['background'] : '',
+			'highlight_border'     => isset( $level['border'] ) ? $level['border'] : '',
+			'highlighted'          => true,
+			'mocked'               => true,
+			'network'              => false,
+			'source'               => 'stub',
+		);
+	}
+}
+
 if ( ! class_exists( 'PVS_Contract', false ) ) {
 	class PVS_Contract {
 		public static function get_contract() {
@@ -295,6 +348,10 @@ if ( ! class_exists( 'PVS_Contract', false ) ) {
 
 		public static function severity_label( $severity ) {
 			return pvs_severity_label( $severity );
+		}
+
+		public static function risk_highlight( $severity ) {
+			return pvs_risk_highlight( $severity );
 		}
 
 		public static function env_name( $key ) {

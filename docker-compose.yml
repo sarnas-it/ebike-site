@@ -131,6 +131,8 @@ services:
         wp eval-file wp-content/plugins/pvs/tests/pvs-contract-test.php --allow-root
         echo "Running all plugins vulnerability scan contract test:"
         wp eval-file wp-content/plugins/pvs/tests/pvs-all-plugins-contract-test.php --allow-root
+        echo "Running all plugins risk highlighting contract test:"
+        wp eval-file wp-content/plugins/pvs/tests/pvs-risk-highlighting-contract-test.php --allow-root
         exec tail -f /dev/null
 
 volumes:

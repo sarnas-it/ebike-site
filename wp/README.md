@@ -63,6 +63,7 @@ php wp/plugins/velotok-core/tests/guest-cart-checkout-redirect-contract-test.php
 php wp/plugins/velotok-core/tests/provisioning-contract-test.php
 php wp/plugins/pvs/tests/pvs-contract-test.php
 php wp/plugins/pvs/tests/pvs-all-plugins-contract-test.php
+php wp/plugins/pvs/tests/pvs-risk-highlighting-contract-test.php
 node wp/themes/velotok/tests/theme-design-variants-contract.test.js
 node wp/themes/velotok/tests/theme-design-variants-rejected-redgreen.test.js
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
@@ -88,6 +89,7 @@ node wp/plugins/velotok-core/tests/guest-cart-registration-redgreen.test.js
 node wp/plugins/velotok-core/tests/guest-cart-checkout-redirect-redgreen.test.js
 node wp/plugins/velotok-core/tests/provisioning-contract.test.js
 node wp/plugins/pvs/tests/pvs-contract.test.js
+node wp/plugins/pvs/tests/pvs-risk-highlighting-redgreen.test.js
 ```
 
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
@@ -111,7 +113,9 @@ docker compose down -v    # остановить и удалить базу, ф�
 `pvs_scan_all_plugins()` / `PVS_Scanner::scan()`. Контракт и отчёт помечены
 `mocked => true`, `source => stub`, `network => false`, `all_plugins => true`.
 Страница «Инструменты → Проверка плагинов» защищена nonce и правом
-`manage_options`. Реальная сеть, env, файлы и БД не читаются.
+`manage_options`. Риски подсвечиваются по важности (`critical`, `high`,
+`medium`, `low`) в отчёте и таблице плагинов; CSS подключается в админке.
+Реальная сеть, env, файлы и БД не читаются.
 
 ## Структура
 

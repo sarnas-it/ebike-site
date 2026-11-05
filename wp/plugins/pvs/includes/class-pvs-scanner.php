@@ -265,23 +265,28 @@ if ( ! function_exists( 'pvs_plugin_vulnerabilities' ) ) {
 				$severity = 'low';
 			}
 
-			$label = pvs_severity_label( $severity );
+			$label     = pvs_severity_label( $severity );
+			$highlight = pvs_risk_highlight( $severity );
 
-			$entry['mocked']          = true;
-			$entry['network']         = false;
-			$entry['source']          = 'stub';
-			$entry['plugin']          = $slug;
-			$entry['version']         = pvs_normalize_version( $version );
-			$entry['severity']        = $severity;
-			$entry['severity_id']     = $severity;
-			$entry['severity_label']  = $label;
-			$entry['severity_score']  = isset( $levels[ $severity ]['score'] ) ? $levels[ $severity ]['score'] : 0;
-			$entry['severity_class']  = 'pvs-severity-' . $severity;
-			$entry['risk']            = $severity;
-			$entry['risk_level']      = $severity;
-			$entry['risk_label']      = $label;
-			$entry['highlight']       = 'pvs-risk-' . $severity;
-			$entry['highlighted']     = true;
+			$entry['mocked']               = true;
+			$entry['network']              = false;
+			$entry['source']               = 'stub';
+			$entry['plugin']               = $slug;
+			$entry['version']              = pvs_normalize_version( $version );
+			$entry['severity']             = $severity;
+			$entry['severity_id']          = $severity;
+			$entry['severity_label']       = $label;
+			$entry['severity_score']       = isset( $levels[ $severity ]['score'] ) ? $levels[ $severity ]['score'] : 0;
+			$entry['severity_class']       = $highlight['severity_class'];
+			$entry['risk']                 = $severity;
+			$entry['risk_level']           = $severity;
+			$entry['risk_label']           = $label;
+			$entry['risk_class']           = $highlight['risk_class'];
+			$entry['highlight']            = $highlight['highlight'];
+			$entry['highlight_color']      = $highlight['highlight_color'];
+			$entry['highlight_background'] = $highlight['highlight_background'];
+			$entry['highlight_border']     = $highlight['highlight_border'];
+			$entry['highlighted']          = true;
 
 			if ( ! isset( $entry['cvss'] ) ) {
 				$entry['cvss'] = $entry['severity_score'];
@@ -671,29 +676,37 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 				}
 			}
 
+			$plugin_highlight = pvs_risk_highlight( $plugin_severity );
+			$is_vulnerable    = ! empty( $vulnerabilities );
+
 			$scanned[] = array(
-				'slug'                => $plugin['slug'],
-				'name'                => $plugin['name'],
-				'version'             => $plugin['version'],
-				'plugin_file'         => $plugin['plugin_file'],
-				'plugin'              => $plugin['plugin_file'],
-				'active'              => $plugin['active'],
-				'type'                => $plugin['type'],
-				'mocked'              => true,
-				'source'              => 'stub',
-				'network'             => false,
-				'scanned'             => true,
-				'vulnerable'          => ! empty( $vulnerabilities ),
-				'risk'                => ! empty( $vulnerabilities ),
-				'risk_highlighted'    => ! empty( $vulnerabilities ),
-				'risk_level'          => $plugin_severity,
-				'risk_score'          => $plugin_score,
-				'severity'            => $plugin_severity,
-				'severity_label'      => 'none' === $plugin_severity ? '' : pvs_severity_label( $plugin_severity ),
-				'severity_class'      => 'none' === $plugin_severity ? '' : 'pvs-severity-' . $plugin_severity,
-				'vulnerability_count' => count( $vulnerabilities ),
-				'vulnerabilities'     => $vulnerabilities,
-				'issues'              => $vulnerabilities,
+				'slug'                 => $plugin['slug'],
+				'name'                 => $plugin['name'],
+				'version'              => $plugin['version'],
+				'plugin_file'          => $plugin['plugin_file'],
+				'plugin'               => $plugin['plugin_file'],
+				'active'               => $plugin['active'],
+				'type'                 => $plugin['type'],
+				'mocked'               => true,
+				'source'               => 'stub',
+				'network'              => false,
+				'scanned'              => true,
+				'vulnerable'           => $is_vulnerable,
+				'risk'                 => $is_vulnerable,
+				'risk_highlighted'     => $is_vulnerable,
+				'risk_level'           => $plugin_severity,
+				'risk_score'           => $plugin_score,
+				'risk_label'           => $is_vulnerable ? $plugin_highlight['label'] : '',
+				'risk_class'           => $is_vulnerable ? $plugin_highlight['risk_class'] : '',
+				'highlight'            => $is_vulnerable ? $plugin_highlight['highlight'] : '',
+				'highlight_color'      => $is_vulnerable ? $plugin_highlight['highlight_color'] : '',
+				'highlight_background' => $is_vulnerable ? $plugin_highlight['highlight_background'] : '',
+				'severity'             => $plugin_severity,
+				'severity_label'       => 'none' === $plugin_severity ? '' : $plugin_highlight['label'],
+				'severity_class'       => 'none' === $plugin_severity ? '' : $plugin_highlight['severity_class'],
+				'vulnerability_count'  => count( $vulnerabilities ),
+				'vulnerabilities'      => $vulnerabilities,
+				'issues'               => $vulnerabilities,
 			);
 		}
 
@@ -703,6 +716,9 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 
 		$vulnerable_plugins = 0;
 		$severity_counts    = array();
+		$highest_risk       = 'none';
+		$highest_score      = 0;
+		$levels             = pvs_severity_levels();
 
 		foreach ( $scanned as $plugin ) {
 			if ( $plugin['vulnerable'] ) {
@@ -718,7 +734,29 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 			}
 
 			$severity_counts[ $severity ]++;
+
+			$score = isset( $levels[ $severity ]['score'] ) ? (float) $levels[ $severity ]['score'] : 0;
+
+			if ( $score > $highest_score ) {
+				$highest_score = $score;
+				$highest_risk  = $severity;
+			}
 		}
+
+		$highest_highlight = pvs_risk_highlight( $highest_risk );
+		$risk_summary      = array(
+			'highest_risk'        => $highest_risk,
+			'highest_risk_label'  => $highest_highlight['label'],
+			'highest_risk_score'  => $highest_score,
+			'highest_highlight'   => $highest_highlight['highlight'],
+			'vulnerable_plugins'  => $vulnerable_plugins,
+			'vulnerability_count' => count( $found ),
+			'severity_counts'     => $severity_counts,
+			'risk_highlighting'   => true,
+			'mocked'              => true,
+			'network'             => false,
+			'source'              => 'stub',
+		);
 
 		$all_plugins = $include_inactive && $include_mu && $include_dropins;
 		$coverage    = isset( $contract['coverage'] ) && is_array( $contract['coverage'] ) ? $contract['coverage'] : array();
@@ -760,6 +798,9 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 			'vulnerability_count'   => count( $found ),
 			'vulnerabilities_found' => count( $found ),
 			'severity_counts'       => $severity_counts,
+			'highest_risk'          => $highest_risk,
+			'highest_risk_label'    => $highest_highlight['label'],
+			'risk_summary'          => $risk_summary,
 			'risk_highlighting'     => true,
 			'plugins'               => $scanned,
 			'vulnerabilities'       => $found,
@@ -774,6 +815,9 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 				'total_plugins'      => $total_plugins,
 				'vulnerable_plugins' => $vulnerable_plugins,
 				'severity_counts'    => $severity_counts,
+				'highest_risk'       => $highest_risk,
+				'risk_summary'       => $risk_summary,
+				'risk_highlighting'  => true,
 				'vulnerabilities'    => $found,
 			),
 			'errors'                => array(),
@@ -862,6 +906,10 @@ if ( ! class_exists( 'PVS_Scanner', false ) ) {
 
 		public static function vulnerabilities( $slug, $version, $database = null ) {
 			return pvs_plugin_vulnerabilities( $slug, $version, $database );
+		}
+
+		public static function risk_highlight( $severity ) {
+			return pvs_risk_highlight( $severity );
 		}
 
 		public static function stub_plugins() {
