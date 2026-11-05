@@ -29,8 +29,10 @@ docker compose exec wordpress wp plugin list
 docker compose exec wordpress wp theme list
 docker compose run --rm --entrypoint wp wpcli --allow-root plugin list
 docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-contract-test.php
+docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-design-variants-contract-test.php
 bash wp/tests/smoke.sh
 php wp/themes/velotok/tests/theme-contract-test.php
+php wp/themes/velotok/tests/theme-design-variants-contract-test.php
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
@@ -43,6 +45,7 @@ php wp/plugins/velotok-core/tests/delivery-options-contract-test.php
 php wp/plugins/velotok-core/tests/order-delivery-contract-test.php
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 php wp/plugins/velotok-core/tests/provisioning-contract-test.php
+node wp/themes/velotok/tests/theme-design-variants-contract.test.js
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
 node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
@@ -72,6 +75,7 @@ docker compose down -v    # остановить и удалить базу, ф�
 ## Структура
 
 * `wp/themes/velotok/` — тема витрины и шаблоны WooCommerce;
+* `wp/themes/velotok/inc/theme-design-variants.php` — mocked-контракт выбора варианта дизайна темы;
 * `wp/plugins/velotok-core/` — поля характеристик электровелосипедов;
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
