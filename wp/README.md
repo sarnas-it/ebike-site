@@ -32,10 +32,13 @@ bash wp/tests/smoke.sh
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
+php wp/plugins/velotok-core/tests/product-extra-attributes-contract-test.php
+php wp/themes/velotok/tests/extra-attributes-card-test.php
 php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
+node wp/plugins/velotok-core/tests/product-extra-attributes-contract.test.js
 node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
 ```
