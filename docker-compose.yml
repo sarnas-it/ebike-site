@@ -33,6 +33,7 @@ services:
     volumes:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
+      - ./wp/plugins/pvs:/var/www/html/wp-content/plugins/pvs:ro
       - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
       - ./scripts:/var/www/html/scripts:ro
       - ./content:/var/www/html/content:ro
@@ -56,6 +57,7 @@ services:
     volumes:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
+      - ./wp/plugins/pvs:/var/www/html/wp-content/plugins/pvs:ro
       - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
       - ./scripts:/var/www/html/scripts:ro
       - ./content:/var/www/html/content:ro
@@ -75,6 +77,7 @@ services:
         done
         wp plugin install woocommerce --activate --allow-root >/dev/null 2>&1 || true
         wp plugin activate velotok-core --allow-root >/dev/null 2>&1 || true
+        wp plugin activate pvs --allow-root >/dev/null 2>&1 || true
         wp theme activate velotok --allow-root >/dev/null 2>&1 || true
         echo "Running storefront theme contract test:"
         wp eval-file wp-content/themes/velotok/tests/theme-contract-test.php --allow-root
@@ -112,6 +115,10 @@ services:
         wp eval-file wp-content/plugins/velotok-core/tests/cart-contract-test.php --allow-root
         echo "Running provisioning stub contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/provisioning-contract-test.php --allow-root
+        echo "Running plugin vulnerability scanner contract test:"
+        wp eval-file wp-content/plugins/pvs/tests/pvs-contract-test.php --allow-root
+        echo "Running all plugins vulnerability scan contract test:"
+        wp eval-file wp-content/plugins/pvs/tests/pvs-all-plugins-contract-test.php --allow-root
         exec tail -f /dev/null
 
 volumes:
