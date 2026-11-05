@@ -11,7 +11,7 @@
  * handling and the external category directory are out of scope for this
  * contract.
  *
- * Spec: clarify-9e1a1acd.
+ * Spec: clarify-41b1da6d.
  *
  * @package Velotok_Core
  */
@@ -97,7 +97,7 @@ function velotok_core_product_validation_contract() {
 	);
 
 	$contract = array(
-		'spec'                         => 'clarify-9e1a1acd',
+		'spec'                         => 'clarify-41b1da6d',
 		'source'                       => 'stub',
 		'mocked'                       => true,
 		'required_attributes'          => $required,
@@ -649,7 +649,7 @@ function velotok_core_validate_product( $product, $category = '' ) {
 
 	return array(
 		'valid'              => array() === $errors,
-		'spec'               => 'clarify-9e1a1acd',
+		'spec'               => 'clarify-41b1da6d',
 		'mocked'             => true,
 		'category'           => $category,
 		'required_attributes' => $required,
