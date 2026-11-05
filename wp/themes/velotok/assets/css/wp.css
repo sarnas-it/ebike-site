@@ -823,6 +823,35 @@ form.checkout .button:hover {
 	text-align: right;
 }
 
+.product-extra {
+	margin-top: 12px;
+}
+
+.product-extra-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 16px;
+	padding-bottom: 8px;
+	border-bottom: 1px dashed var(--line);
+	font-size: 13px;
+}
+
+.product-extra-row:last-child {
+	padding-bottom: 0;
+	border-bottom: 0;
+}
+
+.product-extra dt {
+	color: var(--muted);
+}
+
+.product-extra dd {
+	margin: 0;
+	font-weight: 650;
+	text-align: right;
+}
+
 .product-buy {
 	margin-top: 24px;
 }

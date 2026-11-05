@@ -42,6 +42,8 @@ function velotok_core_product_validation_contract() {
 		'photo'       => array(
 			'required'    => true,
 			'type'        => 'attachment_id',
+			'mocked'      => true,
+			'spec'        => 'clarify-9e1a1acd',
 			'error_codes' => array(
 				'required' => 'PHOTO_REQUIRED',
 				'format'   => 'PHOTO_INVALID_FORMAT',
@@ -50,22 +52,35 @@ function velotok_core_product_validation_contract() {
 		'title'       => array(
 			'required'    => true,
 			'type'        => 'string',
+			'mocked'      => true,
+			'spec'        => 'clarify-9e1a1acd',
+			'trim'        => true,
 			'error_codes' => array(
 				'required' => 'TITLE_REQUIRED',
 				'too_long' => 'TITLE_TOO_LONG',
 			),
 		),
 		'description' => array(
-			'required'    => true,
-			'type'        => 'string',
-			'error_codes' => array(
+			'required'         => true,
+			'type'             => 'string',
+			'mocked'           => true,
+			'spec'             => 'clarify-9e1a1acd',
+			'trim'             => true,
+			'blank_is_missing' => true,
+			'error_codes'      => array(
 				'required' => 'DESCRIPTION_REQUIRED',
 			),
 		),
 		'price'       => array(
-			'required'    => true,
-			'type'        => 'number',
-			'error_codes' => array(
+			'required'         => true,
+			'type'             => 'number',
+			'mocked'           => true,
+			'spec'             => 'clarify-9e1a1acd',
+			'trim'             => true,
+			'blank_is_missing' => true,
+			'allow_zero'       => true,
+			'allow_negative'   => false,
+			'error_codes'      => array(
 				'required' => 'PRICE_REQUIRED',
 				'format'   => 'PRICE_INVALID_FORMAT',
 				'negative' => 'PRICE_NEGATIVE',
@@ -103,9 +118,28 @@ function velotok_core_product_validation_contract() {
 		'unknown_category'             => 'default_attributes',
 		'future_source'                => 'woocommerce',
 		'missing_attribute'            => 'error_code',
+		'open_questions'               => array(
+			'Какие именно форматы изображений считаются поддерживаемыми и есть ли ограничения по размеру файла и разрешению?',
+			'Требуется ли минимальное количество фото и отдельное обязательное главное фото?',
+			'Допускается ли нулевая цена как валидное значение во всех категориях или только в отдельных (например, бесплатные позиции)?',
+			'Каковы предельные длины названия и описания, и различаются ли они по категориям?',
+			'Источник справочника категорий и их обязательных атрибутов: локальная конфигурация, внешняя система или комбинация с приоритетами?',
+			'Как должны формулироваться сообщения об ошибках валидации и требуется ли их локализация?',
+		),
 	);
 
 	return $contract;
+}
+
+/**
+ * Return the open questions recorded by the product validation contract.
+ *
+ * @return string[]
+ */
+function velotok_core_product_validation_open_questions() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['open_questions'];
 }
 
 /**
@@ -115,6 +149,48 @@ function velotok_core_product_validation_contract() {
  */
 function velotok_core_validation_contract() {
 	return velotok_core_product_validation_contract();
+}
+
+/**
+ * Return the mocked rule for a single required product attribute.
+ *
+ * Every rule is an in-memory stub: it is explicitly marked `mocked => true`
+ * and references the spec, so removing the contract makes its callers fail.
+ *
+ * @param string $attribute Attribute key.
+ * @return array<string,mixed>|null
+ */
+function velotok_core_product_attribute_rule( $attribute ) {
+	$contract = velotok_core_product_validation_contract();
+
+	if ( ! is_string( $attribute ) || ! isset( $contract['attributes'][ $attribute ] ) ) {
+		return null;
+	}
+
+	return $contract['attributes'][ $attribute ];
+}
+
+/**
+ * Return the mocked category attribute contract.
+ *
+ * The directory is a fixed local stub. It does not synchronize with an
+ * external category system and returns the same required list for every
+ * known and unknown category.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_required_attributes_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return array(
+		'spec'                  => $contract['spec'],
+		'source'                => 'stub',
+		'mocked'                => true,
+		'required_attributes'   => $contract['required_attributes'],
+		'categories'            => $contract['category_required_attributes'],
+		'category_source'       => $contract['category_source'],
+		'unknown_category'      => $contract['unknown_category'],
+	);
 }
 
 /**
@@ -173,14 +249,14 @@ function velotok_core_is_supported_image_mime( $mime ) {
  * @return string[]
  */
 function velotok_core_get_required_attributes( $category = '' ) {
-	$contract = velotok_core_product_validation_contract();
+	$contract = velotok_core_required_attributes_contract();
 	$key      = is_string( $category ) ? strtolower( trim( $category ) ) : '';
 
-	if ( '' !== $key && isset( $contract['category_required_attributes'][ $key ] ) ) {
-		return $contract['category_required_attributes'][ $key ];
+	if ( '' !== $key && isset( $contract['categories'][ $key ] ) ) {
+		return $contract['categories'][ $key ];
 	}
 
-	return $contract['category_required_attributes']['default'];
+	return $contract['categories']['default'];
 }
 
 /**
@@ -204,11 +280,13 @@ function velotok_core_validation_strlen( $value ) {
 		return (int) mb_strlen( $value, 'UTF-8' );
 	}
 
-	if ( preg_match_all( '/./us', $value, $matches ) ) {
-		return (int) count( $matches[0] );
+	$matched = preg_match_all( '/./us', (string) $value, $characters );
+
+	if ( false !== $matched ) {
+		return (int) $matched;
 	}
 
-	return (int) strlen( $value );
+	return (int) strlen( (string) $value );
 }
 
 /**
@@ -245,15 +323,20 @@ function velotok_core_validation_result( $valid, $code, $value, $errors = array(
  */
 function velotok_core_validate_product_title( $title ) {
 	$contract = velotok_core_product_validation_contract();
+	$rule     = velotok_core_product_attribute_rule( 'title' );
 	$max      = (int) $contract['limits']['title_max_length'];
-	$value    = is_scalar( $title ) ? trim( (string) $title ) : '';
+	$value    = is_scalar( $title ) ? (string) $title : '';
+
+	if ( ! empty( $rule['trim'] ) ) {
+		$value = trim( $value );
+	}
 
 	if ( '' === $value ) {
-		return velotok_core_validation_result( false, 'TITLE_REQUIRED', $title );
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $title );
 	}
 
 	if ( velotok_core_validation_strlen( $value ) > $max ) {
-		return velotok_core_validation_result( false, 'TITLE_TOO_LONG', $title );
+		return velotok_core_validation_result( false, $rule['error_codes']['too_long'], $title );
 	}
 
 	return velotok_core_validation_result( true, null, $title );
@@ -270,19 +353,40 @@ function velotok_core_validate_title( $title ) {
 }
 
 /**
+ * Return the mocked description validation rule.
+ *
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
+ * single source for description validation. It never reads the database,
+ * files, media library or remote services.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_description_validation_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['attributes']['description'];
+}
+
+/**
  * Validate a product description.
  *
  * Empty strings, whitespace-only strings and non-scalar values produce
- * DESCRIPTION_REQUIRED.
+ * DESCRIPTION_REQUIRED. The rule is taken from the mocked description
+ * validation contract.
  *
  * @param mixed $description Product description.
  * @return array<string,mixed>
  */
 function velotok_core_validate_product_description( $description ) {
-	$value = is_scalar( $description ) ? trim( (string) $description ) : '';
+	$rule  = velotok_core_description_validation_contract();
+	$value = is_scalar( $description ) ? (string) $description : '';
+
+	if ( ! empty( $rule['trim'] ) ) {
+		$value = trim( $value );
+	}
 
 	if ( '' === $value ) {
-		return velotok_core_validation_result( false, 'DESCRIPTION_REQUIRED', $description );
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $description );
 	}
 
 	return velotok_core_validation_result( true, null, $description );
@@ -299,36 +403,54 @@ function velotok_core_validate_description( $description ) {
 }
 
 /**
+ * Return the mocked price validation rule.
+ *
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
+ * single source for price validation. It never reads the database, files,
+ * currency services or remote price feeds.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_price_validation_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['attributes']['price'];
+}
+
+/**
  * Validate a product price.
  *
  * Numeric values are accepted, including zero. A non-numeric value produces
  * PRICE_INVALID_FORMAT, a negative value produces PRICE_NEGATIVE and a missing
- * value produces PRICE_REQUIRED.
+ * value produces PRICE_REQUIRED. The rule is taken from the mocked price
+ * validation contract.
  *
  * @param mixed $price Product price.
  * @return array<string,mixed>
  */
 function velotok_core_validate_product_price( $price ) {
+	$rule = velotok_core_price_validation_contract();
+
 	if ( null === $price || ( is_string( $price ) && '' === trim( $price ) ) ) {
-		return velotok_core_validation_result( false, 'PRICE_REQUIRED', $price );
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $price );
 	}
 
 	if ( is_string( $price ) ) {
 		$normalized = trim( $price );
 
 		if ( ! preg_match( '/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/', $normalized ) ) {
-			return velotok_core_validation_result( false, 'PRICE_INVALID_FORMAT', $price );
+			return velotok_core_validation_result( false, $rule['error_codes']['format'], $price );
 		}
 
 		$number = (float) str_replace( ',', '.', $normalized );
 	} elseif ( is_int( $price ) || ( is_float( $price ) && is_finite( $price ) ) ) {
 		$number = (float) $price;
 	} else {
-		return velotok_core_validation_result( false, 'PRICE_INVALID_FORMAT', $price );
+		return velotok_core_validation_result( false, $rule['error_codes']['format'], $price );
 	}
 
 	if ( $number < 0 ) {
-		return velotok_core_validation_result( false, 'PRICE_NEGATIVE', $price );
+		return velotok_core_validation_result( false, $rule['error_codes']['negative'], $price );
 	}
 
 	return velotok_core_validation_result( true, null, $price );
@@ -383,6 +505,21 @@ function velotok_core_photo_parts( $photo ) {
 }
 
 /**
+ * Return the mocked photo validation rule.
+ *
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
+ * single source for photo validation. It never reads the database, files,
+ * media library or remote image storage.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_photo_validation_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['attributes']['photo'];
+}
+
+/**
  * Check whether a photo id is present.
  *
  * @param mixed $id Attachment id.
@@ -415,6 +552,7 @@ function velotok_core_photo_id_is_present( $id ) {
  * @return array<string,mixed>
  */
 function velotok_core_validate_product_photo( $photo, $mime = null ) {
+	$rule  = velotok_core_photo_validation_contract();
 	$parts = velotok_core_photo_parts( $photo );
 
 	if ( null === $mime && null !== $parts['mime'] ) {
@@ -422,11 +560,11 @@ function velotok_core_validate_product_photo( $photo, $mime = null ) {
 	}
 
 	if ( ! velotok_core_photo_id_is_present( $parts['id'] ) ) {
-		return velotok_core_validation_result( false, 'PHOTO_REQUIRED', $photo );
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $photo );
 	}
 
 	if ( null !== $mime && '' !== $mime && ! velotok_core_is_supported_image_mime( $mime ) ) {
-		return velotok_core_validation_result( false, 'PHOTO_INVALID_FORMAT', $photo );
+		return velotok_core_validation_result( false, $rule['error_codes']['format'], $photo );
 	}
 
 	return velotok_core_validation_result( true, null, $photo );

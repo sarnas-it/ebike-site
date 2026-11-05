@@ -27,11 +27,41 @@ WooCommerce установить не удалось, сайт всё равно
 ```bash
 docker compose exec wordpress wp plugin list
 docker compose exec wordpress wp theme list
-docker compose run --rm wpcli plugin list
+docker compose run --rm --entrypoint wp wpcli --allow-root plugin list
+docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-contract-test.php
+docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-design-variants-contract-test.php
 bash wp/tests/smoke.sh
+php wp/themes/velotok/tests/theme-contract-test.php
+php wp/themes/velotok/tests/theme-design-variants-contract-test.php
+php wp/themes/velotok/tests/catalog-display-test.php
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
+php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
+php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
+php wp/plugins/velotok-core/tests/product-price-validation-contract-test.php
+php wp/plugins/velotok-core/tests/product-extra-attributes-contract-test.php
+php wp/themes/velotok/tests/extra-attributes-card-test.php
 php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
+php wp/plugins/velotok-core/tests/delivery-options-contract-test.php
+php wp/plugins/velotok-core/tests/delivery-order-total-contract-test.php
+php wp/plugins/velotok-core/tests/order-delivery-contract-test.php
+php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
+php wp/plugins/velotok-core/tests/content-articles-contract-test.php
+php wp/plugins/velotok-core/tests/provisioning-contract-test.php
+node wp/themes/velotok/tests/theme-design-variants-contract.test.js
+node wp/plugins/velotok-core/tests/spec-data-contract.test.js
+node wp/plugins/velotok-core/tests/product-validation-contract.test.js
+node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
+node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
+node wp/plugins/velotok-core/tests/product-price-validation-contract.test.js
+node wp/plugins/velotok-core/tests/product-extra-attributes-contract.test.js
+node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
+node wp/plugins/velotok-core/tests/delivery-options-contract.test.js
+node wp/plugins/velotok-core/tests/delivery-order-total-contract.test.js
+node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
+node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
+node wp/plugins/velotok-core/tests/content-articles-contract.test.js
+node wp/plugins/velotok-core/tests/provisioning-contract.test.js
 ```
 
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
@@ -50,7 +80,9 @@ docker compose down -v    # остановить и удалить базу, ф�
 ## Структура
 
 * `wp/themes/velotok/` — тема витрины и шаблоны WooCommerce;
+* `wp/themes/velotok/inc/theme-design-variants.php` — mocked-контракт выбора варианта дизайна темы;
 * `wp/plugins/velotok-core/` — поля характеристик электровелосипедов;
+* `wp/plugins/velotok-core/includes/content-articles.php` — mocked-контракт контентных статей о товарах и магазине;
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
 * `wp/cli/wp-entrypoint.sh` — обёртка WP-CLI для контейнера `wpcli`;
