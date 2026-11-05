@@ -54,6 +54,8 @@ php wp/plugins/velotok-core/tests/content-articles-contract-test.php
 php wp/plugins/velotok-core/tests/catalog-contract-test.php
 php wp/plugins/velotok-core/tests/cart-contract-test.php
 php wp/plugins/velotok-core/tests/provisioning-contract-test.php
+php wp/plugins/pvs/tests/pvs-contract-test.php
+php wp/plugins/pvs/tests/pvs-all-plugins-contract-test.php
 node wp/themes/velotok/tests/theme-design-variants-contract.test.js
 node wp/themes/velotok/tests/theme-design-variants-rejected-redgreen.test.js
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
@@ -73,6 +75,7 @@ node wp/plugins/velotok-core/tests/content-articles-contract.test.js
 node wp/plugins/velotok-core/tests/catalog-contract.test.js
 node wp/plugins/velotok-core/tests/cart-contract.test.js
 node wp/plugins/velotok-core/tests/provisioning-contract.test.js
+node wp/plugins/pvs/tests/pvs-contract.test.js
 ```
 
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
@@ -88,11 +91,22 @@ docker compose down       # остановить, данные сохранит�
 docker compose down -v    # остановить и удалить базу, файлы WordPress и загрузки
 ```
 
+## Проверка плагинов на уязвимости
+
+Плагин `wp/plugins/pvs/` проверяет все установленные плагины, включая
+неактивные, mu-плагины и drop-ins. Единая точка доступа — `pvs_contract()` в
+`wp/plugins/pvs/includes/class-pvs-contract.php`; запуск проверки —
+`pvs_scan_all_plugins()` / `PVS_Scanner::scan()`. Контракт и отчёт помечены
+`mocked => true`, `source => stub`, `network => false`, `all_plugins => true`.
+Страница «Инструменты → Проверка плагинов» защищена nonce и правом
+`manage_options`. Реальная сеть, env, файлы и БД не читаются.
+
 ## Структура
 
 * `wp/themes/velotok/` — тема витрины и шаблоны WooCommerce;
 * `wp/themes/velotok/inc/theme-design-variants.php` — mocked-контракт выбора варианта дизайна темы;
 * `wp/plugins/velotok-core/` — поля характеристик электровелосипедов;
+* `wp/plugins/pvs/` — mocked-проверка всех плагинов на уязвимости;
 * `wp/plugins/velotok-core/includes/content-articles.php` — mocked-контракт контентных статей о товарах и магазине;
 * `wp/plugins/velotok-core/includes/catalog.php` — mocked-контракт каталога электровелосипедов;
 * `wp/plugins/velotok-core/includes/cart.php` — mocked-контракт корзины для оформления заказа;
