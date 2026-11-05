@@ -219,6 +219,29 @@ php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
 ```
 
+= Каталог электровелосипедов (stub) =
+
+Единая точка доступа — `velotok_core_catalog_contract()` в `includes/catalog.php`. Контракт помечен `mocked => true`, ссылается на спеку `ecommerce-store` и требование `TESTEB-150`.
+
+Правила контракта:
+
+* каталог содержит четыре обязательные категории: `city` («Городские»), `mountain` («Горные»), `cargo` («Грузовые») и `folding` («Складные»);
+* демонстрационный ассортимент — семь электровелосипедов (`riviera`, `street-7`, `hrebet-pro`, `hrebet-trail`, `family`, `courier`, `sklad-20`) с полями модели, цены и характеристик;
+* обязательные поля товара: `slug`, `name`, `price`, `category`; характеристики (`range_km`, `motor_w`, `weight_kg`, `wheel`) и изображение необязательны;
+* список товаров отдаёт `velotok_core_catalog_products()` с фильтром по категории, лимитом, смещением и сортировкой; краткий алиас — `catalogProducts()`;
+* один товар находят по slug или названию через `velotok_core_catalog_product()`; неизвестный товар возвращает `null`, неизвестная категория — пустой список;
+* заглушка не читает env, файлы, БД и не обращается к WooCommerce или внешним сервисам; реальная синхронизация каталога не требуется;
+* если WooCommerce ещё не установлен, тема витрины использует этот же mocked-каталог как резервный источник моделей.
+
+Открытые вопросы об атрибутах товаров, связанных статьях, фильтрах, остатках и источнике данных перечислены в `velotok_core_catalog_open_questions()`.
+
+Запуск контрактного теста каталога:
+
+```bash
+php wp/plugins/velotok-core/tests/catalog-contract-test.php
+node wp/plugins/velotok-core/tests/catalog-contract.test.js
+```
+
 = Провижининг (stub) =
 
 Единая точка доступа — `velotok_core_provisioning_contract()` в `includes/provisioning.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-497c0475` и родительскую спецификацию `clarify-096bb945`.

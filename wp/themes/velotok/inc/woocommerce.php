@@ -411,6 +411,44 @@ function velotok_normalize_product( $product, $index = 0 ) {
  * @return array<int,array>
  */
 function velotok_fallback_models() {
+	if ( function_exists( 'velotok_core_catalog_products' ) ) {
+		$models = array();
+
+		foreach ( velotok_core_catalog_products() as $product ) {
+			if ( ! is_array( $product ) || empty( $product['slug'] ) || empty( $product['name'] ) ) {
+				continue;
+			}
+
+			$badge          = isset( $product['badge'] ) ? trim( (string) $product['badge'] ) : '';
+			$category       = isset( $product['category'] ) ? $product['category'] : '';
+			$category_label = function_exists( 'velotok_core_catalog_category_label' )
+				? velotok_core_catalog_category_label( $category )
+				: '';
+			$description    = isset( $product['short_description'] ) && '' !== (string) $product['short_description']
+				? (string) $product['short_description']
+				: ( isset( $product['description'] ) ? (string) $product['description'] : '' );
+
+			$models[] = array(
+				'slug'           => (string) $product['slug'],
+				'name'           => (string) $product['name'],
+				'description'    => $description,
+				'category_label' => '' !== $category_label ? $category_label : __( 'Электровелосипед', 'velotok' ),
+				'badge'          => $badge,
+				'badge_lime'     => in_array( $badge, array( 'Хит', 'Выбор механиков', 'Новинка' ), true ),
+				'range'          => isset( $product['range_km'] ) ? (string) $product['range_km'] : '',
+				'motor'          => isset( $product['motor_w'] ) ? (string) $product['motor_w'] : '',
+				'wheel'          => isset( $product['wheel'] ) ? (string) $product['wheel'] : '',
+				'weight'         => isset( $product['weight_kg'] ) && null !== $product['weight_kg'] ? (string) $product['weight_kg'] : '',
+				'price'          => isset( $product['price'] ) ? (int) $product['price'] : 0,
+				'image'          => isset( $product['image'] ) ? (string) $product['image'] : '',
+			);
+		}
+
+		if ( ! empty( $models ) ) {
+			return $models;
+		}
+	}
+
 	return array(
 		array(
 			'slug'           => 'riviera',
