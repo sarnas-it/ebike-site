@@ -1,4 +1,4 @@
-name: Recover PR #7 checks
+name: "Recover PR #7 checks"
 
 # GitHub never starts a workflow for a commit that predates the workflow file.
 # PR #7 head 92b31d9... is exactly such a commit: it has no .github/workflows
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   recover:
-    name: Recover PR #7 checks
+    name: "Recover PR #7 checks"
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -82,3 +82,31 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash tooling/scripts/recover-pr7.sh
+
+      - name: Record final PR and check state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          merged="false"
+          for _ in 1 2 3 4 5; do
+            merged="$(gh api "repos/${REPO}/pulls/${TARGET_PR}" --jq '.merged')"
+            if [ "$merged" = "true" ]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$merged" = "true"
+          pr_state="$(gh api "repos/${REPO}/pulls/${TARGET_PR}" \
+            --jq '"merged=\(.merged) state=\(.state) merge_commit=\(.merge_commit_sha // "")"')"
+          check_state="$(gh api \
+            "repos/${REPO}/commits/${TARGET_SHA}/check-runs?per_page=100" \
+            --jq '.check_runs[] | select(.name == "Repository checks") | "\(.conclusion) \(.html_url)"' |
+            head -n 1)"
+          {
+            echo "## Deferred merge result"
+            echo ""
+            echo "- PR #${TARGET_PR}: ${pr_state}"
+            echo "- Check for ${TARGET_SHA}: ${check_state}"
+            echo "- Recovery run: ${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+          } | tee -a "$GITHUB_STEP_SUMMARY"

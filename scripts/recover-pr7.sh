@@ -89,17 +89,20 @@ git_with_auth() {
 
 sync_branch_with_main() {
 	local head_ref="$1"
+	local merge_output
 
 	echo "PR #${TARGET_PR} conflicts with the current base; merging main into the PR branch." >&2
 
 	git -C "$TARGET_DIR" config user.name "github-actions[bot]"
 	git -C "$TARGET_DIR" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-	git_with_auth fetch origin main "refs/heads/${head_ref}:refs/remotes/origin/${head_ref}"
+	git_with_auth fetch origin main "refs/heads/${head_ref}:refs/remotes/origin/${head_ref}" >&2
 
-	if git -C "$TARGET_DIR" merge --no-edit origin/main; then
-		echo "Base branch merged without conflicts."
+	if merge_output="$(git -C "$TARGET_DIR" merge --no-edit origin/main 2>&1)"; then
+		printf '%s\n' "$merge_output" >&2
+		echo "Base branch merged without conflicts." >&2
 	else
+		printf '%s\n' "$merge_output" >&2
 		mapfile -t conflicts < <(git -C "$TARGET_DIR" diff --name-only --diff-filter=U)
 		if [ "${#conflicts[@]}" -ne 1 ] || [ "${conflicts[0]}" != "docker-compose.yml" ]; then
 			printf 'Unexpected merge conflicts: %s\n' "${conflicts[*]}" >&2
@@ -109,14 +112,18 @@ sync_branch_with_main() {
 
 		# Keep the already working compose file from main. PR #7's other files
 		# (wp/cli, wp/tests, wp/docker) do not conflict and are preserved.
-		git -C "$TARGET_DIR" checkout --theirs -- docker-compose.yml
-		git -C "$TARGET_DIR" add docker-compose.yml
-		git -C "$TARGET_DIR" commit --no-edit
+		git -C "$TARGET_DIR" checkout --theirs -- docker-compose.yml >&2
+		git -C "$TARGET_DIR" add docker-compose.yml >&2
+		if ! merge_output="$(git -C "$TARGET_DIR" commit --no-edit 2>&1)"; then
+			printf '%s\n' "$merge_output" >&2
+			return 1
+		fi
+		printf '%s\n' "$merge_output" >&2
 	fi
 
-	bash "$(dirname "${BASH_SOURCE[0]}")/ci-check.sh" "$TARGET_DIR"
+	bash "$(dirname "${BASH_SOURCE[0]}")/ci-check.sh" "$TARGET_DIR" >&2
 
-	git_with_auth push origin "HEAD:refs/heads/${head_ref}"
+	git_with_auth push origin "HEAD:refs/heads/${head_ref}" >&2
 
 	git -C "$TARGET_DIR" rev-parse HEAD
 }
@@ -148,6 +155,17 @@ if [ "$head_sha" != "$TARGET_SHA" ]; then
 		echo "PR #${TARGET_PR} head is ${head_sha} and does not contain ${TARGET_SHA}; refusing to merge." >&2
 		exit 1
 	fi
+
+	# The branch was already synced with main by an earlier run. Check that
+	# current head too, so the PR has a successful check run on the commit
+	# GitHub will actually merge.
+	echo "PR #${TARGET_PR} head is ${head_sha}; checking the current head as well." >&2
+	git_with_auth fetch origin "refs/heads/${head_ref}:refs/remotes/origin/${head_ref}" >&2
+	git -C "$TARGET_DIR" checkout --detach "$head_sha" >&2
+	bash "$(dirname "${BASH_SOURCE[0]}")/ci-check.sh" "$TARGET_DIR" >&2
+
+	head_summary="scripts/ci-check.sh выполнен на коммите ${TARGET_SHA} и на текущем head ${head_sha} в GitHub Actions. Лог: ${job_url}."
+	publish_check "$head_sha" "$head_summary"
 fi
 
 # wait_for_mergeable: GitHub computes mergeability asynchronously.
