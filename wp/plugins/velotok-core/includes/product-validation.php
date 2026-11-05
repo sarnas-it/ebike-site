@@ -118,9 +118,28 @@ function velotok_core_product_validation_contract() {
 		'unknown_category'             => 'default_attributes',
 		'future_source'                => 'woocommerce',
 		'missing_attribute'            => 'error_code',
+		'open_questions'               => array(
+			'Какие именно форматы изображений считаются поддерживаемыми и есть ли ограничения по размеру файла и разрешению?',
+			'Требуется ли минимальное количество фото и отдельное обязательное главное фото?',
+			'Допускается ли нулевая цена как валидное значение во всех категориях или только в отдельных (например, бесплатные позиции)?',
+			'Каковы предельные длины названия и описания, и различаются ли они по категориям?',
+			'Источник справочника категорий и их обязательных атрибутов: локальная конфигурация, внешняя система или комбинация с приоритетами?',
+			'Как должны формулироваться сообщения об ошибках валидации и требуется ли их локализация?',
+		),
 	);
 
 	return $contract;
+}
+
+/**
+ * Return the open questions recorded by the product validation contract.
+ *
+ * @return string[]
+ */
+function velotok_core_product_validation_open_questions() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['open_questions'];
 }
 
 /**
@@ -486,6 +505,21 @@ function velotok_core_photo_parts( $photo ) {
 }
 
 /**
+ * Return the mocked photo validation rule.
+ *
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
+ * single source for photo validation. It never reads the database, files,
+ * media library or remote image storage.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_photo_validation_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['attributes']['photo'];
+}
+
+/**
  * Check whether a photo id is present.
  *
  * @param mixed $id Attachment id.
@@ -518,7 +552,7 @@ function velotok_core_photo_id_is_present( $id ) {
  * @return array<string,mixed>
  */
 function velotok_core_validate_product_photo( $photo, $mime = null ) {
-	$rule  = velotok_core_product_attribute_rule( 'photo' );
+	$rule  = velotok_core_photo_validation_contract();
 	$parts = velotok_core_photo_parts( $photo );
 
 	if ( null === $mime && null !== $parts['mime'] ) {
