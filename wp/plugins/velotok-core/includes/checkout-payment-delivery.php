@@ -19,6 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
 }
 
+require_once __DIR__ . '/delivery-options.php';
+
 /**
  * Return the checkout, delivery and payment contract.
  *
@@ -71,6 +73,18 @@ function velotok_core_checkout_contract() {
 		),
 	);
 
+	$delivery_tariffs = function_exists( 'velotok_core_delivery_tariffs' ) ? velotok_core_delivery_tariffs() : array();
+
+	foreach ( $delivery_methods as $method_id => &$delivery_method ) {
+		$delivery_method['source'] = 'stub';
+
+		if ( isset( $delivery_tariffs[ $method_id ] ) ) {
+			$delivery_method['tariff']      = $delivery_tariffs[ $method_id ];
+			$delivery_method['provider_id'] = 'stub';
+		}
+	}
+	unset( $delivery_method );
+
 	$contract = array(
 		'spec'             => 'clarify-096bb945',
 		'source'           => 'stub',
@@ -104,17 +118,22 @@ function velotok_core_checkout_contract() {
 			'methods'        => $delivery_methods,
 			'default'        => 'russian_post',
 			'source'         => 'stub',
+			'provider'       => 'stub',
+			'provider_label' => 'Stub delivery provider',
 			'mocked'         => true,
 			'required'       => true,
 			'future_source'  => 'provider_api',
 			'missing_method' => 'DELIVERY_METHOD_REQUIRED',
 			'invalid_method' => 'DELIVERY_METHOD_INVALID',
+			'tariffs'        => $delivery_tariffs,
+			'tariff_grid'    => $delivery_tariffs,
 			'cost'           => array(
-				'source'     => 'manual',
+				'source'     => 'stub',
 				'mocked'     => true,
 				'amount'     => null,
 				'currency'   => 'RUB',
-				'calculated' => false,
+				'calculated' => true,
+				'tariffs'    => $delivery_tariffs,
 			),
 		),
 		'delivery_methods'      => $delivery_methods,
@@ -473,8 +492,9 @@ function velotok_core_validate_delivery_method( $method, $required = true ) {
 /**
  * Return a mocked delivery cost for a method.
  *
- * Tariffs are an open question, so the stub always returns a zero amount and
- * marks the result as manual and mocked.
+ * Without order data the legacy checkout stub keeps returning a zero amount.
+ * When order data is provided, the dedicated delivery-options stub applies its
+ * tariff grid (spec clarify-a8fe76a0) and returns the calculated amount.
  *
  * @param mixed               $method Delivery method identifier.
  * @param array<string,mixed> $order  Optional order data.
@@ -483,6 +503,17 @@ function velotok_core_validate_delivery_method( $method, $required = true ) {
 function velotok_core_delivery_cost( $method, $order = array() ) {
 	$contract = velotok_core_delivery_contract();
 	$resolved = velotok_core_delivery_method( $method );
+	$has_order = is_object( $order ) || is_numeric( $order ) || ( is_array( $order ) && ! empty( $order ) );
+
+	if ( null !== $resolved && $has_order && function_exists( 'velotok_core_calculate_delivery_cost' ) ) {
+		$calculated = velotok_core_calculate_delivery_cost( $method, $order );
+
+		if ( ! empty( $calculated['valid'] ) ) {
+			$calculated['source'] = 'stub';
+
+			return $calculated;
+		}
+	}
 
 	return array(
 		'valid'    => null !== $resolved,
