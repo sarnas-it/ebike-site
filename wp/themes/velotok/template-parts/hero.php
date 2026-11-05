@@ -7,13 +7,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$velotok_models        = velotok_get_home_models();
-$velotok_offer         = ! empty( $velotok_models[0] ) ? $velotok_models[0] : null;
-$velotok_range         = ( $velotok_offer && ! empty( $velotok_offer['specs'][0][1] ) ) ? $velotok_offer['specs'][0][1] : '';
-$velotok_price         = $velotok_offer ? wp_strip_all_tags( $velotok_offer['price_html'] ) : '';
-$velotok_model_types   = velotok_spec_value( 'catalog_model_types', 4 );
-$velotok_catalog_range = velotok_spec_value( 'catalog_range', __( '20–120 км', 'velotok' ) );
-$velotok_warranty      = velotok_spec_value( 'warranty_years', 2 );
+$velotok_models          = velotok_get_home_models();
+$velotok_offer           = ! empty( $velotok_models[0] ) ? $velotok_models[0] : null;
+$velotok_range           = ( $velotok_offer && ! empty( $velotok_offer['specs'][0][1] ) ) ? $velotok_offer['specs'][0][1] : '';
+$velotok_price           = $velotok_offer ? wp_strip_all_tags( $velotok_offer['price_html'] ) : '';
+$velotok_model_types     = velotok_spec_value( 'catalog_model_types', 4 );
+$velotok_catalog_range   = velotok_spec_value( 'catalog_range', __( '20–120 км', 'velotok' ) );
+$velotok_warranty        = velotok_spec_value( 'warranty_years', 2 );
+$velotok_delivery_cities = velotok_spec_value( 'delivery_cities', 340 );
 ?>
 <section class="hero" id="top" aria-labelledby="hero-title">
 	<img class="hero-bg" src="<?php echo esc_url( get_template_directory_uri() . '/assets/img/hero-city-1-web.jpg' ); ?>" width="1536" height="864" alt="<?php esc_attr_e( 'Городской электровелосипед кремово-оливкового цвета на мощёной улице на закате', 'velotok' ); ?>" fetchpriority="high" decoding="async">
@@ -55,9 +56,9 @@ $velotok_warranty      = velotok_spec_value( 'warranty_years', 2 );
 				<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
 				<span><?php esc_html_e( 'Рассрочка 0%', 'velotok' ); ?></span>
 				<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
-				<span><?php esc_html_e( 'Доставка в 340 городов', 'velotok' ); ?></span>
+				<span><?php printf( esc_html__( 'Доставка в %s городов', 'velotok' ), esc_html( (string) $velotok_delivery_cities ) ); ?></span>
 				<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
-				<span><?php esc_html_e( 'Гарантия 2 года', 'velotok' ); ?></span>
+				<span><?php printf( esc_html__( 'Гарантия %s года', 'velotok' ), esc_html( (string) $velotok_warranty ) ); ?></span>
 				<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
 			</div>
 		<?php endfor; ?>
