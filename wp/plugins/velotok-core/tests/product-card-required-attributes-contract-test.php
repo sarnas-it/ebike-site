@@ -118,6 +118,31 @@ velotok_product_card_assert(
 	saveProductCard( $valid_product, 'city' ) === velotok_core_save_product_card( $valid_product, 'city' ),
 	'Глобальный алиас saveProductCard должен возвращать тот же результат.'
 );
+velotok_product_card_assert(
+	isset( $service['card_attributes_key'] ) && 'card_attributes' === $service['card_attributes_key'],
+	'Сервис должен возвращать сохранённые атрибуты карточки в card_attributes.'
+);
+velotok_product_card_assert(
+	isset( $valid_result['card_attributes'] ) && is_array( $valid_result['card_attributes'] ),
+	'Результат сохранения должен содержать данные карточки.'
+);
+
+$expected_card = array(
+	'photo'       => 123,
+	'photo_mime'  => 'image/jpeg',
+	'title'       => 'Городской велосипед «Ривьера»',
+	'description' => 'Лёгкая рама и запас хода до 70 км для ежедневных поездок.',
+	'price'       => 62900,
+);
+
+velotok_product_card_assert(
+	isset( $valid_result['card_attributes'] ) && $expected_card === $valid_result['card_attributes'],
+	'Сохранённая карточка должна содержать фото, название, описание и цену.'
+);
+velotok_product_card_assert(
+	isset( $valid_result['card'] ) && $expected_card === $valid_result['card'],
+	'Поле card должно содержать те же обязательные атрибуты, что и card_attributes.'
+);
 
 $missing_codes = array(
 	'photo'       => 'PHOTO_REQUIRED',
@@ -157,6 +182,12 @@ foreach ( $missing_codes as $attribute => $code ) {
 		isset( $missing_result['errors_by_attribute'][ $attribute ] )
 			&& $code === $missing_result['errors_by_attribute'][ $attribute ],
 		sprintf( 'Код %s должен быть привязан к атрибуту «%s».', $code, $attribute )
+	);
+	velotok_product_card_assert(
+		isset( $missing_result['card_attributes'] )
+			&& is_array( $missing_result['card_attributes'] )
+			&& array_key_exists( $attribute, $missing_result['card_attributes'] ),
+		sprintf( 'Карточка без «%s» должна сохранять состав обязательных атрибутов.', $attribute )
 	);
 }
 

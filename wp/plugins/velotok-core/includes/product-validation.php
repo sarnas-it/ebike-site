@@ -720,6 +720,30 @@ function velotok_core_missing_product_attributes( $product, $category = '' ) {
 }
 
 /**
+ * Extract the mandatory attributes of a product card.
+ *
+ * This is the data that is validated and saved by the product card service:
+ * photo, title, description and price. The values are returned unchanged so
+ * the saved card always contains the mandatory attributes that were checked.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @return array<string,mixed>
+ */
+function velotok_core_product_card_attributes( $product ) {
+	if ( ! is_array( $product ) ) {
+		$product = array();
+	}
+
+	return array(
+		'photo'       => velotok_core_product_value( $product, array( 'photo', 'photo_id', 'image', 'image_id', 'thumbnail_id', 'attachment_id' ) ),
+		'photo_mime'  => velotok_core_product_value( $product, array( 'photo_mime', 'image_mime', 'mime', 'mime_type' ) ),
+		'title'       => velotok_core_product_value( $product, array( 'title', 'name', 'product_title' ) ),
+		'description' => velotok_core_product_value( $product, array( 'description', 'product_description', 'body' ) ),
+		'price'       => velotok_core_product_value( $product, array( 'price', 'regular_price' ) ),
+	);
+}
+
+/**
  * Return the mocked product card save service contract.
  *
  * The service validates the required product card attributes on the server
@@ -745,6 +769,7 @@ function velotok_core_product_card_service_contract() {
 		'blocked_status'           => 'blocked',
 		'missing_attributes_key'   => 'missing_attributes',
 		'invalid_attributes_key'   => 'invalid_attributes',
+		'card_attributes_key'      => 'card_attributes',
 		'error_codes'              => velotok_core_validation_error_codes(),
 	);
 }
@@ -762,6 +787,7 @@ function velotok_core_product_card_service_contract() {
  */
 function velotok_core_save_product_card( $product, $category = '' ) {
 	$validation = velotok_core_validate_product( $product, $category );
+	$card       = velotok_core_product_card_attributes( $product );
 	$missing    = array();
 	$invalid    = array();
 
@@ -796,6 +822,8 @@ function velotok_core_save_product_card( $product, $category = '' ) {
 		'validated_on_save'    => true,
 		'category'             => $validation['category'],
 		'required_attributes'  => $validation['required_attributes'],
+		'card'                 => $card,
+		'card_attributes'      => $card,
 		'attributes'           => $validation['attributes'],
 		'errors'               => $validation['errors'],
 		'error_codes'          => $validation['errors'],
