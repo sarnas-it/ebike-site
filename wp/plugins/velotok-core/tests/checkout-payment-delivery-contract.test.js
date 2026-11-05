@@ -25,6 +25,8 @@ includes('velotok_core_delivery_contract', 'Delivery contract accessor is missin
 includes('velotok_core_content_acceptance_contract', 'Content acceptance accessor is missing');
 includes('velotok_core_create_payment_intent', 'Mocked payment intent helper is missing');
 includes('velotok_core_delivery_methods', 'Delivery methods helper is missing');
+includes('velotok_core_delivery_tariffs', 'Delivery tariff grid helper is missing');
+includes('velotok_core_save_delivery_option', 'Delivery order persistence helper is missing');
 includes('velotok_core_validate_delivery_method', 'Delivery validation helper is missing');
 includes('velotok_core_validate_content_acceptance', 'Content acceptance validation helper is missing');
 includes('velotok_core_content_acceptance_role_is_valid', 'Content acceptance role guard is missing');
