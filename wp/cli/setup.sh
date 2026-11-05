@@ -92,7 +92,20 @@ if ! wp_cli theme is-installed velotok; then
 	log "Theme velotok is missing"
 	exit 1
 fi
-wp_cli theme activate velotok >/dev/null
+
+variants_manifest="${VELOTOK_DESIGN_VARIANTS:-$WP_PATH/wp-content/themes/design-variants.json}"
+selected_variant=""
+
+if [ -r "$variants_manifest" ] && command -v php >/dev/null 2>&1; then
+	selected_variant="$(php -r '$m=json_decode((string)@file_get_contents($argv[1]), true); echo isset($m["selected"]) ? $m["selected"] : "";' "$variants_manifest" 2>/dev/null || true)"
+fi
+
+if [ -z "$selected_variant" ] || ! wp_cli theme is-installed "$selected_variant" >/dev/null 2>&1; then
+	selected_variant="velotok"
+fi
+
+log "Activating theme variant: $selected_variant"
+wp_cli theme activate "$selected_variant" >/dev/null
 
 if ! wp_cli plugin is-installed woocommerce; then
 	log "Installing WooCommerce"

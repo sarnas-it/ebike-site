@@ -57,6 +57,15 @@ if ! wp_cli theme list --status=active --field=name | grep -qx 'velotok'; then
 	exit 1
 fi
 
+installed_themes="$(wp_cli theme list --field=name)"
+
+for variant in velotok-bold velotok-minimal; do
+	if ! printf '%s\n' "$installed_themes" | grep -qx "$variant"; then
+		echo "FAIL: вариант дизайна $variant не виден в wp theme list" >&2
+		exit 1
+	fi
+done
+
 if ! wp_cli eval-file wp-content/themes/velotok/tests/theme-contract-test.php; then
 	echo "FAIL: контракт темы velotok не выполняется" >&2
 	exit 1

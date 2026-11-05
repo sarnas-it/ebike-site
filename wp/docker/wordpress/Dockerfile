@@ -2,7 +2,7 @@
 # и `wp theme list` можно было выполнять прямо в контейнере сайта.
 FROM wordpress:cli-php8.2 AS wpcli
 
-FROM wordpress:6.7-php8.2-apache
+FROM wordpress:php8.2-apache
 
 COPY --from=wpcli /usr/local/bin/wp /usr/local/bin/wp-cli.phar
 
