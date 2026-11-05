@@ -33,6 +33,7 @@ docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/
 bash wp/tests/smoke.sh
 php wp/themes/velotok/tests/theme-contract-test.php
 php wp/themes/velotok/tests/theme-design-variants-contract-test.php
+php wp/themes/velotok/tests/catalog-display-test.php
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php

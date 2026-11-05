@@ -631,6 +631,89 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 }
 
 /**
+ * Возвращает карточки каталога электровелосипедов.
+ *
+ * Это единая точка получения данных каталога для главной страницы и архивов.
+ * При активном WooCommerce товары берутся из опубликованного каталога, а при
+ * его отсутствии используется встроенный демонстрационный набор. Каждая
+ * карточка содержит обязательные атрибуты (фото, название, описание, цену).
+ *
+ * @param array<string,mixed> $args Аргументы выборки: limit, category, orderby, order.
+ * @return array<int,array>
+ */
+function velotok_get_catalog_models( $args = array() ) {
+	$args = function_exists( 'wp_parse_args' )
+		? wp_parse_args(
+			$args,
+			array(
+				'limit'    => 0,
+				'category' => array(),
+				'orderby'  => 'menu_order',
+				'order'    => 'ASC',
+			)
+		)
+		: array_merge(
+			array(
+				'limit'    => 0,
+				'category' => array(),
+				'orderby'  => 'menu_order',
+				'order'    => 'ASC',
+			),
+			is_array( $args ) ? $args : array()
+		);
+
+	$limit     = isset( $args['limit'] ) ? (int) $args['limit'] : 0;
+	$category  = isset( $args['category'] ) ? $args['category'] : array();
+	$category  = is_array( $category ) ? $category : array( $category );
+	$category  = array_values( array_filter( array_map( 'strval', $category ) ) );
+	$orderby   = isset( $args['orderby'] ) ? (string) $args['orderby'] : 'menu_order';
+	$order     = isset( $args['order'] ) ? (string) $args['order'] : 'ASC';
+	$models    = array();
+	$index     = 0;
+
+	if ( function_exists( 'wc_get_products' ) ) {
+		$query = array(
+			'status'  => 'publish',
+			'limit'   => $limit > 0 ? $limit : -1,
+			'orderby' => $orderby,
+			'order'   => $order,
+			'return'  => 'objects',
+		);
+
+		if ( ! empty( $category ) ) {
+			$query['category'] = $category;
+		}
+
+		$products = wc_get_products( $query );
+
+		if ( is_array( $products ) ) {
+			foreach ( $products as $product ) {
+				if ( $product instanceof WC_Product ) {
+					$index++;
+					$models[] = velotok_normalize_product( $product, $index );
+				}
+			}
+		}
+	}
+
+	if ( empty( $models ) && empty( $category ) ) {
+		$fallback = velotok_fallback_models();
+
+		if ( $limit > 0 ) {
+			$fallback = array_slice( $fallback, 0, $limit );
+		}
+
+		$index = 0;
+		foreach ( $fallback as $model ) {
+			$index++;
+			$models[] = velotok_normalize_fallback_model( $model, $index );
+		}
+	}
+
+	return $models;
+}
+
+/**
  * Модели для главной страницы.
  *
  * @return array<int,array>
@@ -642,35 +725,7 @@ function velotok_get_home_models() {
 		return $models;
 	}
 
-	$models = array();
-
-	if ( function_exists( 'wc_get_products' ) ) {
-		$products = wc_get_products( array(
-			'status'   => 'publish',
-			'limit'    => 7,
-			'orderby'  => 'menu_order',
-			'order'    => 'ASC',
-			'return'   => 'objects',
-		) );
-
-		if ( ! empty( $products ) ) {
-			$index = 0;
-			foreach ( $products as $product ) {
-				if ( $product instanceof WC_Product ) {
-					$index++;
-					$models[] = velotok_normalize_product( $product, $index );
-				}
-			}
-		}
-	}
-
-	if ( empty( $models ) ) {
-		$index = 0;
-		foreach ( velotok_fallback_models() as $model ) {
-			$index++;
-			$models[] = velotok_normalize_fallback_model( $model, $index );
-		}
-	}
+	$models = velotok_get_catalog_models( array( 'limit' => 7 ) );
 
 	return $models;
 }
@@ -678,29 +733,15 @@ function velotok_get_home_models() {
 /**
  * Товары по категории для блока каталога.
  *
- * @param string $slug Слаг категории.
+ * @param string $slug  Слаг категории.
+ * @param int    $limit Максимальное количество карточек.
  * @return array<int,array>
  */
 function velotok_get_products_by_category( $slug, $limit = 3 ) {
-	if ( ! function_exists( 'wc_get_products' ) ) {
-		return array();
-	}
-
-	$products = wc_get_products( array(
-		'status'   => 'publish',
-		'limit'    => (int) $limit,
-		'category' => array( $slug ),
-		'return'   => 'objects',
-	) );
-
-	$models = array();
-	$index  = 0;
-	foreach ( $products as $product ) {
-		if ( $product instanceof WC_Product ) {
-			$index++;
-			$models[] = velotok_normalize_product( $product, $index );
-		}
-	}
-
-	return $models;
+	return velotok_get_catalog_models(
+		array(
+			'category' => array( $slug ),
+			'limit'    => (int) $limit,
+		)
+	);
 }
