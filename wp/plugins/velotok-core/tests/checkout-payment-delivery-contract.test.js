@@ -27,6 +27,8 @@ includes('velotok_core_create_payment_intent', 'Mocked payment intent helper is 
 includes('velotok_core_delivery_methods', 'Delivery methods helper is missing');
 includes('velotok_core_validate_delivery_method', 'Delivery validation helper is missing');
 includes('velotok_core_validate_content_acceptance', 'Content acceptance validation helper is missing');
+includes('velotok_core_content_acceptance_role_is_valid', 'Content acceptance role guard is missing');
+includes('velotok_core_payment_provider_is_supported', 'Payment provider guard is missing');
 includes('velotok_core_validate_checkout', 'Checkout validation helper is missing');
 
 includes("'mocked'", 'Contract must declare the mocked marker');
@@ -52,6 +54,7 @@ includes('project_manager', 'Project manager role is missing');
 includes('руководитель проекта', 'Project manager role label is missing');
 includes("'human'", 'Content acceptance must be enforced by a human');
 includes('CONTENT_ACCEPTANCE_REQUIRED', 'Content acceptance error code is missing');
+includes('CONTENT_ACCEPTANCE_ROLE_FORBIDDEN', 'Content acceptance role error code is missing');
 includes('DELIVERY_METHOD_REQUIRED', 'Missing delivery error code is missing');
 includes('DELIVERY_METHOD_INVALID', 'Invalid delivery error code is missing');
 includes('open_questions', 'Open questions section is missing');

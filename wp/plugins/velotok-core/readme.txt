@@ -81,9 +81,10 @@ node wp/plugins/velotok-core/tests/product-description-validation-contract.test.
 Правила контракта:
 
 * оплата выполняется через ЮKassa (`velotok_core_payment_provider()`); реальный запрос не отправляется, `velotok_core_create_payment_intent()` возвращает mocked-намерение со статусом `pending`;
-* доступны три способа доставки: `russian_post` («Почта РФ»), `cdek` («СДЭК») и `other` («Иной логист»); выбор проверяет `velotok_core_validate_delivery_method()`;
+* доступны три способа доставки: `russian_post` («Почта РФ»), `cdek` («СДЭК») и `other` («Иной логист»); выбор проверяет `velotok_core_validate_delivery_method()`, идентификатор можно передать кодом или названием без учёта регистра;
 * без выбранного способа доставки возвращается `DELIVERY_METHOD_REQUIRED`, для неизвестного способа — `DELIVERY_METHOD_INVALID`;
-* контент требует приёмки человеком с ролью руководитель проекта (`project_manager`); без приёмки возвращается `CONTENT_ACCEPTANCE_REQUIRED`;
+* контент требует приёмки человеком с ролью руководитель проекта (`project_manager`); без приёмки возвращается `CONTENT_ACCEPTANCE_REQUIRED`, при чужой роли — `CONTENT_ACCEPTANCE_ROLE_FORBIDDEN`;
+* платёжная система принимается по коду `yookassa` или названию `ЮKassa`, остальные значения дают `PAYMENT_PROVIDER_UNSUPPORTED`;
 * стоимость доставки в заглушке не рассчитывается: возвращается нулевая сумма с пометкой `mocked => true`;
 * имена будущих env-переменных ЮKassa (`VELOTOK_YOOKASSA_SHOP_ID`, `VELOTOK_YOOKASSA_SECRET_KEY`, `VELOTOK_YOOKASSA_MODE`) только вычисляются, env не читается.
 
