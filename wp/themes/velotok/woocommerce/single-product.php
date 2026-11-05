@@ -60,7 +60,7 @@ while ( have_posts() ) :
 
 						<div class="product-buy">
 							<?php woocommerce_template_single_add_to_cart(); ?>
-							<p class="cart-note"><?php esc_html_e( 'Оплата при получении. Менеджер свяжется для подтверждения заказа и доставки.', 'velotok' ); ?></p>
+							<p class="cart-note"><?php esc_html_e( 'Оплата через ЮKassa (тестовая заглушка). Способ доставки — Почта РФ, СДЭК или иной логист — выбирается при оформлении заказа.', 'velotok' ); ?></p>
 						</div>
 
 						<?php woocommerce_template_single_meta(); ?>

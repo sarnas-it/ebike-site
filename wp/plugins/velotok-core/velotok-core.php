@@ -22,7 +22,20 @@ define( 'VELOTOK_CORE_FILE', __FILE__ );
 define( 'VELOTOK_CORE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'VELOTOK_CORE_URL', plugin_dir_url( __FILE__ ) );
 
+require_once VELOTOK_CORE_PATH . 'includes/checkout-contracts.php';
 require_once VELOTOK_CORE_PATH . 'includes/meta.php';
+
+/**
+ * Load the WooCommerce checkout integration when WooCommerce is active.
+ */
+function velotok_core_load_checkout_integration() {
+	if ( ! class_exists( 'WooCommerce' ) ) {
+		return;
+	}
+
+	require_once VELOTOK_CORE_PATH . 'includes/checkout-integration.php';
+}
+add_action( 'plugins_loaded', 'velotok_core_load_checkout_integration' );
 
 /**
  * Load plugin translations.

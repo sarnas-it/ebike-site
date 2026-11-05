@@ -1229,6 +1229,36 @@ form.checkout .button:hover {
 	font-weight: 800;
 }
 
+.velotok-delivery-methods {
+	margin: 18px 0;
+	padding: 0;
+	border: 0;
+}
+
+.velotok-delivery-methods legend {
+	margin-bottom: 10px;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: .02em;
+	text-transform: uppercase;
+}
+
+.velotok-delivery-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 0;
+	border-bottom: 1px solid var(--line);
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.velotok-delivery-mocked {
+	margin-left: auto;
+	font-size: 11px;
+	color: var(--muted);
+}
+
 #payment {
 	margin-top: 16px;
 }

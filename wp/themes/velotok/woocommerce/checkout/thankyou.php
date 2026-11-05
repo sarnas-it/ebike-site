@@ -25,7 +25,7 @@ if ( $order->has_status( 'failed' ) ) {
 	?>
 	<div class="thankyou-card">
 		<h2><?php esc_html_e( 'Оплата не прошла', 'velotok' ); ?></h2>
-		<p><?php esc_html_e( 'Попробуйте оформить заказ ещё раз или свяжитесь с менеджером. Если оплата не нужна — выберите оплату при получении.', 'velotok' ); ?></p>
+		<p><?php esc_html_e( 'Попробуйте повторить оплату через ЮKassa (заглушка) или свяжитесь с менеджером — поможем оформить заказ заново.', 'velotok' ); ?></p>
 		<a class="btn btn-dark" href="<?php echo esc_url( $order->get_checkout_payment_url() ); ?>"><?php esc_html_e( 'Повторить оплату', 'velotok' ); ?></a>
 	</div>
 	<?php
@@ -53,11 +53,18 @@ do_action( 'woocommerce_before_thankyou', $order->get_id() );
 	<ul class="order-summary">
 		<li><span><?php esc_html_e( 'Дата', 'velotok' ); ?></span><strong><?php echo esc_html( wc_format_datetime( $order->get_date_created() ) ); ?></strong></li>
 		<li><span><?php esc_html_e( 'Итого', 'velotok' ); ?></span><strong><?php echo wp_kses_post( $order->get_formatted_order_total() ); ?></strong></li>
-		<li><span><?php esc_html_e( 'Оплата', 'velotok' ); ?></span><strong><?php echo esc_html( $order->get_payment_method_title() ? $order->get_payment_method_title() : __( 'При получении', 'velotok' ) ); ?></strong></li>
+		<li><span><?php esc_html_e( 'Оплата', 'velotok' ); ?></span><strong><?php echo esc_html( $order->get_payment_method_title() ? $order->get_payment_method_title() : __( 'ЮKassa (заглушка)', 'velotok' ) ); ?></strong></li>
+		<?php
+		$velotok_delivery_method = (string) $order->get_meta( '_velotok_delivery_method' );
+		$velotok_delivery_label  = (string) $order->get_meta( '_velotok_delivery_method_label' );
+		if ( '' !== $velotok_delivery_method ) :
+			?>
+			<li><span><?php esc_html_e( 'Доставка', 'velotok' ); ?></span><strong><?php echo esc_html( $velotok_delivery_label ? $velotok_delivery_label : $velotok_delivery_method ); ?></strong></li>
+		<?php endif; ?>
 		<li><span><?php esc_html_e( 'Почта', 'velotok' ); ?></span><strong><?php echo esc_html( $order->get_billing_email() ); ?></strong></li>
 	</ul>
 
-	<p class="cart-note"><?php esc_html_e( 'Оплата при получении. Если нужно что-то изменить в заказе, просто скажите менеджеру.', 'velotok' ); ?></p>
+	<p class="cart-note"><?php esc_html_e( 'Оплата через ЮKassa (заглушка). Заказ ожидает приёмки руководителем проекта. Если нужно что-то изменить, просто скажите менеджеру.', 'velotok' ); ?></p>
 
 	<div class="thankyou-actions">
 		<a class="btn btn-primary" href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>"><?php esc_html_e( 'Вернуться в каталог', 'velotok' ); ?></a>
