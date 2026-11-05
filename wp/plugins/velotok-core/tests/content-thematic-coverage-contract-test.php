@@ -53,7 +53,7 @@ function velotok_content_contract_assert( $condition, $message ) {
  */
 function velotok_content_material( $topic ) {
 	$materials = array(
-		'model_overview'     => array(
+		'models_overview'    => array(
 			'title'   => 'Обзор моделей солнечных панелей и инверторов для дома',
 			'summary' => 'Сравнение характеристик и линейки оборудования для зелёной энергетики.',
 		),
@@ -62,20 +62,21 @@ function velotok_content_material( $topic ) {
 			'summary'    => 'Новые нормативы регулирования и сертификации зелёной энергетики.',
 			'source_url' => 'https://example.test/legal/wind',
 		),
-		'green_energy_news'  => array(
-			'title'   => 'Новости зелёной энергетики: запущена солнечная электростанция',
-			'summary' => 'Компания сообщила о запуске нового объекта возобновляемой энергетики.',
+		'news'               => array(
+			'title'      => 'Новости зелёной энергетики: запущена солнечная электростанция',
+			'summary'    => 'Компания сообщила о запуске нового объекта возобновляемой энергетики.',
+			'event_date' => '2025-04-15',
 		),
 	);
 
 	return isset( $materials[ $topic ] ) ? $materials[ $topic ] : array();
 }
 
-$expected_topics = array( 'model_overview', 'legal_requirements', 'green_energy_news' );
+$expected_topics = array( 'models_overview', 'legal_requirements', 'news' );
 $expected_labels = array(
-	'model_overview'     => 'Обзор моделей в зелёной энергетике',
+	'models_overview'    => 'Обзор моделей в зелёной энергетике',
 	'legal_requirements' => 'Требования законодательства',
-	'green_energy_news'  => 'Новости о зелёной энергетике',
+	'news'               => 'Новости о зелёной энергетике',
 );
 
 if ( ! function_exists( 'velotok_core_content_thematic_contract' ) ) {
@@ -111,6 +112,19 @@ if ( ! function_exists( 'velotok_core_content_thematic_contract' ) ) {
 			sprintf( 'Не заданы критерии тематики «%s».', $topic )
 		);
 	}
+
+	velotok_content_contract_assert(
+		isset( $contract['topics']['news']['criteria']['require_date'] ) && true === $contract['topics']['news']['criteria']['require_date'],
+		'Новости должны требовать дату события.'
+	);
+}
+
+if ( function_exists( 'velotok_core_content_topic_key' ) ) {
+	velotok_content_contract_assert( 'models_overview' === velotok_core_content_topic_key( 'model_overview' ), 'Старый ключ обзора моделей должен оставаться алиасом.' );
+	velotok_content_contract_assert( 'models_overview' === velotok_core_content_topic_key( 'models' ), 'Алиас models должен указывать на обзор моделей.' );
+	velotok_content_contract_assert( 'news' === velotok_core_content_topic_key( 'green_energy_news' ), 'Старый ключ новостей должен оставаться алиасом.' );
+	velotok_content_contract_assert( 'news' === velotok_core_content_topic_key( 'новости' ), 'Русский алиас новостей должен поддерживаться.' );
+	velotok_content_contract_assert( 'legal_requirements' === velotok_core_content_topic_key( 'legal' ), 'Алиас legal должен указывать на требования законодательства.' );
 }
 
 if ( function_exists( 'velotok_core_validate_content_topic' ) ) {
@@ -124,9 +138,9 @@ if ( function_exists( 'velotok_core_validate_content_topic' ) ) {
 	}
 
 	$negative_materials = array(
-		'model_overview'     => array( 'title' => 'Обзор городских велосипедов для ежедневных поездок' ),
+		'models_overview'    => array( 'title' => 'Обзор городских велосипедов для ежедневных поездок' ),
 		'legal_requirements' => array( 'title' => 'Требования к упаковке товаров интернет-магазина' ),
-		'green_energy_news'  => array( 'title' => 'Новости магазина: скидки и новые поступления' ),
+		'news'               => array( 'title' => 'Новости магазина: скидки и новые поступления' ),
 	);
 
 	foreach ( $negative_materials as $topic => $material ) {
@@ -149,20 +163,34 @@ if ( function_exists( 'velotok_core_validate_content_topic' ) ) {
 
 	$promotional = velotok_core_validate_content_topic(
 		array( 'title' => 'Обзор моделей солнечных панелей: купить со скидкой' ),
-		'model_overview'
+		'models_overview'
 	);
 	velotok_content_contract_assert( false === $promotional['valid'], 'Продвижение конкретного продукта не должно считаться обзором моделей.' );
 	velotok_content_contract_assert( true === $promotional['promotion_detected'], 'Продвижение в обзоре моделей должно выявляться.' );
 	velotok_content_contract_assert( 'MODEL_PROMOTION_DETECTED' === $promotional['code'], 'Для продвижения должен возвращаться MODEL_PROMOTION_DETECTED.' );
 
+	$news_without_date = velotok_core_validate_content_topic(
+		array(
+			'title'   => 'Новости зелёной энергетики: запущена солнечная электростанция',
+			'summary' => 'Компания сообщила о запуске объекта возобновляемой энергетики.',
+		),
+		'news'
+	);
+	velotok_content_contract_assert( false === $news_without_date['valid'], 'Новость без даты события не должна признаваться соответствующей.' );
+	velotok_content_contract_assert( in_array( 'event_date', $news_without_date['missing'], true ), 'Отсутствие даты события должно фиксироваться в результате.' );
+
 	$manual = velotok_core_validate_content_topic(
-		array( 'topic' => 'green_energy_news', 'title' => 'Пресс-релиз компании' ),
-		'green_energy_news'
+		array(
+			'topic'      => 'green_energy_news',
+			'title'      => 'Пресс-релиз компании о запуске солнечной станции',
+			'event_date' => '2025-05-20',
+		),
+		'news'
 	);
 	velotok_content_contract_assert( true === $manual['valid'], 'Явная тематическая метка должна поддерживаться гибридным правилом.' );
 	velotok_content_contract_assert( 'manual' === $manual['classification'], 'Явная метка должна помечать способ определения как manual.' );
 
-	$unknown = velotok_core_validate_content_topic( velotok_content_material( 'model_overview' ), 'unknown_topic' );
+	$unknown = velotok_core_validate_content_topic( velotok_content_material( 'models_overview' ), 'unknown_topic' );
 	velotok_content_contract_assert( false === $unknown['valid'], 'Неизвестная тематика не должна быть валидной.' );
 	velotok_content_contract_assert( 'TOPIC_UNKNOWN' === $unknown['code'], 'Для неизвестной тематики должен возвращаться TOPIC_UNKNOWN.' );
 }
@@ -177,9 +205,9 @@ if ( function_exists( 'velotok_core_classify_content' ) ) {
 if ( function_exists( 'velotok_core_check_content_coverage' ) ) {
 	$complete = velotok_core_check_content_coverage(
 		array(
-			velotok_content_material( 'model_overview' ),
+			velotok_content_material( 'models_overview' ),
 			velotok_content_material( 'legal_requirements' ),
-			velotok_content_material( 'green_energy_news' ),
+			velotok_content_material( 'news' ),
 		)
 	);
 
@@ -188,16 +216,17 @@ if ( function_exists( 'velotok_core_check_content_coverage' ) ) {
 	velotok_content_contract_assert( array() === $complete['missing'], 'У полного охвата не должно быть недостающих тематик.' );
 	velotok_content_contract_assert( true === $complete['mocked'], 'Результат проверки охвата должен быть помечен mocked.' );
 	velotok_content_contract_assert( 3 === $complete['required_count'], 'В охвате должно быть три обязательные области.' );
+	velotok_content_contract_assert( $expected_topics === $complete['covered'], 'Полный охват должен покрывать обзор моделей, требования законодательства и новости.' );
 
 	$incomplete = velotok_core_check_content_coverage(
 		array(
-			velotok_content_material( 'model_overview' ),
+			velotok_content_material( 'models_overview' ),
 			velotok_content_material( 'legal_requirements' ),
 		)
 	);
 
 	velotok_content_contract_assert( false === $incomplete['complete'], 'Набор без новостей не должен считаться полным.' );
-	velotok_content_contract_assert( array( 'green_energy_news' ) === $incomplete['missing'], 'Должна быть зафиксирована недостающая тематика новостей.' );
+	velotok_content_contract_assert( array( 'news' ) === $incomplete['missing'], 'Должна быть зафиксирована недостающая тематика новостей.' );
 	velotok_content_contract_assert( in_array( 'CONTENT_COVERAGE_INCOMPLETE', $incomplete['errors'], true ), 'Для неполного охвата должен возвращаться CONTENT_COVERAGE_INCOMPLETE.' );
 
 	$empty = velotok_core_check_content_coverage( array() );
