@@ -1,9 +1,8 @@
 name: CI
 
-# Runs on every push and on every pull request (no path filters).
-# Keep these triggers broad: a previous CI run never started for a PR because
-# the repository had no workflow registered for pull_request events.
-
+# Runs on every push and on every pull request (no branch or path filters).
+# Commit 92b31d9ed3ccc55a6195a45f91db56cbc3202951 has no .github/workflows
+# directory at all, so GitHub could not start any run for it.
 on:
   push:
   pull_request:
@@ -18,7 +17,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Contract checks
+    name: Repository checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -36,18 +35,5 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Lint PHP files
-        run: find wp scripts -name '*.php' -print0 | xargs -0 -r -n1 php -l
-
-      - name: Run PHP specification data contract test
-        run: php wp/plugins/velotok-core/tests/spec-data-contract-test.php
-
-      - name: Run Node specification data contract test
-        run: node wp/plugins/velotok-core/tests/spec-data-contract.test.js
-
-      - name: Validate demo product data
-        run: >-
-          php -r '$data = json_decode(file_get_contents("content/products.json"), true);
-          if (JSON_ERROR_NONE !== json_last_error() || !is_array($data) || [] === $data) {
-          fwrite(STDERR, "content/products.json is invalid\n"); exit(1); }
-          echo "content/products.json OK\n";'
+      - name: Run repository checks
+        run: bash scripts/ci-check.sh

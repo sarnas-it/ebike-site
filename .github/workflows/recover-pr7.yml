@@ -1,0 +1,84 @@
+name: Recover PR #7 checks
+
+# GitHub never starts a workflow for a commit that predates the workflow file.
+# PR #7 head 92b31d9... is exactly such a commit: it has no .github/workflows
+# directory. This workflow replays the repository checks on that SHA, publishes
+# the result for the SHA, and completes the deferred merge of PR #7.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  checks: write
+  statuses: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: recover-pr-7
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Recover PR #7 checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      REPO: ${{ github.repository }}
+      TARGET_PR: "7"
+      TARGET_SHA: 92b31d9ed3ccc55a6195a45f91db56cbc3202951
+      TARGET_DIR: ${{ github.workspace }}/target
+
+    steps:
+      - name: Check out stale PR head
+        uses: actions/checkout@v4
+        with:
+          ref: 92b31d9ed3ccc55a6195a45f91db56cbc3202951
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out CI tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          coverage: none
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Record checked commit
+        run: |
+          set -euo pipefail
+          checked="$(git -C target rev-parse HEAD)"
+          test "$checked" = "$TARGET_SHA"
+          echo "Checked commit: $checked" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run repository checks against stale commit
+        run: |
+          set -euo pipefail
+          bash tooling/scripts/ci-check.sh target | tee "$RUNNER_TEMP/ci-check.log"
+          {
+            echo "### Repository checks"
+            echo ""
+            echo "Commit: \`$TARGET_SHA\`"
+            echo ""
+            echo '```'
+            tail -n 20 "$RUNNER_TEMP/ci-check.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish check results and complete deferred merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tooling/scripts/recover-pr7.sh
