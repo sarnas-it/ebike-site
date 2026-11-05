@@ -272,12 +272,13 @@ function velotok_normalize_product( $product, $index = 0 ) {
 	$price      = (float) $product->get_price();
 	$price_html = $product->get_price_html();
 	$note       = '';
+	$months     = max( 1, (int) velotok_spec_value( 'installment_months', 24 ) );
 
 	if ( $price > 0 ) {
 		$note = sprintf(
 			/* translators: %s: сумма ежемесячного платежа. */
 			__( 'в рассрочку %s ₽/мес', 'velotok' ),
-			number_format_i18n( (int) round( $price / 24 ), 0 )
+			number_format_i18n( (int) round( $price / $months ), 0 )
 		);
 	}
 
@@ -410,8 +411,9 @@ function velotok_fallback_models() {
  * @return array
  */
 function velotok_normalize_fallback_model( $model, $index = 0 ) {
-	$price = isset( $model['price'] ) ? (int) $model['price'] : 0;
-	$specs = array();
+	$price  = isset( $model['price'] ) ? (int) $model['price'] : 0;
+	$months = max( 1, (int) velotok_spec_value( 'installment_months', 24 ) );
+	$specs  = array();
 
 	if ( ! empty( $model['range'] ) ) {
 		$specs[] = array(
@@ -460,7 +462,7 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 		'price_html'     => number_format_i18n( $price, 0 ) . ' ₽',
 		'price_note'     => $price > 0
 			/* translators: %s: сумма ежемесячного платежа. */
-			? sprintf( __( 'в рассрочку %s ₽/мес', 'velotok' ), number_format_i18n( (int) round( $price / 24 ), 0 ) )
+			? sprintf( __( 'в рассрочку %s ₽/мес', 'velotok' ), number_format_i18n( (int) round( $price / $months ), 0 ) )
 			: '',
 		'add_html'       => sprintf(
 			'<a class="btn-add" href="%1$s">%2$s</a>',
