@@ -8,6 +8,28 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * Возвращает значение из stub-слоя данных спецификации.
+ *
+ * Тема не читает env напрямую: единственная точка доступа — контракт плагина
+ * `velotok-core`. Если плагин не активирован, используется локальное значение.
+ *
+ * @param string $key      Ключ данных спецификации.
+ * @param mixed  $fallback Значение на случай недоступности контракта.
+ * @return mixed
+ */
+function velotok_spec_value( $key, $fallback = '' ) {
+	if ( function_exists( 'velotok_core_spec_get' ) ) {
+		$value = velotok_core_spec_get( $key );
+
+		if ( '' !== $value ) {
+			return $value;
+		}
+	}
+
+	return $fallback;
+}
+
+/**
  * Значения по умолчанию для редактируемых текстов.
  *
  * @return array<string,string>
@@ -22,10 +44,10 @@ function velotok_customizer_defaults() {
 		'hero_lead'           => __( 'Семь проверенных моделей для города, гор и дачи. Привозим собранными, настраиваем посадку и объясняем, как обращаться с батареей.', 'velotok' ),
 		'hero_primary_label'  => __( 'Выбрать велосипед', 'velotok' ),
 		'hero_secondary_label' => __( 'Записаться на тест-драйв', 'velotok' ),
-		'phone'               => '+7 (495) 123-45-67',
-		'email'               => 'hello@velotok.ru',
-		'address'             => __( 'Москва, Нижняя Сыромятническая, 10, стр. 2', 'velotok' ),
-		'hours'               => __( 'Ежедневно, 10:00–21:00', 'velotok' ),
+		'phone'               => (string) velotok_spec_value( 'shop_phone', '+7 (495) 123-45-67' ),
+		'email'               => (string) velotok_spec_value( 'shop_email', 'hello@velotok.ru' ),
+		'address'             => (string) velotok_spec_value( 'shop_address', __( 'Москва, Нижняя Сыромятническая, 10, стр. 2', 'velotok' ) ),
+		'hours'               => (string) velotok_spec_value( 'shop_hours', __( 'Ежедневно, 10:00–21:00', 'velotok' ) ),
 		'legal'               => __( '© 2026 «ВЕЛОТОК». ИП Соколов А. В., ИНН 770123456789, ОГРНИП 320770000123456. Цены на сайте не являются публичной офертой. <a href="#privacy">Политика конфиденциальности</a> · <a href="#lead">Публичная оферта</a>', 'velotok' ),
 		'footer_note'         => __( 'Сделано для тех, кто ездит', 'velotok' ),
 	);
