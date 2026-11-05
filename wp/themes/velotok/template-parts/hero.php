@@ -7,10 +7,13 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$velotok_models = velotok_get_home_models();
-$velotok_offer  = ! empty( $velotok_models[0] ) ? $velotok_models[0] : null;
-$velotok_range  = ( $velotok_offer && ! empty( $velotok_offer['specs'][0][1] ) ) ? $velotok_offer['specs'][0][1] : '';
-$velotok_price  = $velotok_offer ? wp_strip_all_tags( $velotok_offer['price_html'] ) : '';
+$velotok_models        = velotok_get_home_models();
+$velotok_offer         = ! empty( $velotok_models[0] ) ? $velotok_models[0] : null;
+$velotok_range         = ( $velotok_offer && ! empty( $velotok_offer['specs'][0][1] ) ) ? $velotok_offer['specs'][0][1] : '';
+$velotok_price         = $velotok_offer ? wp_strip_all_tags( $velotok_offer['price_html'] ) : '';
+$velotok_model_types   = velotok_spec_value( 'catalog_model_types', 4 );
+$velotok_catalog_range = velotok_spec_value( 'catalog_range', __( '20–120 км', 'velotok' ) );
+$velotok_warranty      = velotok_spec_value( 'warranty_years', 2 );
 ?>
 <section class="hero" id="top" aria-labelledby="hero-title">
 	<img class="hero-bg" src="<?php echo esc_url( get_template_directory_uri() . '/assets/img/hero-city-1-web.jpg' ); ?>" width="1536" height="864" alt="<?php esc_attr_e( 'Городской электровелосипед кремово-оливкового цвета на мощёной улице на закате', 'velotok' ); ?>" fetchpriority="high" decoding="async">
@@ -27,9 +30,9 @@ $velotok_price  = $velotok_offer ? wp_strip_all_tags( $velotok_offer['price_html
 			<a class="btn btn-ghost" href="<?php echo esc_url( home_url( '/#lead' ) ); ?>"><?php echo esc_html( velotok_get_option( 'hero_secondary_label' ) ); ?></a>
 		</div>
 		<dl class="hero-stats">
-			<div><dt><?php esc_html_e( 'Типы моделей', 'velotok' ); ?></dt><dd>4</dd></div>
-			<div><dt><?php esc_html_e( 'Запас хода', 'velotok' ); ?></dt><dd><?php esc_html_e( '20–120 км', 'velotok' ); ?></dd></div>
-			<div><dt><?php esc_html_e( 'Гарантия', 'velotok' ); ?></dt><dd><?php esc_html_e( '2 года', 'velotok' ); ?></dd></div>
+			<div><dt><?php esc_html_e( 'Типы моделей', 'velotok' ); ?></dt><dd><?php echo esc_html( (string) $velotok_model_types ); ?></dd></div>
+			<div><dt><?php esc_html_e( 'Запас хода', 'velotok' ); ?></dt><dd><?php echo esc_html( (string) $velotok_catalog_range ); ?></dd></div>
+			<div><dt><?php esc_html_e( 'Гарантия', 'velotok' ); ?></dt><dd><?php printf( esc_html__( '%s года', 'velotok' ), esc_html( (string) $velotok_warranty ) ); ?></dd></div>
 		</dl>
 	</div>
 	<?php if ( $velotok_offer ) : ?>
