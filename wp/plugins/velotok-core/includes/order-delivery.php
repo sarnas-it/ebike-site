@@ -70,6 +70,15 @@ function velotok_core_order_delivery_contract() {
 		'network'           => false,
 		'currency'          => 'RUB',
 		'required'          => true,
+		'persistence'       => array(
+			'enabled'         => true,
+			'mode'            => 'order_object',
+			'storage'         => 'order_fields_and_meta',
+			'fields'          => array( 'delivery_method', 'delivery_method_label', 'delivery_cost', 'delivery_currency' ),
+			'writes_database' => false,
+			'mocked'          => true,
+			'source'          => 'stub',
+		),
 		'default'           => $default,
 		'labels'            => array(
 			'russian_post' => 'Почта РФ',
@@ -572,6 +581,58 @@ function velotok_core_apply_checkout_delivery( &$order, $method = '', $options =
  */
 function velotok_core_save_order_checkout_delivery( $order = array(), $method = '', $options = array() ) {
 	return velotok_core_save_checkout_delivery( $order, $method, $options );
+}
+
+/**
+ * Read the delivery selection saved in a checkout order.
+ *
+ * This is the read counterpart of velotok_core_save_checkout_delivery(). It
+ * supports order arrays and WooCommerce-like objects and never writes to the
+ * database. The result is marked mocked and reports whether the delivery cost
+ * is included in the stored order total.
+ *
+ * @param mixed $order Order data (array or object).
+ * @return array<string,mixed>
+ */
+function velotok_core_get_checkout_delivery( $order = array() ) {
+	$contract = velotok_core_order_delivery_contract();
+	$selection = velotok_core_delivery_read_from_order( $order );
+
+	$selection['spec']          = $contract['spec'];
+	$selection['checkout_spec'] = $contract['checkout_spec'];
+	$selection['provider_label'] = $contract['provider_label'];
+
+	if ( ! empty( $selection['valid'] ) ) {
+		$selection['in_total']                 = true;
+		$selection['total_includes_delivery']  = true;
+		$selection['display']                  = array(
+			'delivery' => velotok_core_order_delivery_format_amount( $selection['delivery_cost'], $selection['delivery_currency'] ),
+		);
+	}
+
+	return $selection;
+}
+
+/**
+ * Alias for callers that use a read-prefixed checkout delivery name.
+ *
+ * @param mixed $order Order data (array or object).
+ * @return array<string,mixed>
+ */
+function velotok_core_read_checkout_delivery( $order = array() ) {
+	return velotok_core_get_checkout_delivery( $order );
+}
+
+/**
+ * Check whether a checkout order stores a valid delivery selection.
+ *
+ * @param mixed $order Order data (array or object).
+ * @return bool
+ */
+function velotok_core_checkout_delivery_is_saved( $order = array() ) {
+	$selection = velotok_core_get_checkout_delivery( $order );
+
+	return ! empty( $selection['valid'] ) && ! empty( $selection['saved'] );
 }
 
 /**

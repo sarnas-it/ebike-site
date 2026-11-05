@@ -26,7 +26,11 @@ function includesIn(source, fragment, message) {
 
 includesIn(orderDelivery, 'velotok_core_save_checkout_delivery', 'Checkout delivery persistence helper is missing');
 includesIn(orderDelivery, 'velotok_core_apply_checkout_delivery', 'Checkout delivery apply helper is missing');
+includesIn(orderDelivery, 'velotok_core_get_checkout_delivery', 'Checkout delivery read helper is missing');
+includesIn(orderDelivery, 'velotok_core_checkout_delivery_is_saved', 'Checkout delivery saved check is missing');
 includesIn(deliveryOptions, 'velotok_core_save_delivery_selection', 'Delivery selection persistence helper is missing');
+includesIn(deliveryOptions, 'velotok_core_delivery_read_from_order', 'Delivery order read helper is missing');
+includesIn(deliveryOptions, 'velotok_core_delivery_order_has_selection', 'Delivery order saved check is missing');
 includesIn(deliveryOptions, 'velotok_core_delivery_options_apply_to_order', 'Delivery order persistence helper is missing');
 includesIn(deliveryOptions, 'clarify-a8fe76a0', 'Delivery options contract must reference spec clarify-a8fe76a0');
 includesIn(deliveryOptions, "'mocked'", 'Delivery options contract must declare the mocked marker');
@@ -53,34 +57,46 @@ if (green.stderr) {
 assert.strictEqual(green.status, 0, 'PHP delivery persistence contract test failed');
 console.log('PASS: selected delivery method and cost are persisted in the order');
 
-const redGreenRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'velotok-delivery-persistence-'));
+function runRedScenario(name, source, replacement) {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'velotok-delivery-persistence-'));
 
-try {
-  const redIncludes = path.join(redGreenRoot, 'includes');
-  const redTests = path.join(redGreenRoot, 'tests');
-  fs.mkdirSync(redIncludes, { recursive: true });
-  fs.mkdirSync(redTests, { recursive: true });
+  try {
+    const redIncludes = path.join(rootDir, 'includes');
+    const redTests = path.join(rootDir, 'tests');
+    fs.mkdirSync(redIncludes, { recursive: true });
+    fs.mkdirSync(redTests, { recursive: true });
 
-  fs.copyFileSync(deliveryOptionsPath, path.join(redIncludes, 'delivery-options.php'));
-  fs.writeFileSync(
-    path.join(redIncludes, 'order-delivery.php'),
-    orderDelivery.replace(
-      'function velotok_core_save_checkout_delivery(',
-      'function velotok_core_save_checkout_delivery_removed_for_red_test('
-    )
-  );
-  fs.copyFileSync(phpTestPath, path.join(redTests, 'delivery-order-persistence-contract-test.php'));
+    fs.copyFileSync(deliveryOptionsPath, path.join(redIncludes, 'delivery-options.php'));
+    fs.writeFileSync(path.join(redIncludes, 'order-delivery.php'), source);
+    fs.copyFileSync(phpTestPath, path.join(redTests, 'delivery-order-persistence-contract-test.php'));
 
-  const red = spawnSync('php', [path.join(redTests, 'delivery-order-persistence-contract-test.php')], {
-    encoding: 'utf8',
-  });
+    const red = spawnSync('php', [path.join(redTests, 'delivery-order-persistence-contract-test.php')], {
+      encoding: 'utf8',
+    });
 
-  assert.notStrictEqual(
-    red.status,
-    0,
-    'Contract test must fail when the order delivery persistence requirement is removed'
-  );
-  console.log('PASS: contract test fails without the order delivery persistence stub (red-green)');
-} finally {
-  fs.rmSync(redGreenRoot, { recursive: true, force: true });
+    assert.notStrictEqual(
+      red.status,
+      0,
+      `Contract test must fail when the ${name} requirement is removed`
+    );
+    console.log(`PASS: contract test fails without the ${name} requirement (red-green)`);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
 }
+
+runRedScenario(
+  'order delivery persistence',
+  orderDelivery.replace(
+    'function velotok_core_save_checkout_delivery(',
+    'function velotok_core_save_checkout_delivery_removed_for_red_test('
+  )
+);
+
+runRedScenario(
+  'saved delivery read-back',
+  orderDelivery.replace(
+    'function velotok_core_get_checkout_delivery(',
+    'function velotok_core_get_checkout_delivery_removed_for_red_test('
+  )
+);

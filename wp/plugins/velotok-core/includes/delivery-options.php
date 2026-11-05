@@ -220,7 +220,14 @@ function velotok_core_delivery_options_contract() {
 			'network' => false,
 		),
 		'network'                 => false,
-		'persistence'             => false,
+		'persistence'             => array(
+			'enabled'         => true,
+			'mode'            => 'order_object',
+			'storage'         => 'order_fields_and_meta',
+			'writes_database' => false,
+			'mocked'          => true,
+			'source'          => 'stub',
+		),
 		'currency'                => 'RUB',
 		'methods'                 => $methods,
 		'delivery_methods'        => $methods,
@@ -256,9 +263,18 @@ function velotok_core_delivery_options_contract() {
 			'tariffs'    => $tariffs,
 		),
 		'order'                   => array(
-			'source'    => 'stub',
-			'mocked'    => true,
-			'persisted' => false,
+			'source'             => 'stub',
+			'mocked'             => true,
+			'persisted'          => false,
+			'persisted_in_order' => true,
+			'persistence'        => array(
+				'enabled'         => true,
+				'mode'            => 'order_object',
+				'storage'         => 'order_fields_and_meta',
+				'writes_database' => false,
+				'mocked'          => true,
+				'source'          => 'stub',
+			),
 			'fields'    => array(
 				'delivery_method'       => 'string',
 				'delivery_method_label' => 'string',
@@ -1499,6 +1515,244 @@ function velotok_core_apply_delivery_to_order( &$order, $method = '', $cost = nu
  */
 function velotok_core_select_delivery_option( $order = array(), $method = '', $cost = null ) {
 	return velotok_core_save_delivery_selection( $order, $method, $cost );
+}
+
+/**
+ * Read a stored order meta value without external calls.
+ *
+ * @param mixed  $order    Order data (array or object).
+ * @param string $meta_key Meta key.
+ * @return mixed Null when the meta value is absent.
+ */
+function velotok_core_delivery_order_meta_value( $order, $meta_key ) {
+	if ( ! is_string( $meta_key ) || '' === $meta_key ) {
+		return null;
+	}
+
+	if ( is_array( $order ) ) {
+		if ( isset( $order['delivery_meta'] ) && is_array( $order['delivery_meta'] ) && array_key_exists( $meta_key, $order['delivery_meta'] ) ) {
+			return $order['delivery_meta'][ $meta_key ];
+		}
+
+		if ( array_key_exists( $meta_key, $order ) ) {
+			return $order[ $meta_key ];
+		}
+
+		return null;
+	}
+
+	if ( is_object( $order ) && method_exists( $order, 'get_meta' ) ) {
+		return $order->get_meta( $meta_key, true );
+	}
+
+	return null;
+}
+
+/**
+ * Read the saved delivery selection from an order.
+ *
+ * The stub reads the canonical order fields for arrays and WooCommerce-like
+ * order objects (`get_shipping_method`, `get_shipping_total`, `get_meta`).
+ * Nothing is written to the database; the returned value is explicitly marked
+ * mocked and reports whether a valid selection was stored.
+ *
+ * @param mixed $order Order data (array or object).
+ * @return array<string,mixed>
+ */
+function velotok_core_delivery_read_from_order( $order ) {
+	$contract = velotok_core_delivery_options_contract();
+	$fields   = $contract['order_fields'];
+	$method   = '';
+	$cost     = null;
+	$label    = '';
+	$currency = '';
+
+	if ( is_array( $order ) ) {
+		foreach ( array( $fields['method'], 'delivery_method_id', 'shipping_method' ) as $key ) {
+			if ( isset( $order[ $key ] ) && is_scalar( $order[ $key ] ) && '' !== trim( (string) $order[ $key ] ) ) {
+				$method = (string) $order[ $key ];
+				break;
+			}
+		}
+
+		if ( '' === $method ) {
+			$stored = velotok_core_delivery_order_meta_value( $order, $fields['meta']['method'] );
+
+			if ( is_scalar( $stored ) && '' !== trim( (string) $stored ) ) {
+				$method = (string) $stored;
+			}
+		}
+
+		foreach ( array( $fields['cost'], 'delivery_cost_amount', 'shipping_cost' ) as $key ) {
+			if ( isset( $order[ $key ] ) && is_numeric( $order[ $key ] ) ) {
+				$cost = round( (float) $order[ $key ], 2 );
+				break;
+			}
+		}
+
+		if ( null === $cost ) {
+			$stored = velotok_core_delivery_order_meta_value( $order, $fields['meta']['cost'] );
+
+			if ( is_numeric( $stored ) ) {
+				$cost = round( (float) $stored, 2 );
+			}
+		}
+
+		$stored = velotok_core_delivery_order_meta_value( $order, $fields['meta']['label'] );
+
+		if ( is_scalar( $stored ) && '' !== trim( (string) $stored ) ) {
+			$label = (string) $stored;
+		} elseif ( isset( $order[ $fields['method_label'] ] ) && is_scalar( $order[ $fields['method_label'] ] ) ) {
+			$label = (string) $order[ $fields['method_label'] ];
+		}
+
+		$stored = velotok_core_delivery_order_meta_value( $order, $fields['meta']['currency'] );
+
+		if ( is_scalar( $stored ) && '' !== trim( (string) $stored ) ) {
+			$currency = (string) $stored;
+		} elseif ( isset( $order[ $fields['currency'] ] ) && is_scalar( $order[ $fields['currency'] ] ) ) {
+			$currency = (string) $order[ $fields['currency'] ];
+		}
+	} elseif ( is_object( $order ) ) {
+		if ( method_exists( $order, 'get_shipping_method' ) ) {
+			$stored = $order->get_shipping_method();
+
+			if ( is_scalar( $stored ) && '' !== trim( (string) $stored ) ) {
+				$method = (string) $stored;
+			}
+		}
+
+		if ( '' === $method ) {
+			$stored = velotok_core_delivery_order_meta_value( $order, $fields['meta']['method'] );
+
+			if ( is_scalar( $stored ) && '' !== trim( (string) $stored ) ) {
+				$method = (string) $stored;
+			}
+		}
+
+		if ( method_exists( $order, 'get_shipping_total' ) ) {
+			$stored = $order->get_shipping_total();
+
+			if ( is_numeric( $stored ) ) {
+				$cost = round( (float) $stored, 2 );
+			}
+		}
+
+		if ( null === $cost ) {
+			$stored = velotok_core_delivery_order_meta_value( $order, $fields['meta']['cost'] );
+
+			if ( is_numeric( $stored ) ) {
+				$cost = round( (float) $stored, 2 );
+			}
+		}
+
+		$stored = velotok_core_delivery_order_meta_value( $order, $fields['meta']['label'] );
+
+		if ( is_scalar( $stored ) && '' !== trim( (string) $stored ) ) {
+			$label = (string) $stored;
+		}
+
+		$stored = velotok_core_delivery_order_meta_value( $order, $fields['meta']['currency'] );
+
+		if ( is_scalar( $stored ) && '' !== trim( (string) $stored ) ) {
+			$currency = (string) $stored;
+		}
+	}
+
+	$resolved = '' !== $method ? velotok_core_delivery_option( $method ) : null;
+
+	if ( null === $resolved ) {
+		$code = '' === $method ? $contract['missing_method'] : $contract['invalid_method'];
+
+		return array(
+			'valid'            => false,
+			'saved'            => false,
+			'code'             => $code,
+			'error'            => $code,
+			'spec'             => $contract['spec'],
+			'source'           => 'stub',
+			'mocked'           => true,
+			'provider'         => $contract['provider_id'],
+			'method'           => '',
+			'method_id'        => '',
+			'method_label'     => '',
+			'delivery_method'  => '',
+			'delivery_cost'    => null,
+			'amount'           => null,
+			'cost'             => null,
+			'delivery_currency' => $contract['currency'],
+			'currency'         => $contract['currency'],
+		);
+	}
+
+	if ( null === $cost ) {
+		$calculation = velotok_core_calculate_delivery_cost( $resolved['id'], is_array( $order ) ? $order : array() );
+
+		if ( ! empty( $calculation['valid'] ) ) {
+			$cost = round( (float) $calculation['amount'], 2 );
+		}
+	}
+
+	if ( '' === $label ) {
+		$label = $resolved['label'];
+	}
+
+	if ( '' === $currency ) {
+		$currency = $contract['currency'];
+	}
+
+	$meta = array(
+		$fields['meta']['method']   => $resolved['id'],
+		$fields['meta']['label']    => $label,
+		$fields['meta']['provider'] => $contract['provider_id'],
+		$fields['meta']['cost']     => $cost,
+		$fields['meta']['currency'] => $currency,
+		$fields['meta']['mocked']   => 'yes',
+	);
+
+	return array(
+		'valid'                 => true,
+		'saved'                 => true,
+		'code'                  => null,
+		'error'                 => null,
+		'spec'                  => $contract['spec'],
+		'source'                => 'stub',
+		'mocked'                => true,
+		'provider'              => $contract['provider_id'],
+		'method'                => $resolved['id'],
+		'method_id'             => $resolved['id'],
+		'method_label'          => $label,
+		'delivery_method'       => $resolved['id'],
+		'delivery_method_label' => $label,
+		'amount'                => $cost,
+		'cost'                  => $cost,
+		'delivery_cost'         => $cost,
+		'delivery_currency'     => $currency,
+		'currency'              => $currency,
+		'meta'                  => $meta,
+	);
+}
+
+/**
+ * Alias for callers that use a get-prefixed saved-delivery name.
+ *
+ * @param mixed $order Order data (array or object).
+ * @return array<string,mixed>
+ */
+function velotok_core_get_delivery_from_order( $order ) {
+	return velotok_core_delivery_read_from_order( $order );
+}
+
+/**
+ * Check whether an order stores a valid delivery selection.
+ *
+ * @param mixed $order Order data (array or object).
+ * @return bool
+ */
+function velotok_core_delivery_order_has_selection( $order ) {
+	$selection = velotok_core_delivery_read_from_order( $order );
+
+	return ! empty( $selection['valid'] ) && ! empty( $selection['saved'] );
 }
 
 /**

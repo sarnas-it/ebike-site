@@ -74,6 +74,19 @@ class Velotok_Delivery_Persistence_Test_Order {
 	}
 
 	/**
+	 * Read order meta like WC_Order::get_meta().
+	 *
+	 * @param string $key    Meta key.
+	 * @param bool   $single Whether to return a single value.
+	 * @return mixed
+	 */
+	public function get_meta( $key, $single = true ) {
+		unset( $single );
+
+		return array_key_exists( $key, $this->meta ) ? $this->meta[ $key ] : '';
+	}
+
+	/**
 	 * Store the shipping total like WC_Order::set_shipping_total().
 	 *
 	 * @param float $value Shipping total.
@@ -91,6 +104,24 @@ class Velotok_Delivery_Persistence_Test_Order {
 	 */
 	public function set_shipping_method( $method ) {
 		$this->shipping_method = $method;
+	}
+
+	/**
+	 * Return the shipping total like WC_Order::get_shipping_total().
+	 *
+	 * @return float|null
+	 */
+	public function get_shipping_total() {
+		return $this->shipping_total;
+	}
+
+	/**
+	 * Return the shipping method like WC_Order::get_shipping_method().
+	 *
+	 * @return string|null
+	 */
+	public function get_shipping_method() {
+		return $this->shipping_method;
 	}
 
 	/**
@@ -132,13 +163,22 @@ velotok_delivery_persistence_assert( isset( $contract['order'] ) && is_array( $c
 velotok_delivery_persistence_assert( isset( $contract['order']['mocked'] ) && true === $contract['order']['mocked'], 'Сохранение доставки в заказе не помечено mocked: true.' );
 velotok_delivery_persistence_assert( isset( $contract['order_fields']['method'], $contract['order_fields']['cost'] ), 'Контракт не описывает поля способа и стоимости доставки в заказе.' );
 velotok_delivery_persistence_assert( isset( $contract['order_fields']['meta']['method'], $contract['order_fields']['meta']['cost'] ), 'Контракт не описывает meta-поля способа и стоимости доставки.' );
+velotok_delivery_persistence_assert( isset( $contract['persistence']['mocked'] ) && true === $contract['persistence']['mocked'], 'Контракт не помечает сохранение доставки в заказе как mocked: true.' );
+velotok_delivery_persistence_assert( isset( $contract['persistence']['enabled'] ) && true === $contract['persistence']['enabled'], 'Сохранение доставки в заказе должно быть включено.' );
+velotok_delivery_persistence_assert( isset( $contract['persistence']['writes_database'] ) && false === $contract['persistence']['writes_database'], 'Заглушка не должна писать в базу данных.' );
+velotok_delivery_persistence_assert( isset( $contract['order']['persistence']['mocked'] ) && true === $contract['order']['persistence']['mocked'], 'Persistence-блок заказа не помечен mocked: true.' );
+velotok_delivery_persistence_assert( isset( $contract['order']['persistence']['enabled'] ) && true === $contract['order']['persistence']['enabled'], 'Persistence-блок заказа должен быть включён.' );
 
 foreach (
 	array(
 		'velotok_core_delivery_options_apply_to_order',
 		'velotok_core_save_delivery_selection',
+		'velotok_core_delivery_read_from_order',
+		'velotok_core_delivery_order_has_selection',
 		'velotok_core_save_checkout_delivery',
 		'velotok_core_apply_checkout_delivery',
+		'velotok_core_get_checkout_delivery',
+		'velotok_core_checkout_delivery_is_saved',
 	) as $helper
 ) {
 	velotok_delivery_persistence_assert( function_exists( $helper ), sprintf( 'Отсутствует функция сохранения доставки в заказе: %s.', $helper ) );
@@ -160,6 +200,25 @@ if ( function_exists( 'velotok_core_save_checkout_delivery' ) ) {
 	velotok_delivery_persistence_assert( 'cdek' === $saved['delivery_meta']['_velotok_delivery_method'], 'Способ доставки не попадает в meta заказа.' );
 	velotok_delivery_persistence_assert( 730.0 === (float) $saved['delivery_meta']['_velotok_delivery_cost'], 'Стоимость доставки не попадает в meta заказа.' );
 	velotok_delivery_persistence_assert( 500 === $saved['id'], 'Сохранение доставки не должно терять данные заказа.' );
+
+	if ( function_exists( 'velotok_core_get_checkout_delivery' ) ) {
+		$stored = velotok_core_get_checkout_delivery( $saved );
+
+		velotok_delivery_persistence_assert( true === $stored['valid'] && true === $stored['saved'], 'Сохранённая доставка должна читаться обратно из заказа.' );
+		velotok_delivery_persistence_assert( true === $stored['mocked'], 'Прочитанная доставка должна быть помечена mocked: true.' );
+		velotok_delivery_persistence_assert( 'cdek' === $stored['delivery_method'], 'Прочитанный способ доставки не совпадает с сохранённым.' );
+		velotok_delivery_persistence_assert( 'СДЭК' === $stored['delivery_method_label'], 'Прочитанное название способа доставки не совпадает с сохранённым.' );
+		velotok_delivery_persistence_assert( 730.0 === (float) $stored['delivery_cost'], 'Прочитанная стоимость доставки не совпадает с сохранённой.' );
+		velotok_delivery_persistence_assert( 'RUB' === $stored['delivery_currency'], 'Прочитанная валюта доставки не совпадает с сохранённой.' );
+		velotok_delivery_persistence_assert( 'cdek' === $stored['meta']['_velotok_delivery_method'], 'Meta способа доставки не читается из заказа.' );
+		velotok_delivery_persistence_assert( 730.0 === (float) $stored['meta']['_velotok_delivery_cost'], 'Meta стоимости доставки не читается из заказа.' );
+		velotok_delivery_persistence_assert( true === velotok_core_checkout_delivery_is_saved( $saved ), 'Заказ с сохранённой доставкой должен определяться как имеющий выбор.' );
+
+		$empty = velotok_core_get_checkout_delivery( array( 'id' => 503 ) );
+		velotok_delivery_persistence_assert( false === $empty['valid'] && false === $empty['saved'], 'Заказ без доставки не должен возвращать сохранённый выбор.' );
+		velotok_delivery_persistence_assert( 'DELIVERY_METHOD_REQUIRED' === $empty['code'], 'Пустой заказ должен давать DELIVERY_METHOD_REQUIRED.' );
+		velotok_delivery_persistence_assert( false === velotok_core_checkout_delivery_is_saved( array( 'id' => 503 ) ), 'Заказ без доставки не должен помечаться как сохранённый.' );
+	}
 
 	$invalid = velotok_core_save_checkout_delivery( $order, 'teleport' );
 	velotok_delivery_persistence_assert( false === $invalid['valid'] && false === $invalid['saved'], 'Неизвестный способ доставки не должен сохраняться в заказе.' );
@@ -189,6 +248,16 @@ if ( function_exists( 'velotok_core_save_checkout_delivery' ) ) {
 	velotok_delivery_persistence_assert( isset( $order->meta['_velotok_delivery_cost'] ) && 730.0 === (float) $order->meta['_velotok_delivery_cost'], 'Стоимость доставки не записывается в meta объекта заказа.' );
 	velotok_delivery_persistence_assert( 730.0 === (float) $order->shipping_total, 'Стоимость доставки не записывается в shipping_total объекта заказа.' );
 	velotok_delivery_persistence_assert( 'cdek' === $order->shipping_method, 'Способ доставки не записывается в shipping_method объекта заказа.' );
+
+	if ( function_exists( 'velotok_core_get_checkout_delivery' ) ) {
+		$stored = velotok_core_get_checkout_delivery( $order );
+
+		velotok_delivery_persistence_assert( true === $stored['valid'] && true === $stored['saved'], 'Сохранённая доставка должна читаться из объекта заказа.' );
+		velotok_delivery_persistence_assert( 'cdek' === $stored['delivery_method'], 'Способ доставки не читается из объекта заказа.' );
+		velotok_delivery_persistence_assert( 730.0 === (float) $stored['delivery_cost'], 'Стоимость доставки не читается из объекта заказа.' );
+		velotok_delivery_persistence_assert( 'RUB' === $stored['delivery_currency'], 'Валюта доставки не читается из объекта заказа.' );
+		velotok_delivery_persistence_assert( true === velotok_core_checkout_delivery_is_saved( $order ), 'Объект заказа должен определяться как имеющий сохранённую доставку.' );
+	}
 }
 
 if ( function_exists( 'velotok_core_apply_checkout_delivery' ) ) {
