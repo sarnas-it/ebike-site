@@ -38,18 +38,27 @@ if ! grep -Eqi 'Велоток|электровелосипед|velotok' "$PAGE_
 	exit 1
 fi
 
-if ! "${COMPOSE[@]}" run --rm -T wpcli theme list --status=active --field=name | grep -qx 'velotok'; then
+if ! "${COMPOSE[@]}" exec -T wordpress wp theme list --status=active --field=name | grep -qx 'velotok'; then
 	echo "FAIL: тема velotok не активирована" >&2
 	exit 1
 fi
 
-if ! "${COMPOSE[@]}" run --rm -T wpcli plugin list --status=active --field=name | grep -qx 'velotok-core'; then
+installed_themes="$("${COMPOSE[@]}" exec -T wordpress wp theme list --field=name)"
+
+for variant in velotok-bold velotok-minimal; do
+	if ! printf '%s\n' "$installed_themes" | grep -qx "$variant"; then
+		echo "FAIL: вариант дизайна $variant не виден в wp theme list" >&2
+		exit 1
+	fi
+done
+
+if ! "${COMPOSE[@]}" exec -T wordpress wp plugin list --status=active --field=name | grep -qx 'velotok-core'; then
 	echo "FAIL: плагин velotok-core не активирован" >&2
 	exit 1
 fi
 
-if "${COMPOSE[@]}" run --rm -T wpcli plugin is-active woocommerce >/dev/null 2>&1; then
-	products="$("${COMPOSE[@]}" run --rm -T wpcli post list --post_type=product --post_status=publish --format=count | tr -dc '0-9')"
+if "${COMPOSE[@]}" exec -T wordpress wp plugin is-active woocommerce >/dev/null 2>&1; then
+	products="$("${COMPOSE[@]}" exec -T wordpress wp post list --post_type=product --post_status=publish --format=count | tr -dc '0-9')"
 	if [ "${products:-0}" -lt 1 ]; then
 		echo "FAIL: в каталоге нет опубликованных товаров" >&2
 		exit 1

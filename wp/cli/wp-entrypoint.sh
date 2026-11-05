@@ -1,9 +1,14 @@
 #!/bin/sh
 #
-# Обёртка WP-CLI для локального контейнера: разрешает запуск от root и
-# принимает как `wp plugin list`, так и `plugin list`.
+# Обёртка WP-CLI для контейнера wpcli: поддерживает как `wp plugin list`,
+# так и `plugin list`, а команда bootstrap запускает первичную настройку.
 #
 set -eu
+
+if [ "${1:-}" = "bootstrap" ]; then
+	shift
+	exec /opt/velotok/cli/bootstrap.sh
+fi
 
 if [ "$#" -eq 0 ]; then
 	set -- --info

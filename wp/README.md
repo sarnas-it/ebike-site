@@ -29,6 +29,8 @@ docker compose exec wordpress wp plugin list
 docker compose exec wordpress wp theme list
 docker compose run --rm wpcli plugin list
 bash wp/tests/smoke.sh
+php wp/tests/theme-variants-test.php
+node wp/tests/theme-variants.test.js
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
@@ -37,8 +39,30 @@ php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
 
 Дымовой тест поднимает отдельный compose-проект, ждёт ответ главной страницы,
-проверяет активные тему и плагин и наличие товаров, затем удаляет контейнеры и
-тома тестового проекта.
+проверяет активные тему и плагин, наличие вариантов дизайна в `wp theme list`
+и наличие товаров, затем удаляет контейнеры и тома тестового проекта.
+
+## Варианты дизайна темы
+
+В каталоге `wp/themes/` лежат три полноценные темы WordPress:
+
+* `velotok` — «Классика» (текущий выбранный вариант);
+* `velotok-bold` — «Смелый»: контраст, неоновый акцент, крупная типографика;
+* `velotok-minimal` — «Минимализм»: светлая палитра, тонкие линии, много воздуха.
+
+Статусы «выбран / отклонён» фиксируются в манифесте
+`wp/themes/design-variants.json`. Выбрать вариант и автоматически пометить
+остальные отклонёнными можно командой:
+
+```bash
+php wp/cli/theme-variants.php list
+php wp/cli/theme-variants.php select velotok-bold
+```
+
+После выбора активируйте тему штатно: `wp theme activate velotok-bold`.
+Отклонённые варианты остаются в `wp/themes/`, чтобы к ним можно было вернуться.
+Скрипт первичной настройки и `docker compose` при повторном запуске активируют
+вариант, записанный в поле `selected` манифеста.
 
 ## Остановка и сброс
 
@@ -50,10 +74,15 @@ docker compose down -v    # остановить и удалить базу, ф�
 ## Структура
 
 * `wp/themes/velotok/` — тема витрины и шаблоны WooCommerce;
+* `wp/themes/velotok-bold/`, `wp/themes/velotok-minimal/` — альтернативные варианты дизайна;
+* `wp/themes/design-variants.json` — статусы вариантов дизайна;
 * `wp/plugins/velotok-core/` — поля характеристик электровелосипедов;
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
+* `wp/cli/bootstrap.sh` — подготовка сайта сервисом `wpcli` при `docker compose up`;
+* `wp/cli/theme-variants.php` — выбор варианта дизайна;
 * `wp/cli/wp-entrypoint.sh` — обёртка WP-CLI для контейнера `wpcli`;
 * `wp/cli/seed.php` — загрузка демо-каталога;
 * `wp/data/products.json` — данные товаров;
+* `wp/tests/theme-variants-test.php` — контракт вариантов дизайна;
 * `wp/tests/smoke.sh` — дымовой тест локального запуска.
