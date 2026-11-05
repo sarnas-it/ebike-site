@@ -56,6 +56,7 @@ php wp/plugins/velotok-core/tests/content-articles-contract-test.php
 php wp/plugins/velotok-core/tests/catalog-contract-test.php
 php wp/plugins/velotok-core/tests/cart-contract-test.php
 php wp/plugins/velotok-core/tests/guest-cart-registration-contract-test.php
+php wp/plugins/velotok-core/tests/guest-cart-checkout-redirect-contract-test.php
 php wp/plugins/velotok-core/tests/provisioning-contract-test.php
 php wp/plugins/pvs/tests/pvs-contract-test.php
 php wp/plugins/pvs/tests/pvs-all-plugins-contract-test.php
@@ -80,6 +81,7 @@ node wp/plugins/velotok-core/tests/catalog-contract.test.js
 node wp/plugins/velotok-core/tests/cart-contract.test.js
 node wp/plugins/velotok-core/tests/guest-cart-registration-contract.test.js
 node wp/plugins/velotok-core/tests/guest-cart-registration-redgreen.test.js
+node wp/plugins/velotok-core/tests/guest-cart-checkout-redirect-redgreen.test.js
 node wp/plugins/velotok-core/tests/provisioning-contract.test.js
 node wp/plugins/pvs/tests/pvs-contract.test.js
 ```
@@ -117,6 +119,7 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/plugins/velotok-core/includes/catalog.php` — mocked-контракт каталога электровелосипедов;
 * `wp/plugins/velotok-core/includes/cart.php` — mocked-контракт корзины для оформления заказа;
 * `wp/plugins/velotok-core/includes/guest-cart-registration.php` — mocked-контракт гостевой корзины, регистрации при нажатии «Купить», переноса корзины и перехода к оформлению;
+* `wp/plugins/velotok-core/includes/guest-cart-checkout-redirect.php` — отдельная точка доступа к mocked-переходу к оформлению после переноса корзины (TESTEB-81);
 * `wp/plugins/velotok-core/includes/payment-integration.php` — mocked-контракт интеграции с платёжной системой для оплаты заказов;
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;

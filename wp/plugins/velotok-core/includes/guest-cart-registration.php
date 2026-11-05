@@ -13,7 +13,8 @@
  * authentication, WooCommerce customer creation and checkout routing are out
  * of scope for this iteration.
  *
- * Spec: clarify-30af92ca (requirements TESTEB-78, TESTEB-79 and TESTEB-80).
+ * Spec: clarify-30af92ca (requirements TESTEB-78, TESTEB-79, TESTEB-80 and
+ * TESTEB-81).
  * Parent spec: ecommerce-store.
  *
  * @package Velotok_Core
@@ -59,20 +60,24 @@ function velotok_core_guest_cart_registration_contract() {
 		'spec'                    => 'clarify-30af92ca',
 		'parent_spec'             => 'ecommerce-store',
 		'requirement'             => 'TESTEB-78',
-		'task'                    => 'TESTEB-80',
-		'task_ids'                => array( 'TESTEB-78', 'TESTEB-79', 'TESTEB-80' ),
-		'previous_task'           => 'TESTEB-79',
-		'current_task'            => 'TESTEB-80',
-		'requirement_id'          => 'TESTEB-80',
-		'current_requirement'     => 'TESTEB-80',
+		'task'                    => 'TESTEB-81',
+		'task_ids'                => array( 'TESTEB-78', 'TESTEB-79', 'TESTEB-80', 'TESTEB-81' ),
+		'previous_task'           => 'TESTEB-80',
+		'previous_tasks'          => array( 'TESTEB-78', 'TESTEB-79', 'TESTEB-80' ),
+		'current_task'            => 'TESTEB-81',
+		'requirement_id'          => 'TESTEB-81',
+		'current_requirement'     => 'TESTEB-81',
 		'transfer_requirement'    => 'TESTEB-80',
-		'requirement_ids'         => array( 'TESTEB-78', 'TESTEB-79', 'TESTEB-80' ),
-		'requirement_aliases'     => array( 'TESTEB-79', 'TESTEB-80' ),
+		'redirect_requirement'    => 'TESTEB-81',
+		'checkout_redirect_requirement' => 'TESTEB-81',
+		'redirect_task'           => 'TESTEB-81',
+		'requirement_ids'         => array( 'TESTEB-78', 'TESTEB-79', 'TESTEB-80', 'TESTEB-81' ),
+		'requirement_aliases'     => array( 'TESTEB-79', 'TESTEB-80', 'TESTEB-81' ),
 		'requirement_tickets'     => array(
 			'guest_cart'            => 'TESTEB-78',
 			'register_on_buy'       => 'TESTEB-79',
 			'transfer_after_signup' => 'TESTEB-80',
-			'redirect_to_checkout'  => 'TESTEB-78',
+			'redirect_to_checkout'  => 'TESTEB-81',
 		),
 		'cart_spec'               => 'clarify-30af92ca',
 		'checkout_spec'           => 'clarify-096bb945',
@@ -164,25 +169,37 @@ function velotok_core_guest_cart_registration_contract() {
 		),
 		'redirect'                => array(
 			'enabled'                 => true,
+			'requirement'             => 'TESTEB-81',
+			'operation'               => 'redirect_to_checkout',
 			'after_transfer'          => true,
+			'after_registration'      => true,
+			'requires_transfer'       => true,
+			'requires_items'          => true,
 			'target'                  => 'checkout',
 			'target_page'             => 'checkout',
 			'target_url'              => '/checkout/',
-			'requires_items'          => true,
+			'next_step'               => 'checkout',
 			'empty_error'             => 'CART_EMPTY',
 			'mocked'                  => true,
 			'source'                  => 'stub',
+			'provider'                => 'stub',
 		),
 		'checkout_redirect'       => array(
 			'enabled'                 => true,
+			'requirement'             => 'TESTEB-81',
+			'operation'               => 'redirect_to_checkout',
 			'after_transfer'          => true,
+			'after_registration'      => true,
+			'requires_transfer'       => true,
+			'requires_items'          => true,
 			'target'                  => 'checkout',
 			'target_page'             => 'checkout',
 			'target_url'              => '/checkout/',
-			'requires_items'          => true,
+			'next_step'               => 'checkout',
 			'empty_error'             => 'CART_EMPTY',
 			'mocked'                  => true,
 			'source'                  => 'stub',
+			'provider'                => 'stub',
 		),
 		'error_codes'             => array(
 			'empty_cart'                 => 'CART_EMPTY',
@@ -191,6 +208,7 @@ function velotok_core_guest_cart_registration_contract() {
 			'registration_email_invalid' => 'REGISTRATION_EMAIL_INVALID',
 			'registration_email_exists'  => 'REGISTRATION_EMAIL_EXISTS',
 			'transfer_failed'            => 'GUEST_CART_TRANSFER_FAILED',
+			'transfer_required'          => 'GUEST_CART_TRANSFER_REQUIRED',
 			'checkout_unavailable'       => 'CHECKOUT_UNAVAILABLE',
 		),
 		'empty_error'             => 'CART_EMPTY',
@@ -527,6 +545,63 @@ function velotok_core_guest_cart_transfer_after_registration( $guest_cart, $user
 }
 
 /**
+ * Alias for callers that reserve a dedicated checkout redirect contract.
+ *
+ * The redirect rules live in the shared guest cart registration contract, so
+ * the full contract is returned with its mocked markers intact.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_checkout_redirect_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
+ * Alias for callers that use the shorter redirect contract wording.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_redirect_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
+ * Alias for callers that use the stub contract wording for the redirect.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_redirect_stub_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
+ * Alias for callers that use the data contract wording for the redirect.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_redirect_data_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
+ * Alias for callers that use the checkout-prefixed stub contract wording.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_checkout_redirect_stub_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
+ * Alias for callers that use the checkout-prefixed data contract wording.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_checkout_redirect_data_contract() {
+	return velotok_core_guest_cart_registration_contract();
+}
+
+/**
  * Build the mocked redirect to checkout after the guest cart transfer.
  *
  * @param mixed $cart    Cart after transfer.
@@ -535,30 +610,82 @@ function velotok_core_guest_cart_transfer_after_registration( $guest_cart, $user
  * @return array<string,mixed>
  */
 function velotok_core_guest_cart_checkout_redirect( $cart = array(), $user = array(), $options = array() ) {
-	$contract = velotok_core_guest_cart_registration_contract();
-	$redirect = $contract['redirect'];
+	$contract  = velotok_core_guest_cart_registration_contract();
+	$redirect  = $contract['redirect'];
 	$has_items = function_exists( 'velotok_core_cart_has_items' ) ? velotok_core_cart_has_items( $cart ) : false;
-	$allowed   = true === $redirect['requires_items'] ? $has_items : true;
+	$is_guest  = isset( $cart['guest'] ) && true === (bool) $cart['guest'];
+	$transferred = ! ( true === $redirect['requires_transfer'] && $is_guest );
+	$allowed    = ( true === $redirect['requires_items'] ? $has_items : true ) && $transferred;
+	$code       = null;
+
+	if ( ! $has_items ) {
+		$code = $redirect['empty_error'];
+	} elseif ( ! $transferred ) {
+		$code = $contract['error_codes']['transfer_required'];
+	}
 
 	return array(
-		'valid'          => $allowed,
-		'redirect'       => $allowed,
-		'redirected'     => $allowed,
-		'target'         => $redirect['target'],
-		'target_page'    => $redirect['target_page'],
-		'redirect_url'   => $allowed ? $redirect['target_url'] : '',
-		'checkout_url'   => $allowed ? $redirect['target_url'] : '',
-		'url'            => $allowed ? $redirect['target_url'] : '',
-		'after_transfer' => true,
-		'requires_items' => true,
-		'has_items'      => $has_items,
-		'user_id'        => isset( $user['user_id'] ) && is_numeric( $user['user_id'] ) ? (int) $user['user_id'] : 0,
-		'code'           => $allowed ? null : $redirect['empty_error'],
-		'error'          => $allowed ? null : $redirect['empty_error'],
-		'mocked'         => true,
-		'source'         => 'stub',
-		'provider'       => 'stub',
+		'valid'              => $allowed,
+		'redirect'           => $allowed,
+		'redirected'         => $allowed,
+		'requirement'        => $redirect['requirement'],
+		'operation'          => $redirect['operation'],
+		'target'             => $redirect['target'],
+		'target_page'        => $redirect['target_page'],
+		'next_step'          => $allowed ? $redirect['next_step'] : null,
+		'redirect_url'       => $allowed ? $redirect['target_url'] : '',
+		'checkout_url'       => $allowed ? $redirect['target_url'] : '',
+		'url'                => $allowed ? $redirect['target_url'] : '',
+		'after_transfer'     => true,
+		'after_registration' => true,
+		'requires_transfer'  => true,
+		'transferred'        => $transferred,
+		'requires_items'     => true,
+		'has_items'          => $has_items,
+		'guest'              => $is_guest,
+		'user_id'            => isset( $user['user_id'] ) && is_numeric( $user['user_id'] ) ? (int) $user['user_id'] : 0,
+		'code'               => $allowed ? null : $code,
+		'error'              => $allowed ? null : $code,
+		'mocked'             => true,
+		'source'             => 'stub',
+		'provider'           => 'stub',
 	);
+}
+
+/**
+ * Alias for the mocked redirect to checkout after the guest cart transfer.
+ *
+ * @param mixed $cart    Cart after transfer.
+ * @param array $user    Registered user data.
+ * @param array $options Reserved options.
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_redirect_to_checkout( $cart = array(), $user = array(), $options = array() ) {
+	return velotok_core_guest_cart_checkout_redirect( $cart, $user, $options );
+}
+
+/**
+ * Alias for callers that describe the redirect as happening after transfer.
+ *
+ * @param mixed $cart    Cart after transfer.
+ * @param array $user    Registered user data.
+ * @param array $options Reserved options.
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_redirect_after_transfer( $cart = array(), $user = array(), $options = array() ) {
+	return velotok_core_guest_cart_checkout_redirect( $cart, $user, $options );
+}
+
+/**
+ * Alias for callers that use a short redirect helper name.
+ *
+ * @param mixed $cart    Cart after transfer.
+ * @param array $user    Registered user data.
+ * @param array $options Reserved options.
+ * @return array<string,mixed>
+ */
+function velotok_core_guest_cart_redirect( $cart = array(), $user = array(), $options = array() ) {
+	return velotok_core_guest_cart_checkout_redirect( $cart, $user, $options );
 }
 
 /**
@@ -701,6 +828,56 @@ if ( ! function_exists( 'guestCartTransferContract' ) ) {
 	 */
 	function guestCartTransferContract() {
 		return velotok_core_guest_cart_transfer_contract();
+	}
+}
+
+if ( ! function_exists( 'guestCartCheckoutRedirectContract' ) ) {
+	/**
+	 * Short global alias for the checkout redirect contract.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function guestCartCheckoutRedirectContract() {
+		return velotok_core_guest_cart_checkout_redirect_contract();
+	}
+}
+
+if ( ! function_exists( 'guestCartRedirectContract' ) ) {
+	/**
+	 * Short global alias for the checkout redirect contract.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function guestCartRedirectContract() {
+		return velotok_core_guest_cart_redirect_contract();
+	}
+}
+
+if ( ! function_exists( 'guestCartRedirectToCheckout' ) ) {
+	/**
+	 * Short global alias for the mocked checkout redirect.
+	 *
+	 * @param mixed $cart    Cart after transfer.
+	 * @param array $user    Registered user data.
+	 * @param array $options Reserved options.
+	 * @return array<string,mixed>
+	 */
+	function guestCartRedirectToCheckout( $cart = array(), $user = array(), $options = array() ) {
+		return velotok_core_guest_cart_redirect_to_checkout( $cart, $user, $options );
+	}
+}
+
+if ( ! function_exists( 'guestCartCheckoutRedirect' ) ) {
+	/**
+	 * Short global alias for the mocked checkout redirect helper.
+	 *
+	 * @param mixed $cart    Cart after transfer.
+	 * @param array $user    Registered user data.
+	 * @param array $options Reserved options.
+	 * @return array<string,mixed>
+	 */
+	function guestCartCheckoutRedirect( $cart = array(), $user = array(), $options = array() ) {
+		return velotok_core_guest_cart_checkout_redirect( $cart, $user, $options );
 	}
 }
 

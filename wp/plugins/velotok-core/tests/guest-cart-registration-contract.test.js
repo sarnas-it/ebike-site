@@ -23,8 +23,25 @@ includes('ecommerce-store', 'Contract must reference parent spec ecommerce-store
 includes('TESTEB-78', 'Contract must reference requirement TESTEB-78');
 includes('TESTEB-79', 'Contract must reference requirement TESTEB-79');
 includes('TESTEB-80', 'Contract must reference requirement TESTEB-80');
+includes('TESTEB-81', 'Contract must reference requirement TESTEB-81');
 includes('transfer_requirement', 'Contract must declare the transfer requirement marker');
+includes('redirect_requirement', 'Contract must declare the redirect requirement marker');
+includes('checkout_redirect_requirement', 'Contract must declare the checkout redirect requirement marker');
 includes('current_task', 'Contract must declare the current task marker');
+includes("'task'                    => 'TESTEB-81'", 'Contract must be marked with task TESTEB-81');
+includes("'current_task'            => 'TESTEB-81'", 'Current task must be TESTEB-81');
+includes("'requirement_id'          => 'TESTEB-81'", 'Requirement id must be TESTEB-81');
+includes("'redirect_requirement'    => 'TESTEB-81'", 'Redirect requirement must be TESTEB-81');
+includes('velotok_core_guest_cart_checkout_redirect_contract', 'Dedicated checkout redirect contract accessor is missing');
+includes('velotok_core_guest_cart_redirect_contract', 'Shorter checkout redirect contract accessor is missing');
+includes('velotok_core_guest_cart_redirect_stub_contract', 'Redirect stub contract alias is missing');
+includes('velotok_core_guest_cart_redirect_data_contract', 'Redirect data contract alias is missing');
+includes('velotok_core_guest_cart_redirect_to_checkout', 'Redirect to checkout helper is missing');
+includes('velotok_core_guest_cart_redirect_after_transfer', 'Redirect after transfer helper is missing');
+includes('guestCartCheckoutRedirectContract', 'Global checkout redirect contract alias is missing');
+includes('guestCartRedirectContract', 'Global redirect contract alias is missing');
+includes('guestCartRedirectToCheckout', 'Global redirect helper alias is missing');
+includes('guestCartCheckoutRedirect', 'Global checkout redirect helper alias is missing');
 includes('velotok_core_guest_cart_transfer_contract', 'Dedicated transfer contract accessor is missing');
 includes('velotok_core_guest_cart_transfer_stub_contract', 'Dedicated transfer stub contract alias is missing');
 includes('velotok_core_guest_cart_transfer_data_contract', 'Dedicated transfer data contract alias is missing');
@@ -65,6 +82,8 @@ includes("'preserve_user_cart'", 'Guest cart transfer must preserve the user car
 includes("'clear_guest_after_transfer'", 'Guest cart clearing rule is missing');
 includes("'redirect'", 'Contract must declare redirect rules');
 includes("'after_transfer'", 'Redirect must happen after transfer');
+includes("'requires_transfer'", 'Redirect must require the guest cart transfer');
+includes("'next_step'", 'Redirect must declare the next checkout step');
 includes("'/checkout/'", 'Checkout redirect target is missing');
 includes("'open_questions'", 'Open questions section is missing');
 includes("'authentication'", 'Authentication open question is missing');
@@ -90,6 +109,7 @@ for (const code of [
   'REGISTRATION_EMAIL_INVALID',
   'REGISTRATION_EMAIL_EXISTS',
   'GUEST_CART_TRANSFER_FAILED',
+  'GUEST_CART_TRANSFER_REQUIRED',
 ]) {
   includes(`'${code}'`, `Guest cart error code is missing: ${code}`);
 }

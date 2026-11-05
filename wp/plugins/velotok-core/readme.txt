@@ -269,14 +269,14 @@ node wp/plugins/velotok-core/tests/cart-contract.test.js
 
 = Гостевая корзина и перенос при регистрации (stub) =
 
-Единая точка доступа — `velotok_core_guest_cart_registration_contract()` в `includes/guest-cart-registration.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-30af92ca`, требования `TESTEB-78`/`TESTEB-79`/`TESTEB-80` (`requirement_ids`, `task => TESTEB-80`, `transfer_requirement => TESTEB-80`), родительская спецификация — `ecommerce-store`.
+Единая точка доступа — `velotok_core_guest_cart_registration_contract()` в `includes/guest-cart-registration.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-30af92ca`, требования `TESTEB-78`/`TESTEB-79`/`TESTEB-80`/`TESTEB-81` (`requirement_ids`, `task => TESTEB-81`, `transfer_requirement => TESTEB-80`, `redirect_requirement => TESTEB-81`), родительская спецификация — `ecommerce-store`. Отдельная точка доступа к переходу — `includes/guest-cart-checkout-redirect.php` и `velotok_core_guest_cart_checkout_redirect_contract()`.
 
 Правила контракта:
 
 * неавторизованный пользователь собирает корзину через `velotok_core_guest_cart_create()` и `velotok_core_guest_cart_add()`; повторное добавление товара суммирует количество;
 * нажатие «Купить» запускает `velotok_core_guest_cart_buy()`: сначала регистрирует пользователя по email через `velotok_core_guest_cart_register()`, затем переносит гостевую корзину в аккаунт через `velotok_core_guest_cart_transfer()`;
 * при переносе после регистрации (`TESTEB-80`, `transfer.on_registration => true`, `transfer.attaches_to_user_account => true`) количество одинаковых товаров суммируется (`merge_quantities`, `merge_by => product_id`), существующая корзина пользователя сохраняется, гостевая после переноса очищается;
-* после успешного переноса `velotok_core_guest_cart_checkout_redirect()` возвращает переход `/checkout/` с целью `checkout`; пустая корзина даёт `CART_EMPTY`, а ошибка регистрации сохраняет гостевую корзину;
+* после успешного переноса (`TESTEB-81`, `redirect.after_transfer => true`, `redirect.requires_transfer => true`) `velotok_core_guest_cart_checkout_redirect()` и его псевдоним `velotok_core_guest_cart_redirect_to_checkout()` возвращают переход `/checkout/` с целью `checkout` и следующим шагом `checkout`; пустая корзина даёт `CART_EMPTY`, а ошибка регистрации сохраняет гостевую корзину;
 * заглушка не читает env, файлы, БД и не обращается к внешним сервисам; реальная регистрация, WooCommerce-аккаунт и маршрутизация оформления не выполняются (`network => false`, `persistent => false`).
 
 Открытые вопросы о способе аутентификации, подтверждении email, обработке существующего пользователя, правилах слияния, целевой странице оформления и локальном запуске перечислены в `velotok_core_guest_cart_open_questions()`.
@@ -285,8 +285,10 @@ node wp/plugins/velotok-core/tests/cart-contract.test.js
 
 ```bash
 php wp/plugins/velotok-core/tests/guest-cart-registration-contract-test.php
+php wp/plugins/velotok-core/tests/guest-cart-checkout-redirect-contract-test.php
 node wp/plugins/velotok-core/tests/guest-cart-registration-contract.test.js
 node wp/plugins/velotok-core/tests/guest-cart-registration-redgreen.test.js
+node wp/plugins/velotok-core/tests/guest-cart-checkout-redirect-redgreen.test.js
 ```
 
 = Провижининг (stub) =

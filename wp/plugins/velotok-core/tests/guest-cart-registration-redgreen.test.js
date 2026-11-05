@@ -85,6 +85,20 @@ try {
     'Contract test must fail when the cart is not attached to the user account'
   );
 
+  const redirectMutation = source.replace(
+    /'redirects_to_checkout'\s*=>\s*true/,
+    "'redirects_to_checkout' => false"
+  );
+  assert.notStrictEqual(redirectMutation, source, 'Mutation must change the checkout redirect marker');
+  fs.writeFileSync(mutationTarget, redirectMutation, 'utf8');
+
+  const redirectBroken = runTest(mutationTarget);
+  assert.notStrictEqual(
+    redirectBroken.status,
+    0,
+    'Contract test must fail when the visitor is not redirected to checkout after transfer'
+  );
+
   const missing = runTest(path.join(tmpDir, 'missing-stub.php'));
   assert.notStrictEqual(
     missing.status,
