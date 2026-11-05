@@ -17,6 +17,7 @@ $velotok_includes = array(
 	'inc/enqueue.php',
 	'inc/security.php',
 	'inc/woocommerce.php',
+	'inc/theme-design-variants.php',
 );
 
 foreach ( $velotok_includes as $velotok_file ) {

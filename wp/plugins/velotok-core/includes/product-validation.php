@@ -52,6 +52,9 @@ function velotok_core_product_validation_contract() {
 		'title'       => array(
 			'required'    => true,
 			'type'        => 'string',
+			'mocked'      => true,
+			'spec'        => 'clarify-9e1a1acd',
+			'trim'        => true,
 			'error_codes' => array(
 				'required' => 'TITLE_REQUIRED',
 				'too_long' => 'TITLE_TOO_LONG',
@@ -149,6 +152,48 @@ function velotok_core_validation_contract() {
 }
 
 /**
+ * Return the mocked rule for a single required product attribute.
+ *
+ * Every rule is an in-memory stub: it is explicitly marked `mocked => true`
+ * and references the spec, so removing the contract makes its callers fail.
+ *
+ * @param string $attribute Attribute key.
+ * @return array<string,mixed>|null
+ */
+function velotok_core_product_attribute_rule( $attribute ) {
+	$contract = velotok_core_product_validation_contract();
+
+	if ( ! is_string( $attribute ) || ! isset( $contract['attributes'][ $attribute ] ) ) {
+		return null;
+	}
+
+	return $contract['attributes'][ $attribute ];
+}
+
+/**
+ * Return the mocked category attribute contract.
+ *
+ * The directory is a fixed local stub. It does not synchronize with an
+ * external category system and returns the same required list for every
+ * known and unknown category.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_required_attributes_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return array(
+		'spec'                  => $contract['spec'],
+		'source'                => 'stub',
+		'mocked'                => true,
+		'required_attributes'   => $contract['required_attributes'],
+		'categories'            => $contract['category_required_attributes'],
+		'category_source'       => $contract['category_source'],
+		'unknown_category'      => $contract['unknown_category'],
+	);
+}
+
+/**
  * Return every validation error code declared by the contract.
  *
  * @return string[]
@@ -204,14 +249,14 @@ function velotok_core_is_supported_image_mime( $mime ) {
  * @return string[]
  */
 function velotok_core_get_required_attributes( $category = '' ) {
-	$contract = velotok_core_product_validation_contract();
+	$contract = velotok_core_required_attributes_contract();
 	$key      = is_string( $category ) ? strtolower( trim( $category ) ) : '';
 
-	if ( '' !== $key && isset( $contract['category_required_attributes'][ $key ] ) ) {
-		return $contract['category_required_attributes'][ $key ];
+	if ( '' !== $key && isset( $contract['categories'][ $key ] ) ) {
+		return $contract['categories'][ $key ];
 	}
 
-	return $contract['category_required_attributes']['default'];
+	return $contract['categories']['default'];
 }
 
 /**
@@ -278,15 +323,20 @@ function velotok_core_validation_result( $valid, $code, $value, $errors = array(
  */
 function velotok_core_validate_product_title( $title ) {
 	$contract = velotok_core_product_validation_contract();
+	$rule     = velotok_core_product_attribute_rule( 'title' );
 	$max      = (int) $contract['limits']['title_max_length'];
-	$value    = is_scalar( $title ) ? trim( (string) $title ) : '';
+	$value    = is_scalar( $title ) ? (string) $title : '';
+
+	if ( ! empty( $rule['trim'] ) ) {
+		$value = trim( $value );
+	}
 
 	if ( '' === $value ) {
-		return velotok_core_validation_result( false, 'TITLE_REQUIRED', $title );
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $title );
 	}
 
 	if ( velotok_core_validation_strlen( $value ) > $max ) {
-		return velotok_core_validation_result( false, 'TITLE_TOO_LONG', $title );
+		return velotok_core_validation_result( false, $rule['error_codes']['too_long'], $title );
 	}
 
 	return velotok_core_validation_result( true, null, $title );

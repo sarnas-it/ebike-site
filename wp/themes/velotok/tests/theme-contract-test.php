@@ -89,6 +89,7 @@ $velotok_required_files = array(
 	'inc/customizer.php',
 	'inc/security.php',
 	'inc/woocommerce.php',
+	'inc/theme-design-variants.php',
 	'template-parts/header-bar.php',
 	'template-parts/hero.php',
 	'template-parts/categories.php',
@@ -158,7 +159,7 @@ if ( is_readable( $velotok_style_path ) ) {
  */
 $velotok_functions = velotok_theme_contract_source( $velotok_theme_dir . '/functions.php' );
 
-foreach ( array( 'inc/setup.php', 'inc/customizer.php', 'inc/enqueue.php', 'inc/security.php', 'inc/woocommerce.php' ) as $velotok_include ) {
+foreach ( array( 'inc/setup.php', 'inc/customizer.php', 'inc/enqueue.php', 'inc/security.php', 'inc/woocommerce.php', 'inc/theme-design-variants.php' ) as $velotok_include ) {
 	velotok_theme_contract_assert(
 		false !== strpos( $velotok_functions, $velotok_include ),
 		sprintf( 'functions.php не подключает модуль %s.', $velotok_include )
@@ -256,7 +257,7 @@ if ( defined( 'ABSPATH' ) && function_exists( 'wp_get_theme' ) ) {
 		velotok_theme_contract_assert( isset( $velotok_menus['footer'] ), 'Не зарегистрировано меню подвала.' );
 	}
 
-	foreach ( array( 'velotok_setup', 'velotok_enqueue_assets', 'velotok_get_home_models', 'velotok_product_specs', 'velotok_cart_url' ) as $velotok_function ) {
+	foreach ( array( 'velotok_setup', 'velotok_enqueue_assets', 'velotok_get_home_models', 'velotok_product_specs', 'velotok_cart_url', 'velotok_order_delivery_total' ) as $velotok_function ) {
 		velotok_theme_contract_assert( function_exists( $velotok_function ), sprintf( 'Не загружена функция темы %s().', $velotok_function ) );
 	}
 
