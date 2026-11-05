@@ -303,6 +303,209 @@ if ( ! function_exists( 'pvs_plugin_vulnerabilities' ) ) {
 	}
 }
 
+if ( ! function_exists( 'pvs_normalize_manual_findings' ) ) {
+	function pvs_normalize_manual_findings( $findings ) {
+		if ( ! is_array( $findings ) ) {
+			return array();
+		}
+
+		$normalized = array();
+
+		foreach ( $findings as $key => $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+
+			$default_slug = is_string( $key ) && ! is_numeric( $key ) ? strtolower( trim( $key ) ) : '';
+
+			if ( isset( $item['vulnerabilities'] ) && is_array( $item['vulnerabilities'] ) ) {
+				$item = $item['vulnerabilities'];
+			}
+
+			if ( isset( $item['findings'] ) && is_array( $item['findings'] ) ) {
+				$item = $item['findings'];
+			}
+
+			$is_list = array_keys( $item ) === range( 0, count( $item ) - 1 );
+
+			if ( $is_list ) {
+				foreach ( $item as $finding ) {
+					if ( ! is_array( $finding ) ) {
+						continue;
+					}
+
+					$finding = pvs_normalize_manual_finding( $finding, $default_slug );
+
+					if ( null !== $finding ) {
+						$normalized[] = $finding;
+					}
+				}
+
+				continue;
+			}
+
+			$finding = pvs_normalize_manual_finding( $item, $default_slug );
+
+			if ( null !== $finding ) {
+				$normalized[] = $finding;
+			}
+		}
+
+		return $normalized;
+	}
+}
+
+if ( ! function_exists( 'pvs_normalize_manual_finding' ) ) {
+	function pvs_normalize_manual_finding( $finding, $default_slug = '' ) {
+		if ( ! is_array( $finding ) ) {
+			return null;
+		}
+
+		$slug = '';
+
+		foreach ( array( 'plugin', 'slug', 'plugin_slug', 'plugin_file' ) as $slug_key ) {
+			if ( isset( $finding[ $slug_key ] ) && is_scalar( $finding[ $slug_key ] ) && '' !== trim( (string) $finding[ $slug_key ] ) ) {
+				$slug = pvs_slug_from_file( trim( (string) $finding[ $slug_key ] ) );
+				break;
+			}
+		}
+
+		if ( '' === $slug && '' !== $default_slug ) {
+			$slug = pvs_slug_from_file( $default_slug );
+		}
+
+		if ( '' === $slug ) {
+			return null;
+		}
+
+		$title = '';
+
+		foreach ( array( 'title', 'description', 'name' ) as $title_key ) {
+			if ( isset( $finding[ $title_key ] ) && is_scalar( $finding[ $title_key ] ) && '' !== trim( (string) $finding[ $title_key ] ) ) {
+				$title = trim( (string) $finding[ $title_key ] );
+				break;
+			}
+		}
+
+		if ( '' === $title ) {
+			$title = 'Находка ручного аудита';
+		}
+
+		$severity = 'low';
+
+		foreach ( array( 'severity', 'risk', 'risk_level', 'level' ) as $severity_key ) {
+			if ( isset( $finding[ $severity_key ] ) && is_scalar( $finding[ $severity_key ] ) && '' !== trim( (string) $finding[ $severity_key ] ) ) {
+				$severity = strtolower( trim( (string) $finding[ $severity_key ] ) );
+				break;
+			}
+		}
+
+		$aliases  = array(
+			'moderate'  => 'medium',
+			'important' => 'high',
+			'grave'     => 'critical',
+			'warning'   => 'medium',
+			'info'      => 'low',
+			'none'      => 'low',
+		);
+
+		if ( isset( $aliases[ $severity ] ) ) {
+			$severity = $aliases[ $severity ];
+		}
+
+		$levels = pvs_severity_levels();
+
+		if ( ! isset( $levels[ $severity ] ) ) {
+			$severity = 'low';
+		}
+
+		$version = '0.0.0';
+
+		foreach ( array( 'version', 'affected_version' ) as $version_key ) {
+			if ( isset( $finding[ $version_key ] ) && is_scalar( $finding[ $version_key ] ) && '' !== trim( (string) $finding[ $version_key ] ) ) {
+				$version = pvs_normalize_version( $finding[ $version_key ] );
+				break;
+			}
+		}
+
+		$id = '';
+
+		if ( isset( $finding['id'] ) && is_scalar( $finding['id'] ) ) {
+			$id = trim( (string) $finding['id'] );
+		}
+
+		if ( '' === $id ) {
+			$id = 'PVS-MANUAL-' . substr( hash( 'sha256', $slug . '|' . $title . '|' . $severity ), 0, 8 );
+		}
+
+		$normalized = array(
+			'id'       => $id,
+			'title'    => $title,
+			'severity' => $severity,
+			'plugin'   => $slug,
+			'version'  => $version,
+			'manual'   => true,
+		);
+
+		if ( isset( $finding['fixed_in'] ) && is_scalar( $finding['fixed_in'] ) && '' !== trim( (string) $finding['fixed_in'] ) ) {
+			$normalized['fixed_in'] = pvs_normalize_version( $finding['fixed_in'] );
+		}
+
+		return $normalized;
+	}
+}
+
+if ( ! function_exists( 'pvs_manual_audit_vulnerabilities' ) ) {
+	function pvs_manual_audit_vulnerabilities( $findings ) {
+		$normalized = pvs_normalize_manual_findings( $findings );
+		$found      = array();
+
+		foreach ( $normalized as $finding ) {
+			$entry = array(
+				'id'       => $finding['id'],
+				'title'    => $finding['title'],
+				'severity' => $finding['severity'],
+				'affected' => '*',
+			);
+
+			if ( isset( $finding['fixed_in'] ) ) {
+				$entry['fixed_in'] = $finding['fixed_in'];
+			}
+
+			$vulnerabilities = pvs_plugin_vulnerabilities(
+				$finding['plugin'],
+				$finding['version'],
+				array( $finding['plugin'] => array( $entry ) )
+			);
+
+			if ( empty( $vulnerabilities ) ) {
+				continue;
+			}
+
+			$vulnerability                 = $vulnerabilities[0];
+			$vulnerability['manual']       = true;
+			$vulnerability['manual_audit'] = true;
+			$vulnerability['provider']     = 'manual';
+
+			$found[] = $vulnerability;
+		}
+
+		return $found;
+	}
+}
+
+if ( ! function_exists( 'pvs_manual_audit_findings' ) ) {
+	function pvs_manual_audit_findings( $findings ) {
+		return pvs_manual_audit_vulnerabilities( $findings );
+	}
+}
+
+if ( ! function_exists( 'pvs_normalize_manual_audit_findings' ) ) {
+	function pvs_normalize_manual_audit_findings( $findings ) {
+		return pvs_normalize_manual_findings( $findings );
+	}
+}
+
 if ( ! function_exists( 'pvs_collect_plugins' ) ) {
 	function pvs_collect_plugins() {
 		$collected = array();
@@ -539,6 +742,10 @@ if ( ! function_exists( 'pvs_error_report' ) ) {
 			'persisted'             => false,
 			'spec'                  => isset( $contract['spec'] ) ? $contract['spec'] : 'ecommerce-store',
 			'requirement'           => isset( $contract['requirement'] ) ? $contract['requirement'] : 'TESTEB-154',
+			'provider'              => isset( $contract['default_provider'] ) ? $contract['default_provider'] : 'wpscan',
+			'provider_id'           => isset( $contract['default_provider'] ) ? $contract['default_provider'] : 'wpscan',
+			'providers'             => isset( $contract['supported_providers'] ) ? $contract['supported_providers'] : array(),
+			'highlight_format'      => isset( $contract['highlight_format'] ) ? $contract['highlight_format'] : array(),
 			'scan_id'               => 'mock-pvs-error-' . substr( hash( 'sha256', $code . '|' . $message ), 0, 16 ),
 			'all_plugins'           => false,
 			'scans_all_plugins'     => false,
@@ -562,6 +769,9 @@ if ( ! function_exists( 'pvs_error_report' ) ) {
 				'mocked'             => true,
 				'source'             => 'stub',
 				'network'            => false,
+				'provider'           => isset( $contract['default_provider'] ) ? $contract['default_provider'] : 'wpscan',
+				'providers'          => isset( $contract['supported_providers'] ) ? $contract['supported_providers'] : array(),
+				'highlight_format'   => isset( $contract['highlight_format'] ) ? $contract['highlight_format'] : array(),
 				'all_plugins'        => false,
 				'plugins_scanned'    => 0,
 				'vulnerable_plugins' => 0,
@@ -592,7 +802,7 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 		}
 
 		if ( empty( $options ) && is_array( $plugins ) ) {
-			$option_keys = array( 'plugins', 'vulnerability_database', 'vulnerability_db', 'database', 'db', 'include_inactive', 'include_mu_plugins', 'include_dropins' );
+			$option_keys = array( 'plugins', 'vulnerability_database', 'vulnerability_db', 'database', 'db', 'include_inactive', 'include_mu_plugins', 'include_dropins', 'provider', 'provider_id', 'manual_findings', 'manual_audit', 'manual_vulnerabilities', 'findings', 'audit_findings' );
 
 			foreach ( $option_keys as $option_key ) {
 				if ( array_key_exists( $option_key, $plugins ) ) {
@@ -620,9 +830,17 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 			return pvs_error_report( 'PVS_INVALID_INPUT', 'Список плагинов для проверки должен быть массивом.', $contract );
 		}
 
-		$normalized = pvs_normalize_plugins( $plugins );
+		$normalized  = pvs_normalize_plugins( $plugins );
+		$has_manual  = false;
 
-		if ( empty( $normalized ) ) {
+		foreach ( array( 'manual_findings', 'manual_audit', 'manual_vulnerabilities', 'findings', 'audit_findings' ) as $manual_key ) {
+			if ( isset( $options[ $manual_key ] ) && is_array( $options[ $manual_key ] ) && ! empty( $options[ $manual_key ] ) ) {
+				$has_manual = true;
+				break;
+			}
+		}
+
+		if ( empty( $normalized ) && ! $has_manual ) {
 			return pvs_error_report( 'PVS_REPORT_EMPTY', 'Не найдено ни одного плагина для проверки.', $contract );
 		}
 
@@ -640,6 +858,31 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 
 		if ( null === $database ) {
 			$database = pvs_vulnerability_database();
+		}
+
+		$provider_id = '';
+
+		foreach ( array( 'provider', 'provider_id' ) as $provider_key ) {
+			if ( isset( $options[ $provider_key ] ) && is_scalar( $options[ $provider_key ] ) ) {
+				$provider_id = (string) $options[ $provider_key ];
+				break;
+			}
+		}
+
+		$provider_id = pvs_normalize_provider( $provider_id );
+
+		if ( '' === $provider_id ) {
+			$provider_id = pvs_default_provider();
+		}
+
+		$provider = pvs_provider( $provider_id );
+		$manual_findings = array();
+
+		foreach ( array( 'manual_findings', 'manual_audit', 'manual_vulnerabilities', 'findings', 'audit_findings' ) as $manual_key ) {
+			if ( isset( $options[ $manual_key ] ) && is_array( $options[ $manual_key ] ) ) {
+				$manual_findings = $options[ $manual_key ];
+				break;
+			}
 		}
 
 		$scanned = array();
@@ -708,6 +951,117 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 				'vulnerabilities'      => $vulnerabilities,
 				'issues'               => $vulnerabilities,
 			);
+		}
+
+		$manual = pvs_manual_audit_vulnerabilities( $manual_findings );
+
+		if ( ! empty( $manual ) ) {
+			$scanned_by_slug = array();
+
+			foreach ( $scanned as $index => $plugin ) {
+				$scanned_by_slug[ $plugin['slug'] ] = $index;
+			}
+
+			foreach ( $manual as $vulnerability ) {
+				$slug = isset( $vulnerability['plugin'] ) ? (string) $vulnerability['plugin'] : '';
+
+				if ( '' === $slug ) {
+					continue;
+				}
+
+				if ( ! isset( $scanned_by_slug[ $slug ] ) ) {
+					$scanned_by_slug[ $slug ] = count( $scanned );
+					$scanned[] = array(
+						'slug'                 => $slug,
+						'name'                 => $slug,
+						'version'              => isset( $vulnerability['version'] ) ? $vulnerability['version'] : '0.0.0',
+						'plugin_file'          => $slug . '.php',
+						'plugin'               => $slug . '.php',
+						'active'               => true,
+						'type'                 => 'plugin',
+						'manual'               => true,
+						'mocked'               => true,
+						'source'               => 'stub',
+						'network'              => false,
+						'scanned'              => true,
+						'vulnerable'           => true,
+						'risk'                 => true,
+						'risk_highlighted'     => true,
+						'risk_level'           => $vulnerability['severity'],
+						'risk_score'           => $vulnerability['severity_score'],
+						'risk_label'           => $vulnerability['severity_label'],
+						'risk_class'           => $vulnerability['risk_class'],
+						'highlight'            => $vulnerability['highlight'],
+						'highlight_color'      => $vulnerability['highlight_color'],
+						'highlight_background' => $vulnerability['highlight_background'],
+						'severity'             => $vulnerability['severity'],
+						'severity_label'       => $vulnerability['severity_label'],
+						'severity_class'       => $vulnerability['severity_class'],
+						'vulnerability_count'  => 0,
+						'vulnerabilities'      => array(),
+						'issues'               => array(),
+					);
+				}
+
+				$found[] = $vulnerability;
+			}
+
+			$found_by_slug = array();
+
+			foreach ( $found as $vulnerability ) {
+				$slug = isset( $vulnerability['plugin'] ) ? (string) $vulnerability['plugin'] : '';
+
+				if ( '' === $slug ) {
+					continue;
+				}
+
+				if ( ! isset( $found_by_slug[ $slug ] ) ) {
+					$found_by_slug[ $slug ] = array();
+				}
+
+				$found_by_slug[ $slug ][] = $vulnerability;
+			}
+
+			foreach ( $scanned as $index => $plugin ) {
+				$slug        = $plugin['slug'];
+				$plugin_vulns = isset( $found_by_slug[ $slug ] ) ? $found_by_slug[ $slug ] : array();
+
+				if ( empty( $plugin_vulns ) ) {
+					continue;
+				}
+
+				$levels          = pvs_severity_levels();
+				$plugin_severity = 'none';
+				$plugin_score    = 0;
+
+				foreach ( $plugin_vulns as $vulnerability ) {
+					$severity = isset( $vulnerability['severity'] ) ? (string) $vulnerability['severity'] : 'low';
+					$score    = isset( $levels[ $severity ]['score'] ) ? (float) $levels[ $severity ]['score'] : 0;
+
+					if ( $score > $plugin_score ) {
+						$plugin_score    = $score;
+						$plugin_severity = $severity;
+					}
+				}
+
+				$plugin_highlight                        = pvs_risk_highlight( $plugin_severity );
+				$scanned[ $index ]['vulnerable']         = true;
+				$scanned[ $index ]['risk']               = true;
+				$scanned[ $index ]['risk_highlighted']   = true;
+				$scanned[ $index ]['risk_level']         = $plugin_severity;
+				$scanned[ $index ]['risk_score']         = $plugin_score;
+				$scanned[ $index ]['risk_label']         = $plugin_highlight['label'];
+				$scanned[ $index ]['risk_class']         = $plugin_highlight['risk_class'];
+				$scanned[ $index ]['highlight']          = $plugin_highlight['highlight'];
+				$scanned[ $index ]['highlight_color']    = $plugin_highlight['highlight_color'];
+				$scanned[ $index ]['highlight_background'] = $plugin_highlight['highlight_background'];
+				$scanned[ $index ]['severity']           = $plugin_severity;
+				$scanned[ $index ]['severity_label']     = $plugin_highlight['label'];
+				$scanned[ $index ]['severity_class']     = $plugin_highlight['severity_class'];
+				$scanned[ $index ]['vulnerability_count'] = count( $plugin_vulns );
+				$scanned[ $index ]['vulnerabilities']    = $plugin_vulns;
+				$scanned[ $index ]['issues']             = $plugin_vulns;
+			}
 		}
 
 		$scanned = array_values( $scanned );
@@ -782,6 +1136,14 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 			'persisted'             => false,
 			'spec'                  => $contract['spec'],
 			'requirement'           => $contract['requirement'],
+			'provider'              => $provider_id,
+			'provider_id'           => $provider_id,
+			'provider_label'        => isset( $provider['label'] ) ? $provider['label'] : '',
+			'provider_manual'       => ! empty( $provider['manual'] ),
+			'providers'             => pvs_supported_providers(),
+			'supported_providers'   => pvs_supported_providers(),
+			'manual_audit'          => pvs_manual_audit_contract(),
+			'highlight_format'      => pvs_highlight_format(),
 			'scan_id'               => 'mock-pvs-' . substr( $hash, 0, 16 ),
 			'all_plugins'           => $all_plugins,
 			'scans_all_plugins'     => $all_plugins,
@@ -809,6 +1171,11 @@ if ( ! function_exists( 'pvs_scan_plugins_data' ) ) {
 				'mocked'             => true,
 				'source'             => 'stub',
 				'network'            => false,
+				'provider'           => $provider_id,
+				'provider_label'     => isset( $provider['label'] ) ? $provider['label'] : '',
+				'providers'          => pvs_supported_providers(),
+				'manual_audit'       => pvs_manual_audit_contract(),
+				'highlight_format'   => pvs_highlight_format(),
 				'all_plugins'        => $all_plugins,
 				'coverage'           => $coverage,
 				'plugins_scanned'    => count( $scanned ),
@@ -910,6 +1277,30 @@ if ( ! class_exists( 'PVS_Scanner', false ) ) {
 
 		public static function risk_highlight( $severity ) {
 			return pvs_risk_highlight( $severity );
+		}
+
+		public static function providers() {
+			return pvs_providers();
+		}
+
+		public static function get_providers() {
+			return pvs_providers();
+		}
+
+		public static function supported_providers() {
+			return pvs_supported_providers();
+		}
+
+		public static function provider( $provider = null ) {
+			return pvs_provider( $provider );
+		}
+
+		public static function highlight_format() {
+			return pvs_highlight_format();
+		}
+
+		public static function manual_audit( $findings ) {
+			return pvs_manual_audit_vulnerabilities( $findings );
 		}
 
 		public static function stub_plugins() {
