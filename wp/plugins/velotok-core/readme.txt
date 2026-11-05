@@ -49,7 +49,7 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 = Валидация карточки товара (stub) =
 
-Единая точка доступа — `velotok_core_product_validation_contract()` в `includes/product-validation.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-9e1a1acd`.
+Единая точка доступа — `velotok_core_product_validation_contract()` в `includes/product-validation.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-41b1da6d`.
 
 Обязательные атрибуты карточки: `photo`, `title`, `description`, `price`. Перечень обязательных атрибутов категории возвращает `velotok_core_get_required_attributes()` (краткий алиас — `getRequiredAttributes()`).
 
@@ -63,11 +63,13 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 Валидаторы не читают базу данных, файлы, медиатеку и внешние сервисы. Реальная интеграция с хранилищем изображений и справочником категорий не требуется.
 
-Запуск контрактного теста валидации:
+Запуск контрактных тестов валидации и обязательных атрибутов:
 
 ```bash
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
+php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
+node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
 ```
 
 = Оформление заказа, доставка и оплата (stub) =

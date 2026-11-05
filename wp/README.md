@@ -31,6 +31,7 @@ docker compose run --rm wpcli plugin list
 bash wp/tests/smoke.sh
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
+php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
 php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
 ```
 
