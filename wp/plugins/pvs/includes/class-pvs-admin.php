@@ -62,6 +62,35 @@ if ( ! function_exists( 'pvs_admin_run_scan' ) ) {
 	}
 }
 
+if ( ! function_exists( 'pvs_admin_styles' ) ) {
+	function pvs_admin_styles() {
+		$levels = function_exists( 'pvs_severity_levels' ) ? pvs_severity_levels() : array();
+		$css    = '.pvs-report{margin-top:16px}.pvs-report table{margin-top:12px}.pvs-risk{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:600;border:1px solid transparent}.pvs-plugin-vulnerable{background:#fff7ed}.pvs-risk-highlight{box-shadow:inset 4px 0 0 #dc2626}.pvs-plugin-safe{background:#f0fdf4}.pvs-severity-critical,.pvs-severity-high,.pvs-severity-medium,.pvs-severity-low{font-weight:600}';
+
+		foreach ( $levels as $severity => $level ) {
+			if ( ! is_string( $severity ) || '' === $severity || ! is_array( $level ) ) {
+				continue;
+			}
+
+			$selector = '.pvs-risk-' . $severity;
+			$color    = isset( $level['color'] ) ? $level['color'] : 'inherit';
+			$bg       = isset( $level['background'] ) ? $level['background'] : 'transparent';
+			$border   = isset( $level['border'] ) ? $level['border'] : 'transparent';
+
+			$css .= $selector . '{color:' . $color . ';background:' . $bg . ';border-color:' . $border . '}';
+			$css .= '.pvs-severity-' . $severity . '{border-left:4px solid ' . $border . '}';
+		}
+
+		return $css;
+	}
+}
+
+if ( ! function_exists( 'pvs_admin_render_styles' ) ) {
+	function pvs_admin_render_styles() {
+		echo '<style id="pvs-risk-styles">' . pvs_admin_styles() . '</style>';
+	}
+}
+
 if ( ! function_exists( 'pvs_admin_render_report' ) ) {
 	function pvs_admin_render_report( $result ) {
 		if ( ! is_array( $result ) ) {
@@ -102,7 +131,8 @@ if ( ! function_exists( 'pvs_admin_render_report' ) ) {
 					$row_class .= ' pvs-severity-' . $risk_level;
 				}
 
-				$html .= '<tr class="' . $escape( $row_class ) . '" data-risk="' . ( ! empty( $plugin['vulnerable'] ) ? 'true' : 'false' ) . '" data-severity="' . $escape( $risk_level ) . '">';
+				$highlight = isset( $plugin['highlight'] ) && is_scalar( $plugin['highlight'] ) ? (string) $plugin['highlight'] : '';
+				$html     .= '<tr class="' . $escape( $row_class ) . '" data-risk="' . ( ! empty( $plugin['vulnerable'] ) ? 'true' : 'false' ) . '" data-severity="' . $escape( $risk_level ) . '" data-highlight="' . $escape( $highlight ) . '">';
 				$html     .= '<td>' . $escape( isset( $plugin['name'] ) ? $plugin['name'] : '' ) . '</td>';
 				$html     .= '<td>' . $escape( isset( $plugin['version'] ) ? $plugin['version'] : '' ) . '</td>';
 				$html     .= '<td>' . $escape( ! empty( $plugin['active'] ) ? 'Активен' : 'Неактивен' ) . '</td>';
@@ -124,7 +154,8 @@ if ( ! function_exists( 'pvs_admin_render_report' ) ) {
 				$severity = isset( $vulnerability['severity'] ) && is_scalar( $vulnerability['severity'] ) ? strtolower( trim( (string) $vulnerability['severity'] ) ) : 'low';
 				$label    = isset( $vulnerability['severity_label'] ) ? $vulnerability['severity_label'] : ( function_exists( 'pvs_severity_label' ) ? pvs_severity_label( $severity ) : $severity );
 
-				$html .= '<li class="pvs-vulnerability pvs-severity-' . $escape( $severity ) . '" data-severity="' . $escape( $severity ) . '" data-risk="' . $escape( $severity ) . '">';
+				$highlight = isset( $vulnerability['highlight'] ) && is_scalar( $vulnerability['highlight'] ) ? (string) $vulnerability['highlight'] : 'pvs-risk-' . $severity;
+				$html     .= '<li class="pvs-vulnerability pvs-severity-' . $escape( $severity ) . '" data-severity="' . $escape( $severity ) . '" data-risk="' . $escape( $severity ) . '" data-highlight="' . $escape( $highlight ) . '">';
 				$html .= '<span class="pvs-vulnerability-plugin">' . $escape( isset( $vulnerability['plugin'] ) ? $vulnerability['plugin'] : '' ) . '</span>';
 				$html .= ': ' . $escape( isset( $vulnerability['title'] ) ? $vulnerability['title'] : '' );
 				$html .= ' <span class="pvs-risk pvs-risk-' . $escape( $severity ) . '">(' . $escape( $label ) . ')</span>';
@@ -166,9 +197,18 @@ if ( ! class_exists( 'PVS_Admin', false ) ) {
 		public static function init() {
 			if ( function_exists( 'add_action' ) ) {
 				add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
+				add_action( 'admin_head', array( __CLASS__, 'render_styles' ) );
 				add_action( 'admin_post_pvs_scan', array( __CLASS__, 'handle_scan' ) );
 				add_action( 'wp_ajax_pvs_scan', array( __CLASS__, 'handle_ajax_scan' ) );
 			}
+		}
+
+		public static function styles() {
+			return pvs_admin_styles();
+		}
+
+		public static function render_styles() {
+			pvs_admin_render_styles();
 		}
 
 		public static function register_menu() {

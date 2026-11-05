@@ -21,7 +21,9 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 * список проверенных плагинов с версиями и статусом;
 * список найденных уязвимостей с идентификатором, важностью и исправленной версией;
-* маркеры `mocked`, `source`, `network` на уровне отчёта, плагина и уязвимости.
+* маркеры `mocked`, `source`, `network` на уровне отчёта, плагина и уязвимости;
+* подсветку рисков по важности (`pvs-risk-critical/high/medium/low`) в отчёте
+  и таблице плагинов, с CSS в админке.
 
 Страница проверки находится в админке: «Инструменты → Проверка плагинов».
 Форма защищена nonce и проверкой права `manage_options`.
@@ -35,5 +37,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 ```bash
 php wp/plugins/pvs/tests/pvs-contract-test.php
 php wp/plugins/pvs/tests/pvs-all-plugins-contract-test.php
+php wp/plugins/pvs/tests/pvs-risk-highlighting-contract-test.php
 node wp/plugins/pvs/tests/pvs-contract.test.js
+node wp/plugins/pvs/tests/pvs-risk-highlighting-redgreen.test.js
 ```
