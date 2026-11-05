@@ -59,8 +59,14 @@ if ( ! function_exists( 'velotok_core_guest_cart_registration_contract' ) ) {
 	velotok_guest_cart_contract_assert( isset( $contract['spec'] ) && 'clarify-30af92ca' === $contract['spec'], 'Контракт ссылается на неверную спеку.' );
 	velotok_guest_cart_contract_assert( isset( $contract['parent_spec'] ) && 'ecommerce-store' === $contract['parent_spec'], 'Не зафиксирована родительская спецификация.' );
 	velotok_guest_cart_contract_assert( isset( $contract['requirement'] ) && 'TESTEB-78' === $contract['requirement'], 'Контракт ссылается на неверное требование.' );
-	velotok_guest_cart_contract_assert( isset( $contract['task'] ) && 'TESTEB-79' === $contract['task'], 'Контракт не помечен задачей TESTEB-79.' );
+	velotok_guest_cart_contract_assert( isset( $contract['task'] ) && 'TESTEB-80' === $contract['task'], 'Контракт не помечен задачей TESTEB-80.' );
+	velotok_guest_cart_contract_assert( isset( $contract['previous_task'] ) && 'TESTEB-79' === $contract['previous_task'], 'Контракт не фиксирует предыдущую задачу TESTEB-79.' );
+	velotok_guest_cart_contract_assert( isset( $contract['transfer_requirement'] ) && 'TESTEB-80' === $contract['transfer_requirement'], 'Контракт не фиксирует требование переноса TESTEB-80.' );
 	velotok_guest_cart_contract_assert( isset( $contract['requirement_ids'] ) && in_array( 'TESTEB-79', $contract['requirement_ids'], true ), 'Контракт не содержит требование TESTEB-79.' );
+	velotok_guest_cart_contract_assert( isset( $contract['requirement_ids'] ) && in_array( 'TESTEB-80', $contract['requirement_ids'], true ), 'Контракт не содержит требование TESTEB-80.' );
+	velotok_guest_cart_contract_assert( isset( $contract['requirement_tickets']['transfer_after_signup'] ) && 'TESTEB-80' === $contract['requirement_tickets']['transfer_after_signup'], 'Перенос корзины не привязан к задаче TESTEB-80.' );
+	velotok_guest_cart_contract_assert( isset( $contract['current_task'] ) && 'TESTEB-80' === $contract['current_task'], 'Контракт не помечен текущей задачей TESTEB-80.' );
+	velotok_guest_cart_contract_assert( isset( $contract['requirement_id'] ) && 'TESTEB-80' === $contract['requirement_id'], 'Контракт не содержит идентификатор требования TESTEB-80.' );
 	velotok_guest_cart_contract_assert( isset( $contract['mocked'] ) && true === $contract['mocked'], 'Контракт не помечен mocked: true.' );
 	velotok_guest_cart_contract_assert( isset( $contract['source'] ) && 'stub' === $contract['source'], 'Источником должна быть заглушка.' );
 	velotok_guest_cart_contract_assert( isset( $contract['network'] ) && false === $contract['network'], 'Заглушка не должна ходить в сеть.' );
@@ -96,10 +102,17 @@ if ( ! function_exists( 'velotok_core_guest_cart_registration_contract' ) ) {
 	velotok_guest_cart_contract_assert( isset( $contract['registration']['mocked'] ) && true === $contract['registration']['mocked'], 'Регистрация не помечена mocked: true.' );
 	velotok_guest_cart_contract_assert( isset( $contract['registration']['required_fields'] ) && in_array( 'email', $contract['registration']['required_fields'], true ), 'Email должен быть обязательным полем регистрации.' );
 
+	velotok_guest_cart_contract_assert( isset( $contract['transfer']['enabled'] ) && true === $contract['transfer']['enabled'], 'Перенос гостевой корзины должен быть включён.' );
+	velotok_guest_cart_contract_assert( isset( $contract['transfer']['requirement'] ) && 'TESTEB-80' === $contract['transfer']['requirement'], 'Перенос гостевой корзины не привязан к требованию TESTEB-80.' );
 	velotok_guest_cart_contract_assert( isset( $contract['transfer']['on_registration'] ) && true === $contract['transfer']['on_registration'], 'Не описан перенос гостевой корзины при регистрации.' );
+	velotok_guest_cart_contract_assert( isset( $contract['transfer']['source'] ) && 'guest_cart' === $contract['transfer']['source'], 'Источником переноса должна быть гостевая корзина.' );
+	velotok_guest_cart_contract_assert( isset( $contract['transfer']['target'] ) && 'user_cart' === $contract['transfer']['target'], 'Целью переноса должна быть корзина пользователя.' );
 	velotok_guest_cart_contract_assert( isset( $contract['transfer']['merge_strategy'] ) && 'merge_quantities' === $contract['transfer']['merge_strategy'], 'Неверная стратегия слияния гостевой корзины.' );
 	velotok_guest_cart_contract_assert( isset( $contract['transfer']['merge_by'] ) && 'product_id' === $contract['transfer']['merge_by'], 'Слияние должно выполняться по товару.' );
+	velotok_guest_cart_contract_assert( isset( $contract['transfer']['preserve_user_cart'] ) && true === $contract['transfer']['preserve_user_cart'], 'Существующая корзина пользователя должна сохраняться.' );
 	velotok_guest_cart_contract_assert( isset( $contract['transfer']['clear_guest_after_transfer'] ) && true === $contract['transfer']['clear_guest_after_transfer'], 'Гостевая корзина должна очищаться после переноса.' );
+	velotok_guest_cart_contract_assert( isset( $contract['transfer']['attaches_to_user_account'] ) && true === $contract['transfer']['attaches_to_user_account'], 'Корзина должна привязываться к аккаунту пользователя.' );
+	velotok_guest_cart_contract_assert( isset( $contract['transfer']['mocked'] ) && true === $contract['transfer']['mocked'], 'Перенос не помечен mocked: true.' );
 
 	velotok_guest_cart_contract_assert( isset( $contract['redirect']['enabled'] ) && true === $contract['redirect']['enabled'], 'Переход к оформлению должен быть включён.' );
 	velotok_guest_cart_contract_assert( isset( $contract['redirect']['after_transfer'] ) && true === $contract['redirect']['after_transfer'], 'Переход должен выполняться после переноса.' );
@@ -183,6 +196,9 @@ if ( function_exists( 'velotok_core_guest_cart_create' ) && function_exists( 've
 	velotok_guest_cart_contract_assert( false === $conflict['valid'] && 'REGISTRATION_EMAIL_EXISTS' === $conflict['code'], 'Стратегия error должна давать REGISTRATION_EMAIL_EXISTS.' );
 }
 
+velotok_guest_cart_contract_assert( function_exists( 'velotok_core_guest_cart_transfer_contract' ), 'Отсутствует контракт переноса гостевой корзины.' );
+velotok_guest_cart_contract_assert( function_exists( 'velotok_core_guest_cart_transfer_after_registration' ), 'Отсутствует перенос корзины после регистрации.' );
+
 if ( function_exists( 'velotok_core_guest_cart_transfer' ) ) {
 	$guest = velotok_core_guest_cart_add( velotok_core_guest_cart_create(), 'riviera', 1 );
 	$user  = velotok_core_cart_add_item( 'riviera', 2 );
@@ -195,6 +211,18 @@ if ( function_exists( 'velotok_core_guest_cart_transfer' ) ) {
 	velotok_guest_cart_contract_assert( true === $merged['guest_cleared'], 'Гостевая корзина должна очищаться после переноса.' );
 	velotok_guest_cart_contract_assert( 5 === (int) $merged['user_id'], 'Корзина должна привязываться к пользователю.' );
 	velotok_guest_cart_contract_assert( true === $merged['mocked'] && 'stub' === $merged['source'], 'Перенос должен быть mocked и stub.' );
+	$transfer_contract = velotok_core_guest_cart_transfer_contract();
+	velotok_guest_cart_contract_assert( true === $transfer_contract['mocked'] && true === $transfer_contract['transfer']['mocked'], 'Контракт переноса должен быть mocked.' );
+	velotok_guest_cart_contract_assert( true === $merged['transfer_mocked'], 'Перенос после регистрации должен быть помечен mocked.' );
+	velotok_guest_cart_contract_assert( false === $merged['guest'], 'После переноса корзина не должна оставаться гостевой.' );
+	velotok_guest_cart_contract_assert( true === $merged['authenticated'], 'После переноса корзина должна принадлежать аккаунту.' );
+
+	$registered = velotok_core_guest_cart_register( array( 'email' => 'transfer@example.com' ), $guest );
+	$after_registration = velotok_core_guest_cart_transfer( $guest, array(), $registered['user'] );
+
+	velotok_guest_cart_contract_assert( true === $after_registration['guest_cart_transferred'], 'После регистрации корзина должна переноситься в аккаунт.' );
+	velotok_guest_cart_contract_assert( (int) $registered['user_id'] === (int) $after_registration['user_id'], 'Перенесённая корзина должна ссылаться на зарегистрированного пользователя.' );
+	velotok_guest_cart_contract_assert( 1 === velotok_core_cart_count( $after_registration ), 'Перенос после регистрации должен сохранять товары.' );
 }
 
 if ( function_exists( 'velotok_core_guest_cart_checkout_redirect' ) ) {
