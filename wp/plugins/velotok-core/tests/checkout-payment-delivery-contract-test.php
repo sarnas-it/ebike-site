@@ -112,6 +112,14 @@ if ( function_exists( 'velotok_core_delivery_methods' ) ) {
 	velotok_checkout_contract_assert( isset( $methods['cdek'] ), 'Не найден способ доставки СДЭК.' );
 	velotok_checkout_contract_assert( isset( $methods['other'] ), 'Не найден способ доставки «Иной логист».' );
 
+	$tariffs = velotok_core_delivery_tariffs();
+	velotok_checkout_contract_assert( isset( $tariffs['russian_post'], $tariffs['cdek'], $tariffs['other'] ), 'Не задана тарифная сетка для всех способов доставки.' );
+
+	foreach ( $tariffs as $tariff ) {
+		velotok_checkout_contract_assert( isset( $tariff['mocked'] ) && true === $tariff['mocked'], 'Тариф не помечен mocked: true.' );
+		velotok_checkout_contract_assert( ! empty( $tariff['tiers'] ) && is_array( $tariff['tiers'] ), 'У тарифа не заданы уровни.' );
+	}
+
 	velotok_checkout_contract_assert( 'Почта РФ' === velotok_core_delivery_method( 'russian_post' )['label'], 'Способ доставки Почта РФ разрешается неверно.' );
 	velotok_checkout_contract_assert( 'СДЭК' === velotok_core_delivery_method( 'cdek' )['label'], 'Способ доставки СДЭК разрешается неверно.' );
 	velotok_checkout_contract_assert( 'Иной логист' === velotok_core_delivery_method( 'other' )['label'], 'Способ доставки Иной логист разрешается неверно.' );
@@ -137,9 +145,26 @@ if ( function_exists( 'velotok_core_delivery_methods' ) ) {
 	$valid_post = velotok_core_validate_delivery_method( 'Почта России' );
 	velotok_checkout_contract_assert( true === $valid_post['valid'] && 'russian_post' === $valid_post['method'], 'Способ доставки «Почта России» должен разрешаться в russian_post.' );
 
-	$cost = velotok_core_delivery_cost( 'cdek' );
+	$cost = velotok_core_delivery_cost( 'cdek', array( 'total' => 10000 ) );
 	velotok_checkout_contract_assert( true === $cost['valid'] && true === $cost['mocked'], 'Стоимость доставки должна возвращаться как mocked-заглушка.' );
-	velotok_checkout_contract_assert( 0.0 === (float) $cost['amount'], 'Стоимость доставки в заглушке должна быть нулевой.' );
+	velotok_checkout_contract_assert( true === $cost['calculated'], 'Стоимость доставки должна рассчитываться по тарифной сетке.' );
+	velotok_checkout_contract_assert( 'stub' === $cost['source'] && 'stub' === $cost['provider'], 'Источником стоимости должна быть тарифная сетка заглушки.' );
+	velotok_checkout_contract_assert( 490.0 === (float) $cost['amount'], 'Для заказа до 20 000 ₽ тариф СДЭК должен быть 490 ₽.' );
+
+	$free_cost = velotok_core_delivery_cost( 'cdek', array( 'total' => 60000 ) );
+	velotok_checkout_contract_assert( 0.0 === (float) $free_cost['amount'] && true === $free_cost['free'], 'От порога бесплатной доставки стоимость должна быть нулевой.' );
+
+	$other_cost = velotok_core_delivery_cost( 'other', array( 'total' => 60000 ) );
+	velotok_checkout_contract_assert( 590.0 === (float) $other_cost['amount'], 'Для «Иного логиста» должна применяться своя тарифная сетка.' );
+
+	$invalid_cost = velotok_core_delivery_cost( 'teleport', array( 'total' => 10000 ) );
+	velotok_checkout_contract_assert( false === $invalid_cost['valid'] && null === $invalid_cost['amount'], 'Для неизвестного способа стоимость не рассчитывается.' );
+
+	$order = velotok_core_save_delivery_option( array( 'id' => 42, 'total' => 10000 ), 'cdek' );
+	velotok_checkout_contract_assert( 'cdek' === $order['delivery_method'], 'Выбранный способ доставки должен сохраняться в заказе.' );
+	velotok_checkout_contract_assert( 'СДЭК' === $order['delivery_method_label'], 'Название выбранного способа доставки должно сохраняться в заказе.' );
+	velotok_checkout_contract_assert( 490.0 === (float) $order['delivery_cost'], 'Стоимость доставки должна сохраняться в заказе.' );
+	velotok_checkout_contract_assert( true === $order['delivery_mocked'], 'Сохранение доставки в заказе должно быть помечено mocked.' );
 }
 
 if ( function_exists( 'velotok_core_validate_content_acceptance' ) ) {
