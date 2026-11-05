@@ -42,6 +42,8 @@ function velotok_core_product_validation_contract() {
 		'photo'       => array(
 			'required'    => true,
 			'type'        => 'attachment_id',
+			'mocked'      => true,
+			'spec'        => 'clarify-9e1a1acd',
 			'error_codes' => array(
 				'required' => 'PHOTO_REQUIRED',
 				'format'   => 'PHOTO_INVALID_FORMAT',
@@ -453,6 +455,21 @@ function velotok_core_photo_parts( $photo ) {
 }
 
 /**
+ * Return the mocked photo validation rule.
+ *
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
+ * single source for photo validation. It never reads the database, files,
+ * media library or remote image storage.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_photo_validation_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['attributes']['photo'];
+}
+
+/**
  * Check whether a photo id is present.
  *
  * @param mixed $id Attachment id.
@@ -485,6 +502,7 @@ function velotok_core_photo_id_is_present( $id ) {
  * @return array<string,mixed>
  */
 function velotok_core_validate_product_photo( $photo, $mime = null ) {
+	$rule  = velotok_core_photo_validation_contract();
 	$parts = velotok_core_photo_parts( $photo );
 
 	if ( null === $mime && null !== $parts['mime'] ) {
@@ -492,11 +510,11 @@ function velotok_core_validate_product_photo( $photo, $mime = null ) {
 	}
 
 	if ( ! velotok_core_photo_id_is_present( $parts['id'] ) ) {
-		return velotok_core_validation_result( false, 'PHOTO_REQUIRED', $photo );
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $photo );
 	}
 
 	if ( null !== $mime && '' !== $mime && ! velotok_core_is_supported_image_mime( $mime ) ) {
-		return velotok_core_validation_result( false, 'PHOTO_INVALID_FORMAT', $photo );
+		return velotok_core_validation_result( false, $rule['error_codes']['format'], $photo );
 	}
 
 	return velotok_core_validation_result( true, null, $photo );
