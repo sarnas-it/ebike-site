@@ -78,6 +78,8 @@ services:
         wp theme activate velotok --allow-root >/dev/null 2>&1 || true
         echo "Running storefront theme contract test:"
         wp eval-file wp-content/themes/velotok/tests/theme-contract-test.php --allow-root
+        echo "Running theme design variants contract test:"
+        wp eval-file wp-content/themes/velotok/tests/theme-design-variants-contract-test.php --allow-root
         echo "Running specification data contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/spec-data-contract-test.php --allow-root
         echo "Running product validation contract test:"

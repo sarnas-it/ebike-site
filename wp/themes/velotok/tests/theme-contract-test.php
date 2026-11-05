@@ -89,6 +89,7 @@ $velotok_required_files = array(
 	'inc/customizer.php',
 	'inc/security.php',
 	'inc/woocommerce.php',
+	'inc/theme-design-variants.php',
 	'template-parts/header-bar.php',
 	'template-parts/hero.php',
 	'template-parts/categories.php',
@@ -158,7 +159,7 @@ if ( is_readable( $velotok_style_path ) ) {
  */
 $velotok_functions = velotok_theme_contract_source( $velotok_theme_dir . '/functions.php' );
 
-foreach ( array( 'inc/setup.php', 'inc/customizer.php', 'inc/enqueue.php', 'inc/security.php', 'inc/woocommerce.php' ) as $velotok_include ) {
+foreach ( array( 'inc/setup.php', 'inc/customizer.php', 'inc/enqueue.php', 'inc/security.php', 'inc/woocommerce.php', 'inc/theme-design-variants.php' ) as $velotok_include ) {
 	velotok_theme_contract_assert(
 		false !== strpos( $velotok_functions, $velotok_include ),
 		sprintf( 'functions.php не подключает модуль %s.', $velotok_include )
