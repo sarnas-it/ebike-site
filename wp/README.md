@@ -30,9 +30,11 @@ docker compose exec wordpress wp theme list
 docker compose run --rm --entrypoint wp wpcli --allow-root plugin list
 docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-contract-test.php
 docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-design-variants-contract-test.php
+docker compose run --rm --entrypoint wp wpcli --allow-root eval-file wp-content/themes/velotok/tests/theme-design-variants-rejected-contract-test.php
 bash wp/tests/smoke.sh
 php wp/themes/velotok/tests/theme-contract-test.php
 php wp/themes/velotok/tests/theme-design-variants-contract-test.php
+php wp/themes/velotok/tests/theme-design-variants-rejected-contract-test.php
 php wp/themes/velotok/tests/catalog-display-test.php
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
@@ -50,6 +52,7 @@ php wp/plugins/velotok-core/tests/content-articles-contract-test.php
 php wp/plugins/velotok-core/tests/catalog-contract-test.php
 php wp/plugins/velotok-core/tests/provisioning-contract-test.php
 node wp/themes/velotok/tests/theme-design-variants-contract.test.js
+node wp/themes/velotok/tests/theme-design-variants-rejected-redgreen.test.js
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
 node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
