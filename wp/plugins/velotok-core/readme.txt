@@ -92,6 +92,33 @@ php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
 node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
 ```
 
+= Тематический охват контента (stub) =
+
+Единая точка доступа — `velotok_core_content_thematic_contract()` в `includes/content-thematic-coverage.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-a2fd2f66` и родительскую спецификацию `ecommerce-store`.
+
+Обязательные тематики:
+
+* `model_overview` — «Обзор моделей в зелёной энергетике»;
+* `legal_requirements` — «Требования законодательства»;
+* `green_energy_news` — «Новости о зелёной энергетике».
+
+Правила контракта:
+
+* принадлежность определяется гибридно: явная метка `topic` в материале или автоматические признаки тематики и контекста зелёной энергетики;
+* материал без тематических признаков не признаётся соответствующим категории и получает код `*_MISMATCH`;
+* обзор моделей с признаками продвижения продукта отклоняется с кодом `MODEL_PROMOTION_DETECTED`;
+* `velotok_core_check_content_coverage()` проверяет полноту покрытия всех трёх областей; при пропуске возвращается `CONTENT_COVERAGE_INCOMPLETE` и список `missing`;
+* проверки выполняются на уровне интерфейса, не читают файлы, БД и внешние сервисы, содержательная экспертиза не входит в объём верификации.
+
+Открытые вопросы по способу определения принадлежности, критериям качества обзора моделей, юридической достоверности и источникам новостей перечислены в `velotok_core_content_open_questions()`.
+
+Запуск контрактного теста тематического охвата:
+
+```bash
+php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
+node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
+```
+
 == Installation ==
 
 1. Убедитесь, что установлен и активирован WooCommerce.
