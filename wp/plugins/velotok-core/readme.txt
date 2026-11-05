@@ -202,16 +202,17 @@ node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
 
 Обязательные тематики:
 
-* `model_overview` — «Обзор моделей в зелёной энергетике»;
+* `models_overview` — «Обзор моделей в зелёной энергетике» (алиас `model_overview`);
 * `legal_requirements` — «Требования законодательства»;
-* `green_energy_news` — «Новости о зелёной энергетике».
+* `news` — «Новости о зелёной энергетике» (алиас `green_energy_news`).
 
 Правила контракта:
 
 * принадлежность определяется гибридно: явная метка `topic` в материале или автоматические признаки тематики и контекста зелёной энергетики;
 * материал без тематических признаков не признаётся соответствующим категории и получает код `*_MISMATCH`;
 * обзор моделей с признаками продвижения продукта отклоняется с кодом `MODEL_PROMOTION_DETECTED`;
-* `velotok_core_check_content_coverage()` проверяет полноту покрытия всех трёх областей; при пропуске возвращается `CONTENT_COVERAGE_INCOMPLETE` и список `missing`;
+* новости требуют описания события и даты события; без даты материал не признаётся соответствующим категории;
+* `velotok_core_check_content_coverage()` проверяет полноту покрытия всех трёх областей и возвращает `complete => true` только при наличии всех трёх; при пропуске возвращается `CONTENT_COVERAGE_INCOMPLETE` и список `missing`;
 * проверки выполняются на уровне интерфейса, не читают файлы, БД и внешние сервисы, содержательная экспертиза не входит в объём верификации.
 
 Открытые вопросы по способу определения принадлежности, критериям качества обзора моделей, юридической достоверности и источникам новостей перечислены в `velotok_core_content_open_questions()`.
@@ -221,6 +222,27 @@ node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
 ```bash
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
+```
+
+= Новости о зелёной энергетике (stub) =
+
+Единая точка доступа — `velotok_core_green_energy_news_contract()` в `includes/green-energy-news.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-a2fd2f66`, задачу `TESTEB-122` и родительскую спецификацию `ecommerce-store`.
+
+Правила контракта:
+
+* материал является новостью, когда содержит описание события или изменения в зелёной энергетике и дату события;
+* дата принимается из полей `event_date`, `date`, `published_at`, `occurred_at`, `news_date` или из текста в форматах `YYYY-MM-DD`, `ДД.ММ.ГГГГ`, `ДД/ММ/ГГГГ`, `Д месяц ГГГГ`; результат нормализуется в `YYYY-MM-DD`;
+* без описания события возвращается `GREEN_ENERGY_NEWS_EVENT_REQUIRED`, без даты — `GREEN_ENERGY_NEWS_DATE_REQUIRED`, при некорректной дате — `GREEN_ENERGY_NEWS_DATE_INVALID`;
+* проверяются только наличие описания и даты; достоверность события, источник и точность даты не проверяются (`not_checked`);
+* заглушка не читает env, файлы, БД и не обращается к внешним сервисам; реальная интеграция с новостными источниками не требуется.
+
+Открытые вопросы об источниках новостей, формате даты и проверке достоверности перечислены в контракте.
+
+Запуск контрактных тестов новостей:
+
+```bash
+php wp/plugins/velotok-core/tests/green-energy-news-contract-test.php
+node wp/plugins/velotok-core/tests/green-energy-news-redgreen.test.js
 ```
 
 = Каталог электровелосипедов (stub) =

@@ -55,6 +55,7 @@ php wp/plugins/velotok-core/tests/order-delivery-contract-test.php
 php wp/plugins/velotok-core/tests/delivery-order-persistence-contract-test.php
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 php wp/plugins/velotok-core/tests/legal-requirements-contract-test.php
+php wp/plugins/velotok-core/tests/green-energy-news-contract-test.php
 php wp/plugins/velotok-core/tests/content-articles-contract-test.php
 php wp/plugins/velotok-core/tests/content-approval-contract-test.php
 php wp/plugins/velotok-core/tests/catalog-contract-test.php
@@ -82,6 +83,7 @@ node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
 node wp/plugins/velotok-core/tests/delivery-order-persistence-contract.test.js
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
 node wp/plugins/velotok-core/tests/legal-requirements-redgreen.test.js
+node wp/plugins/velotok-core/tests/green-energy-news-redgreen.test.js
 node wp/plugins/velotok-core/tests/content-articles-contract.test.js
 node wp/plugins/velotok-core/tests/content-approval-redgreen.test.js
 node wp/plugins/velotok-core/tests/catalog-contract.test.js
@@ -126,6 +128,7 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/plugins/velotok-core/` — поля характеристик электровелосипедов;
 * `wp/plugins/pvs/` — mocked-проверка всех плагинов на уязвимости;
 * `wp/plugins/velotok-core/includes/legal-requirements.php` — mocked-контракт требований законодательства для зелёной энергетики (описание требования и ссылка на источник);
+* `wp/plugins/velotok-core/includes/green-energy-news.php` — mocked-контракт новостей о зелёной энергетике (описание события и дата события);
 * `wp/plugins/velotok-core/includes/content-articles.php` — mocked-контракт контентных статей о товарах и магазине;
 * `wp/plugins/velotok-core/includes/content-approval.php` — обязательная приёмка контента человеком с ролью руководителя проекта (TESTEB-68);
 * `wp/plugins/velotok-core/includes/catalog.php` — mocked-контракт каталога электровелосипедов;
