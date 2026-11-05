@@ -128,6 +128,15 @@ if ( function_exists( 'velotok_core_delivery_methods' ) ) {
 	$valid = velotok_core_validate_delivery_method( 'cdek' );
 	velotok_checkout_contract_assert( true === $valid['valid'] && 'cdek' === $valid['method'], 'Известный способ доставки должен проходить проверку.' );
 
+	$valid_label = velotok_core_validate_delivery_method( 'СДЭК' );
+	velotok_checkout_contract_assert( true === $valid_label['valid'] && 'cdek' === $valid_label['method'], 'Способ доставки по названию «СДЭК» должен проходить проверку.' );
+
+	$valid_lower = velotok_core_validate_delivery_method( 'сдэк' );
+	velotok_checkout_contract_assert( true === $valid_lower['valid'] && 'cdek' === $valid_lower['method'], 'Способ доставки в нижнем регистре «сдэк» должен проходить проверку.' );
+
+	$valid_post = velotok_core_validate_delivery_method( 'Почта России' );
+	velotok_checkout_contract_assert( true === $valid_post['valid'] && 'russian_post' === $valid_post['method'], 'Способ доставки «Почта России» должен разрешаться в russian_post.' );
+
 	$cost = velotok_core_delivery_cost( 'cdek' );
 	velotok_checkout_contract_assert( true === $cost['valid'] && true === $cost['mocked'], 'Стоимость доставки должна возвращаться как mocked-заглушка.' );
 	velotok_checkout_contract_assert( 0.0 === (float) $cost['amount'], 'Стоимость доставки в заглушке должна быть нулевой.' );
@@ -146,6 +155,13 @@ if ( function_exists( 'velotok_core_validate_content_acceptance' ) ) {
 	$accepted = velotok_core_validate_content_acceptance( array( 'accepted' => true, 'role' => 'project_manager' ) );
 	velotok_checkout_contract_assert( true === $accepted['valid'], 'Приёмка руководителем проекта должна быть валидной.' );
 	velotok_checkout_contract_assert( 'project_manager' === $accepted['role'], 'Роль принявшего должна сохраняться.' );
+
+	$accepted_label = velotok_core_validate_content_acceptance( array( 'accepted' => true, 'role' => 'руководитель проекта' ) );
+	velotok_checkout_contract_assert( true === $accepted_label['valid'], 'Приёмка по названию роли должна быть валидной.' );
+
+	$forbidden_role = velotok_core_validate_content_acceptance( array( 'accepted' => true, 'role' => 'customer' ) );
+	velotok_checkout_contract_assert( false === $forbidden_role['valid'], 'Приёмка контента другой ролью должна блокироваться.' );
+	velotok_checkout_contract_assert( 'CONTENT_ACCEPTANCE_ROLE_FORBIDDEN' === $forbidden_role['code'], 'Для чужой роли должен возвращаться CONTENT_ACCEPTANCE_ROLE_FORBIDDEN.' );
 }
 
 if ( function_exists( 'velotok_core_validate_checkout' ) ) {
@@ -168,6 +184,21 @@ if ( function_exists( 'velotok_core_validate_checkout' ) ) {
 	) );
 	velotok_checkout_contract_assert( false === $checkout_without_delivery['valid'], 'Без способа доставки оформление заказа должно блокироваться.' );
 	velotok_checkout_contract_assert( in_array( 'DELIVERY_METHOD_REQUIRED', $checkout_without_delivery['errors'], true ), 'Должна быть ошибка об отсутствии способа доставки.' );
+
+	$checkout_provider_label = velotok_core_validate_checkout( array(
+		'velotok_delivery_method'  => 'СДЭК',
+		'velotok_content_accepted' => true,
+		'payment_provider'         => 'ЮKassa',
+	) );
+	velotok_checkout_contract_assert( true === $checkout_provider_label['valid'], 'Название платёжной системы «ЮKassa» должно приниматься.' );
+
+	$checkout_unknown_provider = velotok_core_validate_checkout( array(
+		'velotok_delivery_method'  => 'cdek',
+		'velotok_content_accepted' => true,
+		'payment_provider'         => 'stripe',
+	) );
+	velotok_checkout_contract_assert( false === $checkout_unknown_provider['valid'], 'Неподдерживаемая платёжная система должна блокироваться.' );
+	velotok_checkout_contract_assert( in_array( 'PAYMENT_PROVIDER_UNSUPPORTED', $checkout_unknown_provider['errors'], true ), 'Должна быть ошибка о неподдерживаемой платёжной системе.' );
 }
 
 $source = (string) file_get_contents( $stub_path );
