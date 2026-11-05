@@ -49,7 +49,7 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 = Валидация карточки товара (stub) =
 
-Единая точка доступа — `velotok_core_product_validation_contract()` в `includes/product-validation.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-9e1a1acd`.
+Единая точка доступа — `velotok_core_product_validation_contract()` в `includes/product-validation.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-41b1da6d`.
 
 Обязательные атрибуты карточки: `photo`, `title`, `description`, `price`. Перечень обязательных атрибутов категории возвращает `velotok_core_get_required_attributes()` (краткий алиас — `getRequiredAttributes()`).
 
@@ -71,7 +71,7 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 Серверная проверка при сохранении карточки вынесена в mocked-сервис `velotok_core_save_product_card()` (алиас `saveProductCard()`): карточка сохраняется только при наличии и валидности фото, названия, описания и цены. Результат содержит `saved`, `blocked`, `missing_attributes` и `invalid_attributes`; контракт сервиса — `velotok_core_product_card_service_contract()`.
 
-Запуск контрактных тестов валидации:
+Запуск контрактных тестов валидации и обязательных атрибутов:
 
 ```bash
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php

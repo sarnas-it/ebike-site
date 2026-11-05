@@ -86,7 +86,7 @@ velotok_product_price_assert(
 	'Контракт не помечен mocked: true.'
 );
 velotok_product_price_assert(
-	isset( $contract['spec'] ) && 'clarify-9e1a1acd' === $contract['spec'],
+	isset( $contract['spec'] ) && 'clarify-41b1da6d' === $contract['spec'],
 	'Контракт ссылается на неверную спеку.'
 );
 velotok_product_price_assert(
