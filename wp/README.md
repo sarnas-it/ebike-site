@@ -31,6 +31,7 @@ docker compose run --rm wpcli plugin list
 bash wp/tests/smoke.sh
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
+php wp/plugins/velotok-core/tests/checkout-contracts-test.php
 ```
 
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
@@ -49,7 +50,7 @@ docker compose down -v    # остановить и удалить базу, ф�
 ## Структура
 
 * `wp/themes/velotok/` — тема витрины и шаблоны WooCommerce;
-* `wp/plugins/velotok-core/` — поля характеристик электровелосипедов;
+* `wp/plugins/velotok-core/` — поля характеристик электровелосипедов и mocked-контракты checkout, доставки и оплаты;
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
 * `wp/cli/wp-entrypoint.sh` — обёртка WP-CLI для контейнера `wpcli`;
