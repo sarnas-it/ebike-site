@@ -119,6 +119,29 @@ php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
 node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
 ```
 
+= Способы доставки (stub) =
+
+Единая точка доступа — `velotok_core_delivery_options_contract()` в `includes/delivery-options.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-a8fe76a0` и родительскую спецификацию `clarify-096bb945`.
+
+Stub-провайдер отдаёт фиксированный список способов доставки:
+
+* `russian_post` — «Почта РФ»;
+* `cdek` — «СДЭК»;
+* `other` — «Иной логист».
+
+Каждый способ содержит тариф из тарифной сетки stub-провайдера (`velotok_core_delivery_tariffs()`): базовую стоимость, ставку за килограмм, порог бесплатной доставки и валюту. Стоимость рассчитывает `velotok_core_calculate_delivery_cost()` как базовая стоимость плюс ставка за килограмм с округлением веса вверх; при достижении порога по сумме заказа доставка бесплатная. Сетевые вызовы, env, файлы, БД и внешние сервисы не используются.
+
+Выбранный способ и стоимость сохраняет `velotok_core_save_delivery_selection()`: для массива заказа возвращается обновлённый массив с `delivery_method`, `delivery_method_label`, `delivery_cost`, `delivery_currency`, `shipping_method`, `shipping_cost` и meta-полями; для объекта с методами WooCommerce (`update_meta_data`, `set_shipping_total`) значения записываются в объект. Неизвестный способ не сохраняется и даёт `DELIVERY_METHOD_INVALID`, пустой — `DELIVERY_METHOD_REQUIRED`.
+
+Реальные службы доставки, правила тарификации и интеграция (создание отправления, трекинг, ошибки, формат данных) остаются в открытых вопросах `velotok_core_delivery_open_questions()`.
+
+Запуск контрактного теста способов доставки:
+
+```bash
+php wp/plugins/velotok-core/tests/delivery-options-contract-test.php
+node wp/plugins/velotok-core/tests/delivery-options-contract.test.js
+```
+
 = Тематический охват контента (stub) =
 
 Единая точка доступа — `velotok_core_content_thematic_contract()` в `includes/content-thematic-coverage.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-a2fd2f66` и родительскую спецификацию `ecommerce-store`.
