@@ -1,0 +1,53 @@
+name: CI
+
+# Runs on every push and on every pull request (no path filters).
+# Keep these triggers broad: a previous CI run never started for a PR because
+# the repository had no workflow registered for pull_request events.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Contract checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          coverage: none
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Lint PHP files
+        run: find wp scripts -name '*.php' -print0 | xargs -0 -r -n1 php -l
+
+      - name: Run PHP specification data contract test
+        run: php wp/plugins/velotok-core/tests/spec-data-contract-test.php
+
+      - name: Run Node specification data contract test
+        run: node wp/plugins/velotok-core/tests/spec-data-contract.test.js
+
+      - name: Validate demo product data
+        run: >-
+          php -r '$data = json_decode(file_get_contents("content/products.json"), true);
+          if (JSON_ERROR_NONE !== json_last_error() || !is_array($data) || [] === $data) {
+          fwrite(STDERR, "content/products.json is invalid\n"); exit(1); }
+          echo "content/products.json OK\n";'
