@@ -72,12 +72,28 @@ function velotok_core_spec_data() {
 		'missing_key'   => 'empty_string',
 		'future_source' => 'env',
 		'env_prefix'    => 'VELOTOK_SPEC_',
+		'accessor'      => 'velotok_core_spec_get',
 		'values'        => $values,
 		'types'         => $types,
 		'env_map'       => $env_map,
 	);
 
 	return $contract;
+}
+
+/**
+ * Report whether the active data provider is a stub.
+ *
+ * Consumers and guards can use this instead of inspecting the raw contract.
+ * The current iteration always returns true; a future env provider must
+ * return false here and update the spec accordingly.
+ *
+ * @return bool
+ */
+function velotok_core_spec_is_mocked() {
+	$contract = velotok_core_spec_data();
+
+	return true === $contract['mocked'];
 }
 
 /**

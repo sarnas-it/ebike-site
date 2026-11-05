@@ -75,8 +75,9 @@ services:
         wp plugin install woocommerce --activate --allow-root >/dev/null 2>&1 || true
         wp plugin activate velotok-core --allow-root >/dev/null 2>&1 || true
         wp theme activate velotok --allow-root >/dev/null 2>&1 || true
-        echo "Running specification data contract test:"
+        echo "Running specification data contract tests:"
         wp eval-file wp-content/plugins/velotok-core/tests/spec-data-contract-test.php --allow-root
+        wp eval-file wp-content/plugins/velotok-core/tests/spec-data-runtime-contract-test.php --allow-root
         exec tail -f /dev/null
 
 volumes:

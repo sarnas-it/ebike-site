@@ -8,7 +8,10 @@ const { spawnSync } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
 const stubPath = path.join(root, 'includes', 'spec-data.php');
-const phpTestPath = path.join(root, 'tests', 'spec-data-contract-test.php');
+const phpTestPaths = [
+  path.join(root, 'tests', 'spec-data-contract-test.php'),
+  path.join(root, 'tests', 'spec-data-runtime-contract-test.php'),
+];
 
 assert.ok(fs.existsSync(stubPath), `Specification data stub is missing: ${stubPath}`);
 
@@ -30,6 +33,8 @@ includes('velotok_core_spec_data', 'Contract accessor is missing');
 includes('velotok_core_spec_get', 'Value accessor is missing');
 includes('velotok_core_spec_has', 'Key existence helper is missing');
 includes('velotok_core_spec_env_name', 'Environment name mapper is missing');
+includes('velotok_core_spec_is_mocked', 'Mocked-provider helper is missing');
+includes("'accessor'", 'Contract must declare its single access point');
 
 for (const key of [
   'shop_phone',
@@ -68,16 +73,23 @@ for (const needle of forbidden) {
 const php = spawnSync('php', ['-v'], { encoding: 'utf8' });
 
 if (php.status === 0) {
-  const result = spawnSync('php', [phpTestPath], { encoding: 'utf8' });
+  for (const phpTestPath of phpTestPaths) {
+    const result = spawnSync('php', [phpTestPath], { encoding: 'utf8' });
 
-  if (result.stdout) {
-    process.stdout.write(result.stdout);
-  }
-  if (result.stderr) {
-    process.stderr.write(result.stderr);
+    if (result.stdout) {
+      process.stdout.write(result.stdout);
+    }
+    if (result.stderr) {
+      process.stderr.write(result.stderr);
+    }
+
+    assert.strictEqual(
+      result.status,
+      0,
+      `PHP contract test failed: ${path.basename(phpTestPath)}`
+    );
   }
 
-  assert.strictEqual(result.status, 0, 'PHP contract test failed');
   console.log('PASS: specification data stub contract verified with PHP');
 } else {
   console.log('PASS: specification data stub structure and mocked markers verified (PHP not available)');

@@ -44,6 +44,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 ```bash
 php wp/plugins/velotok-core/tests/spec-data-contract-test.php
+php wp/plugins/velotok-core/tests/spec-data-runtime-contract-test.php
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 ```
 
