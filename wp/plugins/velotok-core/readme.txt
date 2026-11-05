@@ -242,6 +242,27 @@ php wp/plugins/velotok-core/tests/catalog-contract-test.php
 node wp/plugins/velotok-core/tests/catalog-contract.test.js
 ```
 
+= Корзина для оформления заказа (stub) =
+
+Единая точка доступа — `velotok_core_cart_contract()` в `includes/cart.php`. Контракт помечен `mocked => true`, ссылается на спеку `ecommerce-store` и требование `TESTEB-151`.
+
+Правила контракта:
+
+* корзина хранится только в памяти и не сохраняется между запросами (`storage.persistent => false`, `network => false`); WooCommerce, env, файлы и БД не читаются;
+* операции: `velotok_core_cart_create()`, `velotok_core_cart_items()`, `velotok_core_cart_get_item()`, `velotok_core_cart_add_item()`, `velotok_core_cart_update_item()`, `velotok_core_cart_remove_item()`, `velotok_core_cart_clear()`;
+* товар добавляется по slug, названию или данным из mocked-каталога; повторное добавление суммирует количество, сумма позиции считается как цена × количество;
+* итоги возвращает `velotok_core_cart_totals()`: количество единиц, количество позиций, подытог и итог в RUB; доставка добавляется на этапе оформления заказа, а не в корзине;
+* ошибочные сценарии: `CART_PRODUCT_NOT_FOUND` для неизвестного товара, `CART_ITEM_NOT_FOUND` для неизвестной позиции, `CART_QUANTITY_INVALID` для неположительного количества и `CART_EMPTY` для оформления пустой корзины;
+* гостевая корзина включена (`guest_cart.enabled => true`); `velotok_core_cart_transfer_guest_cart()` переносит её при входе или регистрации со стратегией `merge_quantities`, суммируя количество одинаковых товаров;
+* нерешённый сценарий гостевой корзины и её переноса при регистрации зафиксирован в `velotok_core_cart_open_questions()` (`clarify-30af92ca`), как и вопросы хранения, цен, остатков и интеграции с WooCommerce.
+
+Запуск контрактного теста корзины:
+
+```bash
+php wp/plugins/velotok-core/tests/cart-contract-test.php
+node wp/plugins/velotok-core/tests/cart-contract.test.js
+```
+
 = Провижининг (stub) =
 
 Единая точка доступа — `velotok_core_provisioning_contract()` в `includes/provisioning.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-497c0475` и родительскую спецификацию `clarify-096bb945`.
