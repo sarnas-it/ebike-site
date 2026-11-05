@@ -257,7 +257,7 @@ if ( defined( 'ABSPATH' ) && function_exists( 'wp_get_theme' ) ) {
 		velotok_theme_contract_assert( isset( $velotok_menus['footer'] ), 'Не зарегистрировано меню подвала.' );
 	}
 
-	foreach ( array( 'velotok_setup', 'velotok_enqueue_assets', 'velotok_get_home_models', 'velotok_product_specs', 'velotok_cart_url' ) as $velotok_function ) {
+	foreach ( array( 'velotok_setup', 'velotok_enqueue_assets', 'velotok_get_home_models', 'velotok_product_specs', 'velotok_cart_url', 'velotok_order_delivery_total' ) as $velotok_function ) {
 		velotok_theme_contract_assert( function_exists( $velotok_function ), sprintf( 'Не загружена функция темы %s().', $velotok_function ) );
 	}
 

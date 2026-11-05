@@ -66,6 +66,62 @@ function velotok_cart_url() {
 }
 
 /**
+ * Итоговая сумма заказа со стоимостью доставки из mocked-контракта.
+ *
+ * Если плагин не активирован или у заказа нет способа доставки, возвращается
+ * пустой массив: шаблон просто не показывает дополнительную строку доставки.
+ *
+ * @param mixed  $order  Заказ WooCommerce.
+ * @param string $method Необязательный идентификатор способа доставки.
+ * @return array<string,mixed>
+ */
+function velotok_order_delivery_total( $order, $method = '' ) {
+	if ( ! function_exists( 'velotok_core_delivery_order_total' ) || ! is_object( $order ) ) {
+		return array();
+	}
+
+	$options = array();
+
+	if ( method_exists( $order, 'get_subtotal' ) ) {
+		$subtotal = $order->get_subtotal();
+		if ( is_numeric( $subtotal ) ) {
+			$options['subtotal'] = (float) $subtotal;
+		}
+	}
+
+	if ( method_exists( $order, 'get_shipping_total' ) ) {
+		$shipping = $order->get_shipping_total();
+		if ( is_numeric( $shipping ) && (float) $shipping > 0 ) {
+			$options['delivery_cost'] = (float) $shipping;
+		}
+	}
+
+	if ( '' === $method && method_exists( $order, 'get_id' ) ) {
+		$stored = get_post_meta( (int) $order->get_id(), '_velotok_delivery_method', true );
+		if ( is_string( $stored ) && '' !== $stored ) {
+			$method = $stored;
+		}
+	}
+
+	if ( '' === $method && method_exists( $order, 'get_shipping_methods' ) ) {
+		foreach ( $order->get_shipping_methods() as $shipping_method ) {
+			$candidate = method_exists( $shipping_method, 'get_method_id' ) ? (string) $shipping_method->get_method_id() : '';
+
+			if ( '' !== $candidate && function_exists( 'velotok_core_delivery_option_is_valid' ) && velotok_core_delivery_option_is_valid( $candidate ) ) {
+				$method = $candidate;
+				break;
+			}
+		}
+	}
+
+	if ( '' === $method ) {
+		return array();
+	}
+
+	return velotok_core_delivery_order_total( $method, $order, $options );
+}
+
+/**
  * Человекочитаемое количество моделей у категории.
  *
  * @param string $slug Слаг категории.
