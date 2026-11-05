@@ -131,7 +131,8 @@ h2{font-size:clamp(32px,4.7vw,58px);line-height:1.01;letter-spacing:-.035em;font
 .badge--lime{background:var(--lime);color:var(--ink)}
 .model-body{display:flex;flex-direction:column;flex:1;padding:22px}
 .model-top{display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.model-body h3{font-size:28px;line-height:1.05;letter-spacing:-.03em;margin:7px 0 18px}
+.model-body h3{font-size:28px;line-height:1.05;letter-spacing:-.03em;margin:7px 0 10px}
+.model-description{margin:0 0 18px;font-size:13.5px;line-height:1.55;color:var(--muted)}
 .specs{display:grid;gap:7px}
 .specs li{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding-bottom:7px;border-bottom:1px dashed var(--line);font-size:12.5px}
 .specs span{color:var(--muted)}
