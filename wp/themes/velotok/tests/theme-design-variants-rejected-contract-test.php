@@ -19,7 +19,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
 }
 
-$stub_path = dirname( __DIR__ ) . '/inc/theme-design-variants.php';
+$stub_override = getenv( 'VELOTOK_THEME_DESIGN_VARIANTS_STUB' );
+$stub_path     = false !== $stub_override && '' !== $stub_override
+	? $stub_override
+	: dirname( __DIR__ ) . '/inc/theme-design-variants.php';
 
 if ( ! is_readable( $stub_path ) ) {
 	fwrite( STDERR, 'FAIL: Не найден файл заглушки вариантов дизайна темы.' . PHP_EOL );
@@ -54,6 +57,10 @@ if ( ! function_exists( 'velotok_theme_select_design_variant' ) ) {
 	velotok_theme_design_rejected_assert( isset( $contract['mocked'] ) && true === $contract['mocked'], 'Контракт не помечен mocked: true.' );
 	velotok_theme_design_rejected_assert( count( $expected ) >= 2, 'Для проверки отклонения нужно не менее двух вариантов.' );
 	velotok_theme_design_rejected_assert( isset( $contract['rejected_status'] ) && 'rejected' === $contract['rejected_status'], 'Не зафиксирован статус rejected.' );
+	velotok_theme_design_rejected_assert( isset( $contract['reject_unselected'] ) && true === $contract['reject_unselected'], 'Контракт не требует отклонять невыбранные варианты.' );
+	velotok_theme_design_rejected_assert( isset( $contract['unselected_status'] ) && 'rejected' === $contract['unselected_status'], 'Статус невыбранного варианта должен быть rejected.' );
+	velotok_theme_design_rejected_assert( function_exists( 'velotok_theme_design_variant_status' ), 'Отсутствует функция статуса варианта.' );
+	velotok_theme_design_rejected_assert( function_exists( 'velotok_theme_design_rejected_variants' ), 'Отсутствует функция списка отклонённых вариантов.' );
 
 	foreach ( $expected as $variant ) {
 		$result = velotok_theme_select_design_variant( array( 'variant' => $variant ) );
@@ -82,6 +89,13 @@ if ( ! function_exists( 'velotok_theme_select_design_variant' ) ) {
 
 		velotok_theme_design_rejected_assert( array( $variant ) === $selected_ids, sprintf( 'При выборе «%s» выбран должен быть ровно один вариант.', $variant ) );
 		velotok_theme_design_rejected_assert( $expected_rejected === $rejected_ids, sprintf( 'При выборе «%s» отклонены должны быть все остальные варианты.', $variant ) );
+		velotok_theme_design_rejected_assert( 'selected' === velotok_theme_design_variant_status( $variant, $variant ), 'Функция статуса должна возвращать selected для выбранного варианта.' );
+
+		foreach ( $expected_rejected as $unselected ) {
+			velotok_theme_design_rejected_assert( 'rejected' === velotok_theme_design_variant_status( $unselected, $variant ), sprintf( 'Функция статуса должна возвращать rejected для невыбранного «%s».', $unselected ) );
+		}
+
+		velotok_theme_design_rejected_assert( $expected_rejected === velotok_theme_design_rejected_variants( $variant ), 'Функция отклонённых вариантов должна возвращать все невыбранные варианты.' );
 		velotok_theme_design_rejected_assert( $expected_rejected === $result['rejected'], 'Сводный список rejected должен совпадать со статусами вариантов.' );
 		velotok_theme_design_rejected_assert( $expected_rejected === $result['rejected_variants'], 'Список rejected_variants должен совпадать со статусами вариантов.' );
 		velotok_theme_design_rejected_assert( false === $result['selected_variant']['rejected'], 'Выбранный вариант в selected_variant не должен быть отклонён.' );

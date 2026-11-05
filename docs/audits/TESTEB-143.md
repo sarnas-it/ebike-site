@@ -1,20 +1,49 @@
-# TESTEB-143 — изменений не требуется
+# TESTEB-143 — невыбранные варианты дизайна отклоняются
 
 Задача: Варианты дизайна темы: Система SHALL помечать невыбранные варианты как отклонённые
 
-Цель: Варианты дизайна темы: Система SHALL помечать невыбранные варианты как отклонённые
-
 ## Решение
 
-Исполнитель не внёс изменений в production-код: требование уже реализовано в текущем дереве. Ниже — команды проверки и отчёт движка; ревьюер проверяет критерии по существующим тестам.
+Контракт-заглушка находится в `wp/themes/velotok/inc/theme-design-variants.php`
+и помечен `mocked => true`. В контракт добавлены явные маркеры
+`reject_unselected => true` и `unselected_status => 'rejected'`.
 
-## Отчёт движка
+Операция `velotok_theme_select_design_variant()` выбирает ровно один вариант,
+помечает его `selected`, а все остальные варианты — `rejected`. Для этого
+добавлены публичные помощники:
 
+* `velotok_theme_design_variant_status()` — статус варианта при выборе;
+* `velotok_theme_design_rejected_variants()` — список отклонённых вариантов.
+
+Ошибочный запрос без выбора оставляет варианты в статусе `pending`, поэтому
+`rejected` всегда означает именно невыбранный вариант, а не ошибку ввода.
+Реальная интеграция, сеть и сохранение состояния не используются.
+
+## Контрактный тест
+
+`wp/themes/velotok/tests/theme-design-variants-rejected-contract-test.php`
+проверяет метку `mocked`, маркеры отклонения, статус каждого варианта, список
+`rejected`/`rejected_variants` и помощники статуса. Тест завершается с ошибкой,
+если файл заглушки отсутствует.
+
+`wp/themes/velotok/tests/theme-design-variants-rejected-redgreen.test.js`
+даёт red-green доказательство:
+
+* с настоящей заглушкой тест зелёный;
+* без файла заглушки тест падает;
+* с мутированной копией заглушки, где невыбранные варианты больше не получают
+  `rejected`, тест падает.
+
+## Проверено
+
+```bash
+php wp/themes/velotok/tests/theme-design-variants-contract-test.php
+php wp/themes/velotok/tests/theme-design-variants-rejected-contract-test.php
+node wp/themes/velotok/tests/theme-design-variants-contract.test.js
+node wp/themes/velotok/tests/theme-design-variants-rejected-redgreen.test.js
+php -l wp/themes/velotok/inc/theme-design-variants.php
+php -l wp/themes/velotok/tests/theme-design-variants-rejected-contract-test.php
 ```
-=== opencode ===
-{"type":"step_start","timestamp":1793886551426,"sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","part":{"id":"prt_1abf87d7c001keO1n61ZeSCx9l","messageID":"msg_1abf877f4001xnKOMVhnpLhGNE","sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","type":"step-start"}}
-{"type":"tool_use","timestamp":1793886552674,"sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","part":{"type":"tool","tool":"bash","callID":"call_00_EcCkJwuEznj3Y86neLH01864","state":{"status":"completed","input":{"command":"ls -la /work/152f9492-d202-4f2c-b567-419413186e67"},"output":"total 124\ndrwxr-xr-x 8 worker worker  4096 Nov  5 13:49 .\ndrwxr-xr-x 4 worker worker  4096 Nov  5 13:49 ..\ndrwxr-xr-x 3 worker worker  4096 Nov  5 13:49 .github\n-rw-r--r-- 1 worker worker    30 Nov  5 13:49 .gitignore\n-rw-r--r-- 1 worker worker   738 Nov  5 13:49 README.md\ndrwxr-xr-x 2 worker worker  4096 Nov  5 13:49 assets\ndrwxr-xr-x 2 worker worker  4096 Nov  5 13:49 content\n-rw-r--r-- 1 worker worker  5075 Nov  5 13:49 docker-compose.yml\ndrwxr-xr-x 3 worker worker  4096 Nov  5 13:49 docs\n-rw-r--r-- 1 worker worker 75245 Nov  5 13:49 index.html\ndrwxr-xr-x 2 worker worker  4096 Nov  5 13:49 scripts\ndrwxr-xr-x 9 worker worker  4096 Nov  5 13:49 wp\n","metadata":{"output":"total 124\ndrwxr-xr-x 8 worker worker  4096 Nov  5 13:49 .\ndrwxr-xr-x 4 worker worker  4096 Nov  5 13:49 ..\ndrwxr-xr-x 3 worker worker  4096 Nov  5 13:49 .github\n-rw-r--r-- 1 worker worker    30 Nov  5 13:49 .gitignore\n-rw-r--r-- 1 worker worker   738 Nov  5 13:49 README.md\ndrwxr-xr-x 2 worker worker  4096 Nov  5 13:49 assets\ndrwxr-xr-x 2 worker worker  4096 Nov  5 13:49 content\n-rw-r--r-- 1 worker worker  5075 Nov  5 13:49 docker-compose.yml\ndrwxr-xr-x 3 worker worker  4096 Nov  5 13:49 docs\n-rw-r--r-- 1 worker worker 75245 Nov  5 13:49 index.html\ndrwxr-xr-x 2 worker worker  4096 Nov  5 13:49 scripts\ndrwxr-xr-x 9 worker worker  4096 Nov  5 13:49 wp\n","exit":0,"truncated":false},"title":"ls -la /work/152f9492-d202-4f2c-b567-419413186e67","time":{"start":1793886552462,"end":1793886552619}},"id":"prt_1abf87f7c001grMejLs3uUbNg6","sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","messageID":"msg_1abf877f4001xnKOMVhnpLhGNE"}}
-{"type":"tool_use","timestamp":1793886552676,"sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","part":{"type":"tool","tool":"bash","callID":"call_01_5cjj5OhiUX3pw1BM7U263589","state":{"status":"completed","input":{"command":"find /work/152f9492-d202-4f2c-b567-419413186e67 -maxdepth 3 -type f | head -100"},"output":"/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-mountain-pro-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-cargo-family-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-mountain-hardtail-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-city-classic-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-cargo-courier-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-city-sport-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/hero-city-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-folding-compact-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-city-classic-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-cargo-courier-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-city-sport-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/hero-city-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-folding-compact-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-cargo-family-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-mountain-hardtail-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-mountain-pro-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/data/products.json\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/cli/seed.php\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/cli/setup.sh\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/cli/wp-entrypoint.sh\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/uploads/.gitkeep\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/tests/smoke.sh\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/README.md\n/work/152f9492-d202-4f2c-b567-419413186e67/docker-compose.yml\n/work/152f9492-d202-4f2c-b567-419413186e67/.gitignore\n/work/152f9492-d202-4f2c-b567-419413186e67/scripts/seed.php\n/work/152f9492-d202-4f2c-b567-419413186e67/docs/audits/TESTEB-102.md\n/work/152f9492-d202-4f2c-b567-419413186e67/docs/audits/TESTEB-100.md\n/work/152f9492-d202-4f2c-b567-419413186e67/content/products.json\n/work/152f9492-d202-4f2c-b567-419413186e67/content/README.md\n/work/152f9492-d202-4f2c-b567-419413186e67/README.md\n/work/152f9492-d202-4f2c-b567-419413186e67/.github/workflows/ci.yml\n/work/152f9492-d202-4f2c-b567-419413186e67/index.html\n","metadata":{"output":"/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-mountain-pro-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-cargo-family-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-mountain-hardtail-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-city-classic-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-cargo-courier-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-city-sport-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/hero-city-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-folding-compact-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-city-classic-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-cargo-courier-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-city-sport-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/hero-city-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-folding-compact-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-cargo-family-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-mountain-hardtail-1.png\n/work/152f9492-d202-4f2c-b567-419413186e67/assets/model-mountain-pro-1-web.jpg\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/data/products.json\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/cli/seed.php\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/cli/setup.sh\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/cli/wp-entrypoint.sh\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/uploads/.gitkeep\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/tests/smoke.sh\n/work/152f9492-d202-4f2c-b567-419413186e67/wp/README.md\n/work/152f9492-d202-4f2c-b567-419413186e67/docker-compose.yml\n/work/152f9492-d202-4f2c-b567-419413186e67/.gitignore\n/work/152f9492-d202-4f2c-b567-419413186e67/scripts/seed.php\n/work/152f9492-d202-4f2c-b567-419413186e67/docs/audits/TESTEB-102.md\n/work/152f9492-d202-4f2c-b567-419413186e67/docs/audits/TESTEB-100.md\n/work/152f9492-d202-4f2c-b567-419413186e67/content/products.json\n/work/152f9492-d202-4f2c-b567-419413186e67/content/README.md\n/work/152f9492-d202-4f2c-b567-419413186e67/README.md\n/work/152f9492-d202-4f2c-b567-419413186e67/.github/workflows/ci.yml\n/work/152f9492-d202-4f2c-b567-419413186e67/index.html\n","exit":0,"truncated":false},"title":"find /work/152f9492-d202-4f2c-b567-419413186e67 -maxdepth 3 -type f | head -100","time":{"start":1793886552512,"end":1793886552634}},"id":"prt_1abf88194001kkHcofVUvr2Pwn","sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","messageID":"msg_1abf877f4001xnKOMVhnpLhGNE"}}
-{"type":"step_finish","timestamp":1793886552676,"sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","part":{"id":"prt_1abf88242001DgdZDiPj7mIrmD","reason":"tool-calls","messageID":"msg_1abf877f4001xnKOMVhnpLhGNE","sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","type":"step-finish","tokens":{"total":8238,"input":6439,"output":122,"reasoning":13,"cache":{"write":0,"read":1664}},"cost":0.001051842}}
-{"type":"step_start","timestamp":1793886553149,"sessionID":"ses_e54078b81ffeFRxTvQjj3bkMq2","part":{"id":"prt_1abf88439001PtuIB8pm5Lg3yM","messageID":"msg_1abf8825a0014hotuFlR…
-```
+
+`wp theme list` требует запущенного WordPress/Docker-окружения; в текущем
+окружении проверка выполнена автономными контрактными тестами.
