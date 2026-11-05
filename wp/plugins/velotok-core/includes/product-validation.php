@@ -103,9 +103,28 @@ function velotok_core_product_validation_contract() {
 		'unknown_category'             => 'default_attributes',
 		'future_source'                => 'woocommerce',
 		'missing_attribute'            => 'error_code',
+		'open_questions'               => array(
+			'Какие именно форматы изображений считаются поддерживаемыми и есть ли ограничения по размеру файла и разрешению?',
+			'Требуется ли минимальное количество фото и отдельное обязательное главное фото?',
+			'Допускается ли нулевая цена как валидное значение во всех категориях или только в отдельных (например, бесплатные позиции)?',
+			'Каковы предельные длины названия и описания, и различаются ли они по категориям?',
+			'Источник справочника категорий и их обязательных атрибутов: локальная конфигурация, внешняя система или комбинация с приоритетами?',
+			'Как должны формулироваться сообщения об ошибках валидации и требуется ли их локализация?',
+		),
 	);
 
 	return $contract;
+}
+
+/**
+ * Return the open questions recorded by the product validation contract.
+ *
+ * @return string[]
+ */
+function velotok_core_product_validation_open_questions() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['open_questions'];
 }
 
 /**
