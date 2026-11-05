@@ -83,6 +83,8 @@ function velotok_theme_design_variants_contract() {
 		'provider'           => 'mock',
 		'artifact'           => 'in_repository_mockup',
 		'single_choice'      => true,
+		'reject_unselected'  => true,
+		'unselected_status'  => 'rejected',
 		'required_variants'  => array_keys( $variants ),
 		'variants'           => $variants,
 		'default_variant'    => 'urban',
@@ -321,6 +323,43 @@ function velotok_theme_design_variant_input( $input ) {
 }
 
 /**
+ * Return the selection status for a variant.
+ *
+ * Exactly one variant can be selected. Every other variant is rejected; the
+ * pending status is reserved for failed requests where no choice was made.
+ *
+ * @param string      $variant  Variant key.
+ * @param string|null $selected Selected variant key or null.
+ * @return string
+ */
+function velotok_theme_design_variant_status( $variant, $selected = null ) {
+	$contract = velotok_theme_design_variants_contract();
+
+	return ( $selected === $variant )
+		? $contract['selected_status']
+		: $contract['rejected_status'];
+}
+
+/**
+ * Return the identifiers of every variant rejected by a selection.
+ *
+ * @param string|null $selected Selected variant key or null.
+ * @return string[]
+ */
+function velotok_theme_design_rejected_variants( $selected = null ) {
+	$contract = velotok_theme_design_variants_contract();
+	$rejected = array();
+
+	foreach ( array_keys( $contract['variants'] ) as $key ) {
+		if ( $contract['rejected_status'] === velotok_theme_design_variant_status( $key, $selected ) ) {
+			$rejected[] = $key;
+		}
+	}
+
+	return $rejected;
+}
+
+/**
  * Build a response with every variant marked by its selection status.
  *
  * @param string|null $selected Selected variant key or null.
@@ -331,13 +370,16 @@ function velotok_theme_design_variant_states( $selected = null ) {
 	$states   = array();
 
 	foreach ( $contract['variants'] as $key => $definition ) {
-		$is_selected = ( $selected === $key );
-		$states[]    = array_merge(
+		$status      = velotok_theme_design_variant_status( $key, $selected );
+		$is_selected = ( $contract['selected_status'] === $status );
+		$is_rejected = ( $contract['rejected_status'] === $status );
+
+		$states[] = array_merge(
 			$definition,
 			array(
-				'status'   => $is_selected ? $contract['selected_status'] : $contract['rejected_status'],
+				'status'   => $status,
 				'selected' => $is_selected,
-				'rejected' => ! $is_selected,
+				'rejected' => $is_rejected,
 			)
 		);
 	}
@@ -433,15 +475,9 @@ function velotok_theme_select_design_variant( $input = array(), $options = array
 		return velotok_theme_design_error_response( $contract['error_codes']['unknown_variant'], 'variant', $input );
 	}
 
-	$states    = velotok_theme_design_variant_states( $selected );
-	$rejected  = array();
+	$states     = velotok_theme_design_variant_states( $selected );
+	$rejected   = velotok_theme_design_rejected_variants( $selected );
 	$definition = $contract['variants'][ $selected ];
-
-	foreach ( $states as $state ) {
-		if ( $state['rejected'] ) {
-			$rejected[] = $state['id'];
-		}
-	}
 
 	return array(
 		'ok'                => true,

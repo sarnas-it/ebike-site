@@ -11,6 +11,9 @@
  * coverage checks are mocked contracts; editorial expertise and the real
  * publication pipeline are out of scope.
  *
+ * Canonical topic keys: `models_overview`, `legal_requirements`, `news`. The
+ * former `model_overview` and `green_energy_news` keys remain accepted aliases.
+ *
  * Spec: clarify-a2fd2f66.
  *
  * @package Velotok_Core
@@ -19,6 +22,9 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
 }
+
+require_once __DIR__ . '/legal-requirements.php';
+require_once __DIR__ . '/green-energy-news.php';
 
 /**
  * Return the content thematic coverage contract.
@@ -55,10 +61,11 @@ function velotok_core_content_thematic_contract() {
 	);
 
 	$topics = array(
-		'model_overview'      => array(
-			'id'                 => 'model_overview',
-			'slug'               => 'model_overview',
-			'code'               => 'model_overview',
+		'models_overview'     => array(
+			'id'                 => 'models_overview',
+			'slug'               => 'models_overview',
+			'code'               => 'models_overview',
+			'aliases'            => array( 'model_overview', 'model_review', 'models_review', 'models', 'обзор_моделей', 'обзор_моделей_в_зеленой_энергетике' ),
 			'label'              => 'Обзор моделей в зелёной энергетике',
 			'description'        => 'Обзор, сравнение и характеристики моделей оборудования для зелёной энергетики.',
 			'mocked'             => true,
@@ -75,6 +82,7 @@ function velotok_core_content_thematic_contract() {
 			'id'                 => 'legal_requirements',
 			'slug'               => 'legal_requirements',
 			'code'               => 'legal_requirements',
+			'aliases'            => array( 'legal', 'legislation', 'требования_законодательства', 'законодательство' ),
 			'label'              => 'Требования законодательства',
 			'description'        => 'Требования законодательства и нормативного регулирования в области зелёной энергетики.',
 			'mocked'             => true,
@@ -82,23 +90,26 @@ function velotok_core_content_thematic_contract() {
 				'topic_terms'     => array( 'закон', 'законодательств', 'норматив', 'регулир', 'требован', 'сертифик', 'лиценз', 'гост', 'стандарт' ),
 				'context_terms'   => $context_terms,
 				'forbidden_terms' => array(),
-				'match'           => 'legal term AND green energy context term',
+				'require_source'  => true,
+				'match'           => 'legal term AND green energy context term AND source reference',
 			),
 			'mismatch_code'      => 'LEGAL_REQUIREMENTS_MISMATCH',
 			'promotion_code'     => null,
 		),
-		'green_energy_news'   => array(
-			'id'                 => 'green_energy_news',
+		'news'                => array(
+			'id'                 => 'news',
 			'slug'               => 'green_energy_news',
-			'code'               => 'green_energy_news',
+			'code'               => 'news',
+			'aliases'            => array( 'green_energy_news', 'green_news', 'новости', 'новости_о_зеленой_энергетике' ),
 			'label'              => 'Новости о зелёной энергетике',
 			'description'        => 'Новости, сообщения и анонсы событий в области зелёной энергетики.',
 			'mocked'             => true,
 			'criteria'           => array(
-				'topic_terms'     => array( 'новост', 'сообщ', 'объяв', 'анонс', 'произош', 'запустил', 'открыл', 'подписал', 'пресс-релиз', 'инцидент' ),
+				'topic_terms'     => array( 'новост', 'сообщ', 'объяв', 'анонс', 'произош', 'запустил', 'открыл', 'подписал', 'пресс-релиз', 'инцидент', 'событ', 'изменен', 'запуск' ),
 				'context_terms'   => $context_terms,
 				'forbidden_terms' => array(),
-				'match'           => 'news term AND green energy context term',
+				'require_date'    => true,
+				'match'           => 'news term AND green energy context term AND event date',
 			),
 			'mismatch_code'      => 'GREEN_ENERGY_NEWS_MISMATCH',
 			'promotion_code'     => null,
@@ -198,23 +209,23 @@ function velotok_core_content_topic_key( $topic ) {
 	$key = (string) preg_replace( '/[\s-]+/', '_', $key );
 
 	$aliases = array(
-		'model_overview'                 => 'model_overview',
-		'models_overview'                => 'model_overview',
-		'model_review'                   => 'model_overview',
-		'models_review'                  => 'model_overview',
-		'models'                         => 'model_overview',
-		'обзор_моделей'                  => 'model_overview',
-		'обзор_моделей_в_зеленой_энергетике' => 'model_overview',
+		'models_overview'                => 'models_overview',
+		'model_overview'                 => 'models_overview',
+		'model_review'                   => 'models_overview',
+		'models_review'                  => 'models_overview',
+		'models'                         => 'models_overview',
+		'обзор_моделей'                  => 'models_overview',
+		'обзор_моделей_в_зеленой_энергетике' => 'models_overview',
 		'legal_requirements'             => 'legal_requirements',
 		'legislation'                    => 'legal_requirements',
 		'legal'                          => 'legal_requirements',
 		'требования_законодательства'    => 'legal_requirements',
 		'законодательство'               => 'legal_requirements',
-		'green_energy_news'              => 'green_energy_news',
-		'green_news'                     => 'green_energy_news',
-		'news'                           => 'green_energy_news',
-		'новости'                        => 'green_energy_news',
-		'новости_о_зеленой_энергетике'   => 'green_energy_news',
+		'news'                           => 'news',
+		'green_energy_news'              => 'news',
+		'green_news'                     => 'news',
+		'новости'                        => 'news',
+		'новости_о_зеленой_энергетике'   => 'news',
 	);
 
 	if ( isset( $aliases[ $key ] ) ) {
@@ -362,7 +373,8 @@ function velotok_core_content_manual_topic( $material ) {
  * The result is an interface-level mocked contract: a material matches a topic
  * when it has a topic signal and a green energy context signal, or when it
  * carries an explicit topic hint. Promotional model reviews are rejected by
- * the model overview criteria. No editorial expertise is performed.
+ * the model overview criteria; news requires a valid event date. No editorial
+ * expertise is performed.
  *
  * @param mixed $material Material data.
  * @param mixed $topic    Topic identifier or label.
@@ -415,6 +427,20 @@ function velotok_core_validate_content_topic( $material, $topic ) {
 		$missing[] = 'context_signal';
 	}
 
+	if ( ! empty( $criteria['require_source'] ) && '' === velotok_core_legal_requirements_source( $material ) ) {
+		$missing[] = 'source_link';
+	}
+
+	$event_date = '';
+
+	if ( ! empty( $criteria['require_date'] ) ) {
+		$event_date = velotok_core_green_energy_news_date( $material );
+
+		if ( '' === $event_date ) {
+			$missing[] = 'event_date';
+		}
+	}
+
 	$matched        = array() === $missing;
 	$promotion      = ! empty( $forbidden );
 	$classification = $manual === $key ? 'manual' : 'automatic';
@@ -439,6 +465,7 @@ function velotok_core_validate_content_topic( $material, $topic ) {
 	$result['promotion_detected'] = $promotion;
 	$result['matched_terms']      = array_merge( $topic_matches, $context_matches );
 	$result['missing']            = $missing;
+	$result['event_date']         = $event_date;
 	$result['label']              = $definition['label'];
 
 	return $result;

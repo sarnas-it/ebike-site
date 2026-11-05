@@ -71,6 +71,11 @@ if ! wp_cli eval-file wp-content/themes/velotok/tests/theme-contract-test.php; t
 	exit 1
 fi
 
+if ! wp_cli eval-file wp-content/themes/velotok/tests/theme-design-variants-rejected-contract-test.php; then
+	echo "FAIL: невыбранные варианты дизайна темы не помечаются rejected" >&2
+	exit 1
+fi
+
 if ! wp_cli plugin list --status=active --field=name | grep -qx 'velotok-core'; then
 	echo "FAIL: плагин velotok-core не активирован" >&2
 	exit 1

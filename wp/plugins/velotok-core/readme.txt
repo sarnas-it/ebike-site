@@ -49,7 +49,7 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 = Валидация карточки товара (stub) =
 
-Единая точка доступа — `velotok_core_product_validation_contract()` в `includes/product-validation.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-9e1a1acd`.
+Единая точка доступа — `velotok_core_product_validation_contract()` в `includes/product-validation.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-41b1da6d`.
 
 Обязательные атрибуты карточки: `photo`, `title`, `description`, `price`. Перечень обязательных атрибутов категории возвращает `velotok_core_get_required_attributes()` (краткий алиас — `getRequiredAttributes()`).
 
@@ -69,13 +69,17 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 Правило цены вынесено в отдельную заглушку `velotok_core_price_validation_contract()` с пометкой `mocked => true`; `velotok_core_validate_product_price()` читает коды ошибок из этого правила, разрешает ноль (`allow_zero => true`) и запрещает отрицательные значения (`allow_negative => false`).
 
-Запуск контрактных тестов валидации:
+Серверная проверка при сохранении карточки вынесена в mocked-сервис `velotok_core_save_product_card()` (алиас `saveProductCard()`): карточка сохраняется только при наличии и валидности фото, названия, описания и цены. Результат содержит `saved`, `blocked`, `missing_attributes` и `invalid_attributes`; контракт сервиса — `velotok_core_product_card_service_contract()`.
+
+Запуск контрактных тестов валидации и обязательных атрибутов:
 
 ```bash
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
 php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
 node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
+php wp/plugins/velotok-core/tests/product-card-required-attributes-contract-test.php
+node wp/plugins/velotok-core/tests/product-card-required-attributes-contract.test.js
 php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
 php wp/plugins/velotok-core/tests/product-price-validation-contract-test.php
@@ -198,16 +202,17 @@ node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
 
 Обязательные тематики:
 
-* `model_overview` — «Обзор моделей в зелёной энергетике»;
+* `models_overview` — «Обзор моделей в зелёной энергетике» (алиас `model_overview`);
 * `legal_requirements` — «Требования законодательства»;
-* `green_energy_news` — «Новости о зелёной энергетике».
+* `news` — «Новости о зелёной энергетике» (алиас `green_energy_news`).
 
 Правила контракта:
 
 * принадлежность определяется гибридно: явная метка `topic` в материале или автоматические признаки тематики и контекста зелёной энергетики;
 * материал без тематических признаков не признаётся соответствующим категории и получает код `*_MISMATCH`;
 * обзор моделей с признаками продвижения продукта отклоняется с кодом `MODEL_PROMOTION_DETECTED`;
-* `velotok_core_check_content_coverage()` проверяет полноту покрытия всех трёх областей; при пропуске возвращается `CONTENT_COVERAGE_INCOMPLETE` и список `missing`;
+* новости требуют описания события и даты события; без даты материал не признаётся соответствующим категории;
+* `velotok_core_check_content_coverage()` проверяет полноту покрытия всех трёх областей и возвращает `complete => true` только при наличии всех трёх; при пропуске возвращается `CONTENT_COVERAGE_INCOMPLETE` и список `missing`;
 * проверки выполняются на уровне интерфейса, не читают файлы, БД и внешние сервисы, содержательная экспертиза не входит в объём верификации.
 
 Открытые вопросы по способу определения принадлежности, критериям качества обзора моделей, юридической достоверности и источникам новостей перечислены в `velotok_core_content_open_questions()`.
@@ -217,6 +222,27 @@ node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
 ```bash
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
+```
+
+= Новости о зелёной энергетике (stub) =
+
+Единая точка доступа — `velotok_core_green_energy_news_contract()` в `includes/green-energy-news.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-a2fd2f66`, задачу `TESTEB-122` и родительскую спецификацию `ecommerce-store`.
+
+Правила контракта:
+
+* материал является новостью, когда содержит описание события или изменения в зелёной энергетике и дату события;
+* дата принимается из полей `event_date`, `date`, `published_at`, `occurred_at`, `news_date` или из текста в форматах `YYYY-MM-DD`, `ДД.ММ.ГГГГ`, `ДД/ММ/ГГГГ`, `Д месяц ГГГГ`; результат нормализуется в `YYYY-MM-DD`;
+* без описания события возвращается `GREEN_ENERGY_NEWS_EVENT_REQUIRED`, без даты — `GREEN_ENERGY_NEWS_DATE_REQUIRED`, при некорректной дате — `GREEN_ENERGY_NEWS_DATE_INVALID`;
+* проверяются только наличие описания и даты; достоверность события, источник и точность даты не проверяются (`not_checked`);
+* заглушка не читает env, файлы, БД и не обращается к внешним сервисам; реальная интеграция с новостными источниками не требуется.
+
+Открытые вопросы об источниках новостей, формате даты и проверке достоверности перечислены в контракте.
+
+Запуск контрактных тестов новостей:
+
+```bash
+php wp/plugins/velotok-core/tests/green-energy-news-contract-test.php
+node wp/plugins/velotok-core/tests/green-energy-news-redgreen.test.js
 ```
 
 = Каталог электровелосипедов (stub) =
@@ -242,6 +268,51 @@ php wp/plugins/velotok-core/tests/catalog-contract-test.php
 node wp/plugins/velotok-core/tests/catalog-contract.test.js
 ```
 
+= Корзина для оформления заказа (stub) =
+
+Единая точка доступа — `velotok_core_cart_contract()` в `includes/cart.php`. Контракт помечен `mocked => true`, ссылается на спеку `ecommerce-store` и требование `TESTEB-151`.
+
+Правила контракта:
+
+* корзина хранится только в памяти и не сохраняется между запросами (`storage.persistent => false`, `network => false`); WooCommerce, env, файлы и БД не читаются;
+* операции: `velotok_core_cart_create()`, `velotok_core_cart_items()`, `velotok_core_cart_get_item()`, `velotok_core_cart_add_item()`, `velotok_core_cart_update_item()`, `velotok_core_cart_remove_item()`, `velotok_core_cart_clear()`;
+* товар добавляется по slug, названию или данным из mocked-каталога; повторное добавление суммирует количество, сумма позиции считается как цена × количество;
+* итоги возвращает `velotok_core_cart_totals()`: количество единиц, количество позиций, подытог и итог в RUB; доставка добавляется на этапе оформления заказа, а не в корзине;
+* ошибочные сценарии: `CART_PRODUCT_NOT_FOUND` для неизвестного товара, `CART_ITEM_NOT_FOUND` для неизвестной позиции, `CART_QUANTITY_INVALID` для неположительного количества и `CART_EMPTY` для оформления пустой корзины;
+* гостевая корзина включена (`guest_cart.enabled => true`); `velotok_core_cart_transfer_guest_cart()` переносит её при входе или регистрации со стратегией `merge_quantities`, суммируя количество одинаковых товаров;
+* нерешённый сценарий гостевой корзины и её переноса при регистрации зафиксирован в `velotok_core_cart_open_questions()` (`clarify-30af92ca`), как и вопросы хранения, цен, остатков и интеграции с WooCommerce.
+
+Запуск контрактного теста корзины:
+
+```bash
+php wp/plugins/velotok-core/tests/cart-contract-test.php
+node wp/plugins/velotok-core/tests/cart-contract.test.js
+```
+
+= Гостевая корзина и перенос при регистрации (stub) =
+
+Единая точка доступа — `velotok_core_guest_cart_registration_contract()` в `includes/guest-cart-registration.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-30af92ca`, требования `TESTEB-78`/`TESTEB-79`/`TESTEB-80`/`TESTEB-81` (`requirement_ids`, `task => TESTEB-81`, `transfer_requirement => TESTEB-80`, `redirect_requirement => TESTEB-81`), родительская спецификация — `ecommerce-store`. Отдельная точка доступа к переходу — `includes/guest-cart-checkout-redirect.php` и `velotok_core_guest_cart_checkout_redirect_contract()`.
+
+Правила контракта:
+
+* неавторизованный пользователь собирает корзину через `velotok_core_guest_cart_create()` и `velotok_core_guest_cart_add()`; повторное добавление товара суммирует количество;
+* нажатие «Купить» запускает `velotok_core_guest_cart_buy()`: сначала регистрирует пользователя по email через `velotok_core_guest_cart_register()`, затем переносит гостевую корзину в аккаунт через `velotok_core_guest_cart_transfer()`;
+* при переносе после регистрации (`TESTEB-80`, `transfer.on_registration => true`, `transfer.attaches_to_user_account => true`) количество одинаковых товаров суммируется (`merge_quantities`, `merge_by => product_id`), существующая корзина пользователя сохраняется, гостевая после переноса очищается;
+* после успешного переноса (`TESTEB-81`, `redirect.after_transfer => true`, `redirect.requires_transfer => true`) `velotok_core_guest_cart_checkout_redirect()` и его псевдоним `velotok_core_guest_cart_redirect_to_checkout()` возвращают переход `/checkout/` с целью `checkout` и следующим шагом `checkout`; пустая корзина даёт `CART_EMPTY`, а ошибка регистрации сохраняет гостевую корзину;
+* заглушка не читает env, файлы, БД и не обращается к внешним сервисам; реальная регистрация, WooCommerce-аккаунт и маршрутизация оформления не выполняются (`network => false`, `persistent => false`).
+
+Открытые вопросы о способе аутентификации, подтверждении email, обработке существующего пользователя, правилах слияния, целевой странице оформления и локальном запуске перечислены в `velotok_core_guest_cart_open_questions()`.
+
+Запуск контрактных тестов гостевой корзины:
+
+```bash
+php wp/plugins/velotok-core/tests/guest-cart-registration-contract-test.php
+php wp/plugins/velotok-core/tests/guest-cart-checkout-redirect-contract-test.php
+node wp/plugins/velotok-core/tests/guest-cart-registration-contract.test.js
+node wp/plugins/velotok-core/tests/guest-cart-registration-redgreen.test.js
+node wp/plugins/velotok-core/tests/guest-cart-checkout-redirect-redgreen.test.js
+```
+
 = Провижининг (stub) =
 
 Единая точка доступа — `velotok_core_provisioning_contract()` в `includes/provisioning.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-497c0475` и родительскую спецификацию `clarify-096bb945`.
@@ -263,6 +334,47 @@ node wp/plugins/velotok-core/tests/catalog-contract.test.js
 ```bash
 php wp/plugins/velotok-core/tests/provisioning-contract-test.php
 node wp/plugins/velotok-core/tests/provisioning-contract.test.js
+```
+
+= Интеграция с платёжной системой (stub) =
+
+Единая точка доступа — `velotok_core_payment_integration_contract()` в `includes/payment-integration.php`. Контракт помечен `mocked => true`, ссылается на спеку `ecommerce-store` и требование `TESTEB-153`.
+
+Правила контракта:
+
+* платёжная система — ЮKassa (`yookassa`, «ЮKassa»); реальное списание денег не выполняется (`network => false`, `real_integration.required => false`);
+* поддерживаемые статусы оплаты: `pending`, `waiting_for_capture`, `succeeded`, `canceled`; `succeeded` — финальный оплаченный статус;
+* `velotok_core_payment_integration_create()` / `velotok_core_payment_integration_process()` создают mocked-платёж из суммы заказа с валютой RUB и внутренней ссылкой подтверждения `mock://yookassa/...`; платёж создаётся в статусе `pending` и не считается оплаченным;
+* `velotok_core_payment_integration_status()` разрешает статус, `velotok_core_payment_integration_confirm()` применяет mocked-переход, а `velotok_core_payment_integration_is_paid()` возвращает `true` только для `succeeded`;
+* `velotok_core_payment_integration_validate()` проверяет провайдера, валюту, сумму и статус; ошибки: `PAYMENT_PROVIDER_UNSUPPORTED`, `PAYMENT_AMOUNT_INVALID`, `PAYMENT_CURRENCY_UNSUPPORTED`, `PAYMENT_STATUS_INVALID`;
+* имена будущих env-переменных (`VELOTOK_YOOKASSA_SHOP_ID`, `VELOTOK_YOOKASSA_SECRET_KEY`, `VELOTOK_YOOKASSA_MODE`) только вычисляются, env не читается;
+* реальная интеграция не требуется; открытые вопросы о провайдере, режимах, статусах, подтверждении и синхронизации заказа перечислены в `velotok_core_payment_integration_open_questions()` (`clarify-096bb945`).
+
+Запуск контрактного теста интеграции с платёжной системой:
+
+```bash
+php wp/plugins/velotok-core/tests/payment-integration-contract-test.php
+node wp/plugins/velotok-core/tests/payment-integration-contract.test.js
+```
+
+= Приёмка контента человеком =
+
+Правило реализовано в `includes/content-approval.php`, ссылается на спеку `clarify-096bb945` и требование `TESTEB-68`.
+
+Правила контракта:
+
+* контентные статьи (тип записи `post`) не публикуются без подтверждения человеком; попытка `publish` без приёмки откатывается в `pending`, включая обход через `update_post()` и REST API (`wp_insert_post_data`);
+* подтверждать контент может только человек с ролью `project_manager` («Руководитель проекта») или правом `approve_content`; при чужой роли возвращается `CONTENT_APPROVAL_ROLE_FORBIDDEN`;
+* ID подтвердившего сохраняется в мете `_content_approved_by`, статус приёмки — в `_content_approval_status`; после подтверждения запись публикуется (`publish`);
+* снятие чекбокса в метабоксе «Приёмка контента» отзывает подтверждение: мета `_content_approved_by` удаляется, статья возвращается в `pending`;
+* без подтверждения при попытке публикации возвращается `CONTENT_APPROVAL_REQUIRED`.
+
+Запуск тестов:
+
+```bash
+php wp/plugins/velotok-core/tests/content-approval-contract-test.php
+node wp/plugins/velotok-core/tests/content-approval-redgreen.test.js
+wp eval-file wp-content/plugins/velotok-core/tests/content-approval-wordpress-test.php
 ```
 
 == Installation ==

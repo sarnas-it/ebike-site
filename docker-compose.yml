@@ -34,6 +34,8 @@ services:
     volumes:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
+      - ./wp/plugins/pvs:/var/www/html/wp-content/plugins/pvs:ro
+      - ./wp/plugins/plugin-vulnerability-scanner:/var/www/html/wp-content/plugins/plugin-vulnerability-scanner:ro
       - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
       - ./wp/themes/velotok-bold:/var/www/html/wp-content/themes/velotok-bold:ro
       - ./wp/themes/velotok-minimal:/var/www/html/wp-content/themes/velotok-minimal:ro
@@ -59,6 +61,8 @@ services:
     volumes:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
+      - ./wp/plugins/pvs:/var/www/html/wp-content/plugins/pvs:ro
+      - ./wp/plugins/plugin-vulnerability-scanner:/var/www/html/wp-content/plugins/plugin-vulnerability-scanner:ro
       - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
       - ./wp/themes/velotok-bold:/var/www/html/wp-content/themes/velotok-bold:ro
       - ./wp/themes/velotok-minimal:/var/www/html/wp-content/themes/velotok-minimal:ro

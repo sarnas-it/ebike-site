@@ -95,8 +95,22 @@ const entrypointPath = path.join(wpRoot, 'cli', 'wp-entrypoint.sh');
 const bootstrapPath = path.join(wpRoot, 'cli', 'bootstrap.sh');
 const setupPath = path.join(wpRoot, 'cli', 'setup.sh');
 const compose = fs.readFileSync(composePath, 'utf8');
+const bootstrap = fs.readFileSync(bootstrapPath, 'utf8');
 const entrypoint = fs.readFileSync(entrypointPath, 'utf8');
 const isExecutable = (file) => (fs.statSync(file).mode & 0o111) !== 0;
+
+assert.ok(
+  !/^(?:<{7}|={7}|>{7})(?:\s|$)/m.test(compose),
+  'docker-compose.yml must not contain unresolved merge conflict markers'
+);
+assert.ok(
+  compose.includes('./wp/themes/design-variants.json:/var/www/html/wp-content/themes/design-variants.json:ro'),
+  'docker-compose.yml must mount the design variants manifest'
+);
+assert.ok(
+  bootstrap.includes('wp-content/plugins/pvs/tests/pvs-contract-test.php'),
+  'bootstrap.sh must keep the base branch contract test checks'
+);
 
 assert.ok(
   /entrypoint:\s*\["\/bin\/sh",\s*"\/opt\/velotok\/cli\/wp-entrypoint\.sh"\]/.test(compose),

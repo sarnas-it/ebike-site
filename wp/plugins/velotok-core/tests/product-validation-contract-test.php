@@ -84,7 +84,7 @@ $contract = velotok_core_product_validation_contract();
 
 velotok_product_validation_assert( is_array( $contract ), 'Контракт должен быть массивом.' );
 velotok_product_validation_assert( isset( $contract['mocked'] ) && true === $contract['mocked'], 'Контракт не помечен mocked: true.' );
-velotok_product_validation_assert( isset( $contract['spec'] ) && 'clarify-9e1a1acd' === $contract['spec'], 'Контракт ссылается на неверную спеку.' );
+velotok_product_validation_assert( isset( $contract['spec'] ) && 'clarify-41b1da6d' === $contract['spec'], 'Контракт ссылается на неверную спеку.' );
 velotok_product_validation_assert( isset( $contract['source'] ) && 'stub' === $contract['source'], 'Источником должна быть заглушка.' );
 
 $expected_required = array( 'photo', 'title', 'description', 'price' );

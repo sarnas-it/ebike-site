@@ -11,7 +11,7 @@
  * handling and the external category directory are out of scope for this
  * contract.
  *
- * Spec: clarify-9e1a1acd.
+ * Spec: clarify-41b1da6d.
  *
  * @package Velotok_Core
  */
@@ -97,7 +97,7 @@ function velotok_core_product_validation_contract() {
 	);
 
 	$contract = array(
-		'spec'                         => 'clarify-9e1a1acd',
+		'spec'                         => 'clarify-41b1da6d',
 		'source'                       => 'stub',
 		'mocked'                       => true,
 		'required_attributes'          => $required,
@@ -649,7 +649,7 @@ function velotok_core_validate_product( $product, $category = '' ) {
 
 	return array(
 		'valid'              => array() === $errors,
-		'spec'               => 'clarify-9e1a1acd',
+		'spec'               => 'clarify-41b1da6d',
 		'mocked'             => true,
 		'category'           => $category,
 		'required_attributes' => $required,
@@ -717,6 +717,122 @@ function velotok_core_missing_product_attributes( $product, $category = '' ) {
 	$result = velotok_core_validate_product( $product, $category );
 
 	return $result['missing_attributes'];
+}
+
+/**
+ * Extract the mandatory attributes of a product card.
+ *
+ * This is the data that is validated and saved by the product card service:
+ * photo, title, description and price. The values are returned unchanged so
+ * the saved card always contains the mandatory attributes that were checked.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @return array<string,mixed>
+ */
+function velotok_core_product_card_attributes( $product ) {
+	if ( ! is_array( $product ) ) {
+		$product = array();
+	}
+
+	return array(
+		'photo'       => velotok_core_product_value( $product, array( 'photo', 'photo_id', 'image', 'image_id', 'thumbnail_id', 'attachment_id' ) ),
+		'photo_mime'  => velotok_core_product_value( $product, array( 'photo_mime', 'image_mime', 'mime', 'mime_type' ) ),
+		'title'       => velotok_core_product_value( $product, array( 'title', 'name', 'product_title' ) ),
+		'description' => velotok_core_product_value( $product, array( 'description', 'product_description', 'body' ) ),
+		'price'       => velotok_core_product_value( $product, array( 'price', 'regular_price' ) ),
+	);
+}
+
+/**
+ * Return the mocked product card save service contract.
+ *
+ * The service validates the required product card attributes on the server
+ * before a card is saved. It is a fixed in-memory stub and never depends on
+ * client-side validation, the database or external services.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_product_card_service_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return array(
+		'spec'                     => 'clarify-41b1da6d',
+		'parent_spec'              => $contract['spec'],
+		'source'                   => 'stub',
+		'mocked'                   => true,
+		'service'                  => 'product_card',
+		'required_attributes'      => $contract['required_attributes'],
+		'validate_on_save'         => true,
+		'server_side'              => true,
+		'client_validation_only'   => false,
+		'saved_status'             => 'saved',
+		'blocked_status'           => 'blocked',
+		'missing_attributes_key'   => 'missing_attributes',
+		'invalid_attributes_key'   => 'invalid_attributes',
+		'card_attributes_key'      => 'card_attributes',
+		'error_codes'              => velotok_core_validation_error_codes(),
+	);
+}
+
+/**
+ * Validate and save a product card through the mocked server-side service.
+ *
+ * A card is saved only when every required attribute is present and valid.
+ * Missing attributes are reported in `missing_attributes`; attributes that are
+ * present but invalid are reported in `invalid_attributes`.
+ *
+ * @param array<string,mixed> $product  Product data.
+ * @param mixed               $category Category slug or term.
+ * @return array<string,mixed>
+ */
+function velotok_core_save_product_card( $product, $category = '' ) {
+	$validation = velotok_core_validate_product( $product, $category );
+	$card       = velotok_core_product_card_attributes( $product );
+	$missing    = array();
+	$invalid    = array();
+
+	foreach ( $validation['attributes'] as $attribute => $result ) {
+		if ( ! empty( $result['valid'] ) ) {
+			continue;
+		}
+
+		$code = isset( $result['code'] ) ? (string) $result['code'] : '';
+
+		if ( '_REQUIRED' === substr( $code, -9 ) ) {
+			$missing[] = $attribute;
+			continue;
+		}
+
+		$invalid[] = $attribute;
+	}
+
+	$valid = (bool) $validation['valid'];
+
+	return array(
+		'saved'                => $valid,
+		'blocked'              => ! $valid,
+		'status'               => $valid ? 'saved' : 'blocked',
+		'valid'                => $valid,
+		'spec'                 => 'clarify-41b1da6d',
+		'parent_spec'          => $validation['spec'],
+		'source'               => 'stub',
+		'mocked'               => true,
+		'service'              => 'product_card',
+		'server_side'          => true,
+		'validated_on_save'    => true,
+		'category'             => $validation['category'],
+		'required_attributes'  => $validation['required_attributes'],
+		'card'                 => $card,
+		'card_attributes'      => $card,
+		'attributes'           => $validation['attributes'],
+		'errors'               => $validation['errors'],
+		'error_codes'          => $validation['errors'],
+		'errors_by_attribute'  => $validation['errors_by_attribute'],
+		'missing_attributes'   => array_values( $missing ),
+		'invalid_attributes'   => array_values( $invalid ),
+		'missing'              => array_values( $missing ),
+		'invalid'              => array_values( $invalid ),
+	);
 }
 
 if ( ! function_exists( 'getRequiredAttributes' ) ) {
@@ -803,5 +919,18 @@ if ( ! function_exists( 'validateProductForPublication' ) ) {
 	 */
 	function validateProductForPublication( $product, $category = '' ) {
 		return velotok_core_validate_product_publication( $product, $category );
+	}
+}
+
+if ( ! function_exists( 'saveProductCard' ) ) {
+	/**
+	 * Short global alias for the mocked product card save service.
+	 *
+	 * @param array<string,mixed> $product  Product data.
+	 * @param mixed               $category Category slug or term.
+	 * @return array<string,mixed>
+	 */
+	function saveProductCard( $product, $category = '' ) {
+		return velotok_core_save_product_card( $product, $category );
 	}
 }

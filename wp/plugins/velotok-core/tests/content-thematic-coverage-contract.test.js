@@ -40,9 +40,16 @@ includes("'membership'", 'Contract must declare the membership rule');
 includes('hybrid', 'Membership must be hybrid');
 includes("'open_questions'", 'Open questions section is missing');
 
-for (const topic of ['model_overview', 'legal_requirements', 'green_energy_news']) {
+for (const topic of ['models_overview', 'legal_requirements', 'news']) {
   includes(`'${topic}'`, `Required content topic is missing: ${topic}`);
 }
+
+for (const alias of ['model_overview', 'green_energy_news']) {
+  includes(`'${alias}'`, `Legacy content topic alias is missing: ${alias}`);
+}
+
+includes("'require_date'", 'News topic must require an event date');
+includes('velotok_core_green_energy_news_date', 'News event date helper is missing');
 
 for (const label of [
   'Обзор моделей в зелёной энергетике',
