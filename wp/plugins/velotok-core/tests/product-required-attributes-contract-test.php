@@ -134,7 +134,7 @@ foreach ( $expected as $attribute ) {
 		sprintf( 'Заглушка атрибута «%s» не помечена mocked: true.', $attribute )
 	);
 	velotok_required_attributes_assert(
-		isset( $rule['spec'] ) && 'clarify-41b1da6d' === $rule['spec'],
+		isset( $rule['spec'] ) && 'clarify-9e1a1acd' === $rule['spec'],
 		sprintf( 'Заглушка атрибута «%s» ссылается на неверную спеку.', $attribute )
 	);
 }

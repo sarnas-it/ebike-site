@@ -66,6 +66,62 @@ function velotok_cart_url() {
 }
 
 /**
+ * Итоговая сумма заказа со стоимостью доставки из mocked-контракта.
+ *
+ * Если плагин не активирован или у заказа нет способа доставки, возвращается
+ * пустой массив: шаблон просто не показывает дополнительную строку доставки.
+ *
+ * @param mixed  $order  Заказ WooCommerce.
+ * @param string $method Необязательный идентификатор способа доставки.
+ * @return array<string,mixed>
+ */
+function velotok_order_delivery_total( $order, $method = '' ) {
+	if ( ! function_exists( 'velotok_core_delivery_order_total' ) || ! is_object( $order ) ) {
+		return array();
+	}
+
+	$options = array();
+
+	if ( method_exists( $order, 'get_subtotal' ) ) {
+		$subtotal = $order->get_subtotal();
+		if ( is_numeric( $subtotal ) ) {
+			$options['subtotal'] = (float) $subtotal;
+		}
+	}
+
+	if ( method_exists( $order, 'get_shipping_total' ) ) {
+		$shipping = $order->get_shipping_total();
+		if ( is_numeric( $shipping ) && (float) $shipping > 0 ) {
+			$options['delivery_cost'] = (float) $shipping;
+		}
+	}
+
+	if ( '' === $method && method_exists( $order, 'get_id' ) ) {
+		$stored = get_post_meta( (int) $order->get_id(), '_velotok_delivery_method', true );
+		if ( is_string( $stored ) && '' !== $stored ) {
+			$method = $stored;
+		}
+	}
+
+	if ( '' === $method && method_exists( $order, 'get_shipping_methods' ) ) {
+		foreach ( $order->get_shipping_methods() as $shipping_method ) {
+			$candidate = method_exists( $shipping_method, 'get_method_id' ) ? (string) $shipping_method->get_method_id() : '';
+
+			if ( '' !== $candidate && function_exists( 'velotok_core_delivery_option_is_valid' ) && velotok_core_delivery_option_is_valid( $candidate ) ) {
+				$method = $candidate;
+				break;
+			}
+		}
+	}
+
+	if ( '' === $method ) {
+		return array();
+	}
+
+	return velotok_core_delivery_order_total( $method, $order, $options );
+}
+
+/**
  * Человекочитаемое количество моделей у категории.
  *
  * @param string $slug Слаг категории.
@@ -172,6 +228,28 @@ function velotok_product_image_html( $product, $alt ) {
 }
 
 /**
+ * Дополнительные атрибуты товара из mocked-контракта плагина.
+ *
+ * Если плагин не активирован, карточка просто не показывает дополнительный
+ * блок: обязательные атрибуты остаются на месте.
+ *
+ * @param mixed $product Товар, slug или данные товара.
+ * @param mixed $values  Явные дополнительные атрибуты.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_product_extra_attributes( $product = 0, $values = null ) {
+	if ( function_exists( 'velotok_core_get_product_extra_attributes' ) ) {
+		$items = velotok_core_get_product_extra_attributes( $product, $values );
+
+		if ( is_array( $items ) ) {
+			return $items;
+		}
+	}
+
+	return array();
+}
+
+/**
  * Собирает характеристики товара из post meta.
  *
  * @param int $product_id ID товара.
@@ -262,6 +340,112 @@ function velotok_product_category_label( $product ) {
 }
 
 /**
+ * Описание товара для карточки: краткое, а если его нет — полное.
+ *
+ * @param WC_Product $product Товар.
+ * @return string
+ */
+function velotok_product_description( $product ) {
+	$description = trim( (string) $product->get_short_description() );
+
+	if ( '' === $description ) {
+		$description = trim( (string) $product->get_description() );
+	}
+
+	$description = trim( wp_strip_all_tags( $description ) );
+
+	if ( '' === $description ) {
+		return __( 'Описание уточните у менеджера', 'velotok' );
+	}
+
+	return $description;
+}
+
+/**
+ * Обязательные атрибуты карточки товара.
+ *
+ * @return string[]
+ */
+function velotok_product_card_required_attributes() {
+	return array( 'photo', 'title', 'description', 'price' );
+}
+
+/**
+ * Возвращает обязательные атрибуты карточки в готовом для вывода виде.
+ *
+ * Фото, название, описание и цена всегда присутствуют в результате. Для
+ * отсутствующих необязательных для показа данных используются безопасные
+ * значения по умолчанию, чтобы карточка не теряла обязательные атрибуты.
+ *
+ * @param array<string,mixed> $model Данные карточки.
+ * @return array{photo:string,title:string,description:string,price:string}
+ */
+function velotok_product_card_attributes( $model ) {
+	$model = is_array( $model ) ? $model : array();
+
+	$title = '';
+	foreach ( array( 'title', 'name' ) as $key ) {
+		if ( isset( $model[ $key ] ) && '' !== trim( (string) $model[ $key ] ) ) {
+			$title = trim( (string) $model[ $key ] );
+			break;
+		}
+	}
+
+	$description = isset( $model['description'] ) ? trim( (string) $model['description'] ) : '';
+	if ( '' === $description ) {
+		$description = __( 'Описание уточните у менеджера', 'velotok' );
+	}
+
+	$photo = '';
+	foreach ( array( 'image_html', 'photo_html' ) as $key ) {
+		if ( ! empty( $model[ $key ] ) ) {
+			$photo = trim( (string) $model[ $key ] );
+			break;
+		}
+	}
+
+	if ( '' === $photo && ! empty( $model['photo'] ) ) {
+		$candidate = trim( (string) $model['photo'] );
+
+		if ( '' !== $candidate && false === strpos( $candidate, '<' ) ) {
+			$photo = sprintf(
+				'<img src="%1$s" width="800" height="600" alt="%2$s" loading="lazy" decoding="async" class="model-photo">',
+				esc_url( $candidate ),
+				esc_attr( $title )
+			);
+		} elseif ( '' !== $candidate ) {
+			$photo = $candidate;
+		}
+	}
+
+	if ( '' === $photo ) {
+		$photo = sprintf(
+			'<img src="%1$s" width="800" height="600" alt="%2$s" loading="lazy" decoding="async" class="model-photo">',
+			esc_url( get_template_directory_uri() . '/assets/img/model-city-classic-1-web.jpg' ),
+			esc_attr( $title )
+		);
+	}
+
+	$price = '';
+	if ( isset( $model['price_html'] ) && '' !== trim( (string) $model['price_html'] ) ) {
+		$price = (string) $model['price_html'];
+	} elseif ( array_key_exists( 'price', $model ) && is_numeric( $model['price'] ) ) {
+		$price = number_format_i18n( (float) $model['price'], 0 ) . ' ₽';
+	}
+
+	if ( '' === $price ) {
+		$price = __( 'Цена по запросу', 'velotok' );
+	}
+
+	return array(
+		'photo'       => $photo,
+		'title'       => $title,
+		'description' => $description,
+		'price'       => $price,
+	);
+}
+
+/**
  * Приводит товар WooCommerce к структуре карточки темы.
  *
  * @param WC_Product $product Товар.
@@ -272,7 +456,7 @@ function velotok_normalize_product( $product, $index = 0 ) {
 	$price      = (float) $product->get_price();
 	$price_html = $product->get_price_html();
 	$note       = '';
-	$months     = max( 1, (int) velotok_spec_value( 'installment_months', 24 ) );
+	$months     = max( 1, (int) ( function_exists( 'velotok_spec_value' ) ? velotok_spec_value( 'installment_months', 24 ) : 24 ) );
 
 	if ( $price > 0 ) {
 		$note = sprintf(
@@ -282,23 +466,44 @@ function velotok_normalize_product( $product, $index = 0 ) {
 		);
 	}
 
-	$badge = trim( (string) get_post_meta( $product->get_id(), '_velotok_badge', true ) );
+	$badge       = trim( (string) get_post_meta( $product->get_id(), '_velotok_badge', true ) );
+	$extra       = velotok_product_extra_attributes( $product->get_slug() );
+	$name        = $product->get_name();
+	$description = velotok_product_description( $product );
+	$image_html  = velotok_product_image_html( $product, $name );
+	$photo_id    = (int) get_post_thumbnail_id( $product->get_id() );
+	$photo_mime  = $photo_id && function_exists( 'get_post_mime_type' ) ? (string) get_post_mime_type( $photo_id ) : '';
+	$card_data   = array(
+		'photo'       => $photo_id,
+		'photo_mime'  => $photo_mime,
+		'title'       => $name,
+		'description' => $description,
+		'price'       => $price,
+	);
 
 	return array(
-		'id'             => (int) $product->get_id(),
-		'card_id'        => 'model-' . $product->get_slug(),
-		'slug'           => $product->get_slug(),
-		'name'           => $product->get_name(),
-		'url'            => $product->get_permalink(),
-		'image_html'     => velotok_product_image_html( $product, $product->get_name() ),
-		'category_label' => velotok_product_category_label( $product ),
-		'badge'          => $badge,
-		'badge_lime'     => in_array( $badge, array( 'Хит', 'Выбор механиков', 'Новинка' ), true ),
-		'number'         => $index ? sprintf( '%02d', (int) $index ) : '',
-		'specs'          => velotok_product_specs( $product->get_id() ),
-		'price_html'     => $price_html ? $price_html : esc_html__( 'Цена по запросу', 'velotok' ),
-		'price_note'     => $note,
-		'add_html'       => velotok_product_add_button( $product ),
+		'id'               => (int) $product->get_id(),
+		'card_id'          => 'model-' . $product->get_slug(),
+		'slug'             => $product->get_slug(),
+		'name'             => $name,
+		'title'            => $name,
+		'photo'            => $photo_id,
+		'photo_mime'       => $photo_mime,
+		'description'      => $description,
+		'url'              => $product->get_permalink(),
+		'image_html'       => $image_html,
+		'photo_html'       => $image_html,
+		'category_label'   => velotok_product_category_label( $product ),
+		'badge'            => $badge,
+		'badge_lime'       => in_array( $badge, array( 'Хит', 'Выбор механиков', 'Новинка' ), true ),
+		'number'           => $index ? sprintf( '%02d', (int) $index ) : '',
+		'specs'            => velotok_product_specs( $product->get_id() ),
+		'extra_attributes' => $extra,
+		'price'            => $price,
+		'price_html'       => $price_html ? $price_html : esc_html__( 'Цена по запросу', 'velotok' ),
+		'price_note'       => $note,
+		'add_html'         => velotok_product_add_button( $product ),
+		'card_attributes'  => $card_data,
 	);
 }
 
@@ -308,10 +513,49 @@ function velotok_normalize_product( $product, $index = 0 ) {
  * @return array<int,array>
  */
 function velotok_fallback_models() {
+	if ( function_exists( 'velotok_core_catalog_products' ) ) {
+		$models = array();
+
+		foreach ( velotok_core_catalog_products() as $product ) {
+			if ( ! is_array( $product ) || empty( $product['slug'] ) || empty( $product['name'] ) ) {
+				continue;
+			}
+
+			$badge          = isset( $product['badge'] ) ? trim( (string) $product['badge'] ) : '';
+			$category       = isset( $product['category'] ) ? $product['category'] : '';
+			$category_label = function_exists( 'velotok_core_catalog_category_label' )
+				? velotok_core_catalog_category_label( $category )
+				: '';
+			$description    = isset( $product['short_description'] ) && '' !== (string) $product['short_description']
+				? (string) $product['short_description']
+				: ( isset( $product['description'] ) ? (string) $product['description'] : '' );
+
+			$models[] = array(
+				'slug'           => (string) $product['slug'],
+				'name'           => (string) $product['name'],
+				'description'    => $description,
+				'category_label' => '' !== $category_label ? $category_label : __( 'Электровелосипед', 'velotok' ),
+				'badge'          => $badge,
+				'badge_lime'     => in_array( $badge, array( 'Хит', 'Выбор механиков', 'Новинка' ), true ),
+				'range'          => isset( $product['range_km'] ) ? (string) $product['range_km'] : '',
+				'motor'          => isset( $product['motor_w'] ) ? (string) $product['motor_w'] : '',
+				'wheel'          => isset( $product['wheel'] ) ? (string) $product['wheel'] : '',
+				'weight'         => isset( $product['weight_kg'] ) && null !== $product['weight_kg'] ? (string) $product['weight_kg'] : '',
+				'price'          => isset( $product['price'] ) ? (int) $product['price'] : 0,
+				'image'          => isset( $product['image'] ) ? (string) $product['image'] : '',
+			);
+		}
+
+		if ( ! empty( $models ) ) {
+			return $models;
+		}
+	}
+
 	return array(
 		array(
 			'slug'           => 'riviera',
 			'name'           => __( 'Ривьера', 'velotok' ),
+			'description'    => __( 'Лёгкая низкая рама, 90 км запаса хода и спокойный характер — для ежедневных поездок по городу.', 'velotok' ),
 			'category_label' => __( 'Городской', 'velotok' ),
 			'badge'          => __( 'Хит', 'velotok' ),
 			'badge_lime'     => true,
@@ -325,6 +569,7 @@ function velotok_fallback_models() {
 		array(
 			'slug'           => 'street',
 			'name'           => __( 'Стрит 7', 'velotok' ),
+			'description'    => __( 'Более быстрый и жёсткий вариант для асфальта: 110 км хода и посадка для активной езды.', 'velotok' ),
 			'category_label' => __( 'Городской спорт', 'velotok' ),
 			'badge'          => __( 'Новинка', 'velotok' ),
 			'badge_lime'     => true,
@@ -338,6 +583,7 @@ function velotok_fallback_models() {
 		array(
 			'slug'           => 'hrebet-pro',
 			'name'           => __( 'Хребет Pro', 'velotok' ),
+			'description'    => __( 'Полная подвеска и мотор 750 Вт — если в маршруте есть серьёзные подъёмы и спуски.', 'velotok' ),
 			'category_label' => __( 'Горный', 'velotok' ),
 			'badge'          => __( 'Для гор', 'velotok' ),
 			'badge_lime'     => false,
@@ -351,6 +597,7 @@ function velotok_fallback_models() {
 		array(
 			'slug'           => 'hrebet-trail',
 			'name'           => __( 'Хребет Trail', 'velotok' ),
+			'description'    => __( 'Хардтейл для леса и грунта: меньше веса, простая обслуживаемость и уверенный ход.', 'velotok' ),
 			'category_label' => __( 'Горный', 'velotok' ),
 			'badge'          => __( 'Выбор механиков', 'velotok' ),
 			'badge_lime'     => true,
@@ -364,6 +611,7 @@ function velotok_fallback_models() {
 		array(
 			'slug'           => 'family',
 			'name'           => __( 'Семейный', 'velotok' ),
+			'description'    => __( 'Удлинённая рама и бокс на 80 кг: дети, продукты и всё, что нужно на даче.', 'velotok' ),
 			'category_label' => __( 'Грузовой', 'velotok' ),
 			'badge'          => __( 'Для семьи', 'velotok' ),
 			'badge_lime'     => false,
@@ -377,6 +625,7 @@ function velotok_fallback_models() {
 		array(
 			'slug'           => 'courier',
 			'name'           => __( 'Курьер', 'velotok' ),
+			'description'    => __( 'Рама под ежедневные нагрузки: передний и задний багажник, груз до 120 кг.', 'velotok' ),
 			'category_label' => __( 'Грузовой', 'velotok' ),
 			'badge'          => __( 'Для работы', 'velotok' ),
 			'badge_lime'     => false,
@@ -390,6 +639,7 @@ function velotok_fallback_models() {
 		array(
 			'slug'           => 'sklad',
 			'name'           => __( 'Складень 20', 'velotok' ),
+			'description'    => __( 'Складывается за полминуты и помещается в багажник — для поездов, офиса и лифта.', 'velotok' ),
 			'category_label' => __( 'Складной', 'velotok' ),
 			'badge'          => __( 'В багажник', 'velotok' ),
 			'badge_lime'     => false,
@@ -412,7 +662,7 @@ function velotok_fallback_models() {
  */
 function velotok_normalize_fallback_model( $model, $index = 0 ) {
 	$price  = isset( $model['price'] ) ? (int) $model['price'] : 0;
-	$months = max( 1, (int) velotok_spec_value( 'installment_months', 24 ) );
+	$months = max( 1, (int) ( function_exists( 'velotok_spec_value' ) ? velotok_spec_value( 'installment_months', 24 ) : 24 ) );
 	$specs  = array();
 
 	if ( ! empty( $model['range'] ) ) {
@@ -440,6 +690,12 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 		);
 	}
 
+	$description = isset( $model['description'] ) ? trim( wp_strip_all_tags( (string) $model['description'] ) ) : '';
+
+	if ( '' === $description ) {
+		$description = __( 'Описание уточните у менеджера', 'velotok' );
+	}
+
 	$image = sprintf(
 		'<img src="%1$s" width="800" height="600" alt="%2$s" loading="lazy" decoding="async" class="model-photo">',
 		esc_url( get_template_directory_uri() . '/assets/img/' . $model['image'] ),
@@ -447,29 +703,127 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 		esc_attr( sprintf( __( 'Электровелосипед «%s»', 'velotok' ), $model['name'] ) )
 	);
 
+	$extra       = velotok_product_extra_attributes( $model['slug'] );
+	$card_data   = array(
+		'photo'       => isset( $model['image'] ) ? (string) $model['image'] : '',
+		'title'       => (string) $model['name'],
+		'description' => $description,
+		'price'       => $price,
+	);
+
 	return array(
-		'id'             => 0,
-		'card_id'        => 'model-' . $model['slug'],
-		'slug'           => $model['slug'],
-		'name'           => $model['name'],
-		'url'            => home_url( '/#model-' . $model['slug'] ),
-		'image_html'     => $image,
-		'category_label' => $model['category_label'],
-		'badge'          => $model['badge'],
-		'badge_lime'     => ! empty( $model['badge_lime'] ),
-		'number'         => $index ? sprintf( '%02d', (int) $index ) : '',
-		'specs'          => $specs,
-		'price_html'     => number_format_i18n( $price, 0 ) . ' ₽',
-		'price_note'     => $price > 0
+		'id'               => 0,
+		'card_id'          => 'model-' . $model['slug'],
+		'slug'             => $model['slug'],
+		'name'             => $model['name'],
+		'title'            => (string) $model['name'],
+		'photo'            => isset( $model['image'] ) ? (string) $model['image'] : '',
+		'description'      => $description,
+		'url'              => home_url( '/#model-' . $model['slug'] ),
+		'image_html'       => $image,
+		'photo_html'       => $image,
+		'category_label'   => $model['category_label'],
+		'badge'            => $model['badge'],
+		'badge_lime'       => ! empty( $model['badge_lime'] ),
+		'number'           => $index ? sprintf( '%02d', (int) $index ) : '',
+		'specs'            => $specs,
+		'extra_attributes' => $extra,
+		'price'            => $price,
+		'price_html'       => number_format_i18n( $price, 0 ) . ' ₽',
+		'price_note'       => $price > 0
 			/* translators: %s: сумма ежемесячного платежа. */
 			? sprintf( __( 'в рассрочку %s ₽/мес', 'velotok' ), number_format_i18n( (int) round( $price / $months ), 0 ) )
 			: '',
-		'add_html'       => sprintf(
+		'add_html'         => sprintf(
 			'<a class="btn-add" href="%1$s">%2$s</a>',
 			esc_url( home_url( '/#lead' ) ),
 			esc_html__( 'В корзину', 'velotok' )
 		),
+		'card_attributes'  => $card_data,
 	);
+}
+
+/**
+ * Возвращает карточки каталога электровелосипедов.
+ *
+ * Это единая точка получения данных каталога для главной страницы и архивов.
+ * При активном WooCommerce товары берутся из опубликованного каталога, а при
+ * его отсутствии используется встроенный демонстрационный набор. Каждая
+ * карточка содержит обязательные атрибуты (фото, название, описание, цену).
+ *
+ * @param array<string,mixed> $args Аргументы выборки: limit, category, orderby, order.
+ * @return array<int,array>
+ */
+function velotok_get_catalog_models( $args = array() ) {
+	$args = function_exists( 'wp_parse_args' )
+		? wp_parse_args(
+			$args,
+			array(
+				'limit'    => 0,
+				'category' => array(),
+				'orderby'  => 'menu_order',
+				'order'    => 'ASC',
+			)
+		)
+		: array_merge(
+			array(
+				'limit'    => 0,
+				'category' => array(),
+				'orderby'  => 'menu_order',
+				'order'    => 'ASC',
+			),
+			is_array( $args ) ? $args : array()
+		);
+
+	$limit     = isset( $args['limit'] ) ? (int) $args['limit'] : 0;
+	$category  = isset( $args['category'] ) ? $args['category'] : array();
+	$category  = is_array( $category ) ? $category : array( $category );
+	$category  = array_values( array_filter( array_map( 'strval', $category ) ) );
+	$orderby   = isset( $args['orderby'] ) ? (string) $args['orderby'] : 'menu_order';
+	$order     = isset( $args['order'] ) ? (string) $args['order'] : 'ASC';
+	$models    = array();
+	$index     = 0;
+
+	if ( function_exists( 'wc_get_products' ) ) {
+		$query = array(
+			'status'  => 'publish',
+			'limit'   => $limit > 0 ? $limit : -1,
+			'orderby' => $orderby,
+			'order'   => $order,
+			'return'  => 'objects',
+		);
+
+		if ( ! empty( $category ) ) {
+			$query['category'] = $category;
+		}
+
+		$products = wc_get_products( $query );
+
+		if ( is_array( $products ) ) {
+			foreach ( $products as $product ) {
+				if ( $product instanceof WC_Product ) {
+					$index++;
+					$models[] = velotok_normalize_product( $product, $index );
+				}
+			}
+		}
+	}
+
+	if ( empty( $models ) && empty( $category ) ) {
+		$fallback = velotok_fallback_models();
+
+		if ( $limit > 0 ) {
+			$fallback = array_slice( $fallback, 0, $limit );
+		}
+
+		$index = 0;
+		foreach ( $fallback as $model ) {
+			$index++;
+			$models[] = velotok_normalize_fallback_model( $model, $index );
+		}
+	}
+
+	return $models;
 }
 
 /**
@@ -484,35 +838,7 @@ function velotok_get_home_models() {
 		return $models;
 	}
 
-	$models = array();
-
-	if ( function_exists( 'wc_get_products' ) ) {
-		$products = wc_get_products( array(
-			'status'   => 'publish',
-			'limit'    => 7,
-			'orderby'  => 'menu_order',
-			'order'    => 'ASC',
-			'return'   => 'objects',
-		) );
-
-		if ( ! empty( $products ) ) {
-			$index = 0;
-			foreach ( $products as $product ) {
-				if ( $product instanceof WC_Product ) {
-					$index++;
-					$models[] = velotok_normalize_product( $product, $index );
-				}
-			}
-		}
-	}
-
-	if ( empty( $models ) ) {
-		$index = 0;
-		foreach ( velotok_fallback_models() as $model ) {
-			$index++;
-			$models[] = velotok_normalize_fallback_model( $model, $index );
-		}
-	}
+	$models = velotok_get_catalog_models( array( 'limit' => 7 ) );
 
 	return $models;
 }
@@ -520,29 +846,15 @@ function velotok_get_home_models() {
 /**
  * Товары по категории для блока каталога.
  *
- * @param string $slug Слаг категории.
+ * @param string $slug  Слаг категории.
+ * @param int    $limit Максимальное количество карточек.
  * @return array<int,array>
  */
 function velotok_get_products_by_category( $slug, $limit = 3 ) {
-	if ( ! function_exists( 'wc_get_products' ) ) {
-		return array();
-	}
-
-	$products = wc_get_products( array(
-		'status'   => 'publish',
-		'limit'    => (int) $limit,
-		'category' => array( $slug ),
-		'return'   => 'objects',
-	) );
-
-	$models = array();
-	$index  = 0;
-	foreach ( $products as $product ) {
-		if ( $product instanceof WC_Product ) {
-			$index++;
-			$models[] = velotok_normalize_product( $product, $index );
-		}
-	}
-
-	return $models;
+	return velotok_get_catalog_models(
+		array(
+			'category' => array( $slug ),
+			'limit'    => (int) $limit,
+		)
+	);
 }

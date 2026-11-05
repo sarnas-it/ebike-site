@@ -19,7 +19,7 @@ function includes(fragment, message) {
   assert.ok(source.includes(fragment), message);
 }
 
-includes('clarify-41b1da6d', 'Contract must reference spec clarify-41b1da6d');
+includes('clarify-9e1a1acd', 'Contract must reference spec clarify-9e1a1acd');
 includes('velotok_core_product_validation_contract', 'Contract accessor is missing');
 includes('velotok_core_product_attribute_rule', 'Per-attribute rule accessor is missing');
 includes('velotok_core_required_attributes_contract', 'Category attributes contract is missing');

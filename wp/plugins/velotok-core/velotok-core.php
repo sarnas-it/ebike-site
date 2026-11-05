@@ -23,8 +23,23 @@ define( 'VELOTOK_CORE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'VELOTOK_CORE_URL', plugin_dir_url( __FILE__ ) );
 
 require_once VELOTOK_CORE_PATH . 'includes/spec-data.php';
+require_once VELOTOK_CORE_PATH . 'includes/catalog.php';
+require_once VELOTOK_CORE_PATH . 'includes/cart.php';
+require_once VELOTOK_CORE_PATH . 'includes/guest-cart-registration.php';
 require_once VELOTOK_CORE_PATH . 'includes/product-validation.php';
+require_once VELOTOK_CORE_PATH . 'includes/product-extra-attributes.php';
 require_once VELOTOK_CORE_PATH . 'includes/checkout-payment-delivery.php';
+require_once VELOTOK_CORE_PATH . 'includes/payment-integration.php';
+require_once VELOTOK_CORE_PATH . 'includes/delivery-options.php';
+require_once VELOTOK_CORE_PATH . 'includes/delivery-order-total.php';
+require_once VELOTOK_CORE_PATH . 'includes/order-delivery.php';
+require_once VELOTOK_CORE_PATH . 'includes/checkout-delivery.php';
+require_once VELOTOK_CORE_PATH . 'includes/content-thematic-coverage.php';
+require_once VELOTOK_CORE_PATH . 'includes/content-articles.php';
+require_once VELOTOK_CORE_PATH . 'includes/provisioning.php';
+require_once VELOTOK_CORE_PATH . 'includes/class-pvs-contract.php';
+require_once VELOTOK_CORE_PATH . 'includes/class-pvs-scanner.php';
+require_once VELOTOK_CORE_PATH . 'includes/class-pvs-admin.php';
 require_once VELOTOK_CORE_PATH . 'includes/meta.php';
 
 /**

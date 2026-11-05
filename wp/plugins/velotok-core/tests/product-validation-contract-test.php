@@ -18,7 +18,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
 }
 
-require_once dirname( __DIR__ ) . '/includes/product-validation.php';
+$velotok_product_validation_stub = dirname( __DIR__ ) . '/includes/product-validation.php';
+
+if ( ! file_exists( $velotok_product_validation_stub ) ) {
+	fwrite( STDERR, 'FAIL: заглушка контракта валидации карточки товара отсутствует.' . PHP_EOL );
+	exit( 1 );
+}
+
+require_once $velotok_product_validation_stub;
+
+if ( ! function_exists( 'velotok_core_product_validation_contract' ) ) {
+	fwrite( STDERR, 'FAIL: заглушка не объявляет velotok_core_product_validation_contract().' . PHP_EOL );
+	exit( 1 );
+}
 
 $failures = array();
 
@@ -82,8 +94,37 @@ velotok_product_validation_assert(
 );
 
 foreach ( $expected_required as $attribute ) {
-	velotok_product_validation_assert( isset( $contract['attributes'][ $attribute ] ), sprintf( 'Не описано правило атрибута «%s».', $attribute ) );
+	$rule = velotok_core_product_attribute_rule( $attribute );
+
+	velotok_product_validation_assert( is_array( $rule ), sprintf( 'Не описано правило атрибута «%s».', $attribute ) );
+	velotok_product_validation_assert(
+		isset( $rule['mocked'] ) && true === $rule['mocked'],
+		sprintf( 'Правило атрибута «%s» не помечено mocked: true.', $attribute )
+	);
+	velotok_product_validation_assert(
+		isset( $rule['spec'] ) && 'clarify-9e1a1acd' === $rule['spec'],
+		sprintf( 'Правило атрибута «%s» ссылается на неверную спеку.', $attribute )
+	);
+	velotok_product_validation_assert(
+		isset( $rule['required'] ) && true === $rule['required'],
+		sprintf( 'Атрибут «%s» должен быть обязательным.', $attribute )
+	);
 }
+
+$category_contract = velotok_core_required_attributes_contract();
+velotok_product_validation_assert( is_array( $category_contract ), 'Контракт обязательных атрибутов категории должен быть массивом.' );
+velotok_product_validation_assert(
+	isset( $category_contract['mocked'] ) && true === $category_contract['mocked'],
+	'Контракт обязательных атрибутов категории не помечен mocked: true.'
+);
+velotok_product_validation_assert(
+	isset( $category_contract['source'] ) && 'stub' === $category_contract['source'],
+	'Источником атрибутов категории должна быть заглушка.'
+);
+velotok_product_validation_assert(
+	isset( $category_contract['required_attributes'] ) && $expected_required === $category_contract['required_attributes'],
+	'Контракт категории должен возвращать фиксированный перечень обязательных атрибутов.'
+);
 
 velotok_product_validation_assert(
 	velotok_core_get_required_attributes( 'city' ) === $expected_required,

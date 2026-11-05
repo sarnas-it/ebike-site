@@ -58,6 +58,26 @@ while ( have_posts() ) :
 							<?php endforeach; ?>
 						</ul>
 
+						<?php $velotok_extra_attributes = velotok_product_extra_attributes( $product->get_slug() ); ?>
+						<?php if ( ! empty( $velotok_extra_attributes ) && is_array( $velotok_extra_attributes ) ) : ?>
+							<dl class="product-specs product-extra">
+								<?php foreach ( $velotok_extra_attributes as $velotok_extra ) : ?>
+									<?php
+									$velotok_extra_label = isset( $velotok_extra['label'] ) ? $velotok_extra['label'] : ( isset( $velotok_extra[0] ) ? $velotok_extra[0] : '' );
+									$velotok_extra_value = isset( $velotok_extra['value'] ) ? $velotok_extra['value'] : ( isset( $velotok_extra[1] ) ? $velotok_extra[1] : '' );
+
+									if ( '' === trim( (string) $velotok_extra_value ) ) {
+										continue;
+									}
+									?>
+									<div class="product-extra-row">
+										<dt><?php echo esc_html( $velotok_extra_label ); ?></dt>
+										<dd><?php echo esc_html( $velotok_extra_value ); ?></dd>
+									</div>
+								<?php endforeach; ?>
+							</dl>
+						<?php endif; ?>
+
 						<div class="product-buy">
 							<?php woocommerce_template_single_add_to_cart(); ?>
 							<p class="cart-note"><?php esc_html_e( 'Оплата при получении. Менеджер свяжется для подтверждения заказа и доставки.', 'velotok' ); ?></p>

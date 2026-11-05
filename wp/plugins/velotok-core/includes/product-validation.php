@@ -43,7 +43,7 @@ function velotok_core_product_validation_contract() {
 			'required'    => true,
 			'type'        => 'attachment_id',
 			'mocked'      => true,
-			'spec'        => 'clarify-41b1da6d',
+			'spec'        => 'clarify-9e1a1acd',
 			'error_codes' => array(
 				'required' => 'PHOTO_REQUIRED',
 				'format'   => 'PHOTO_INVALID_FORMAT',
@@ -53,7 +53,7 @@ function velotok_core_product_validation_contract() {
 			'required'    => true,
 			'type'        => 'string',
 			'mocked'      => true,
-			'spec'        => 'clarify-41b1da6d',
+			'spec'        => 'clarify-9e1a1acd',
 			'trim'        => true,
 			'error_codes' => array(
 				'required' => 'TITLE_REQUIRED',
@@ -64,7 +64,7 @@ function velotok_core_product_validation_contract() {
 			'required'         => true,
 			'type'             => 'string',
 			'mocked'           => true,
-			'spec'             => 'clarify-41b1da6d',
+			'spec'             => 'clarify-9e1a1acd',
 			'trim'             => true,
 			'blank_is_missing' => true,
 			'error_codes'      => array(
@@ -75,7 +75,7 @@ function velotok_core_product_validation_contract() {
 			'required'         => true,
 			'type'             => 'number',
 			'mocked'           => true,
-			'spec'             => 'clarify-41b1da6d',
+			'spec'             => 'clarify-9e1a1acd',
 			'trim'             => true,
 			'blank_is_missing' => true,
 			'allow_zero'       => true,
@@ -118,9 +118,28 @@ function velotok_core_product_validation_contract() {
 		'unknown_category'             => 'default_attributes',
 		'future_source'                => 'woocommerce',
 		'missing_attribute'            => 'error_code',
+		'open_questions'               => array(
+			'Какие именно форматы изображений считаются поддерживаемыми и есть ли ограничения по размеру файла и разрешению?',
+			'Требуется ли минимальное количество фото и отдельное обязательное главное фото?',
+			'Допускается ли нулевая цена как валидное значение во всех категориях или только в отдельных (например, бесплатные позиции)?',
+			'Каковы предельные длины названия и описания, и различаются ли они по категориям?',
+			'Источник справочника категорий и их обязательных атрибутов: локальная конфигурация, внешняя система или комбинация с приоритетами?',
+			'Как должны формулироваться сообщения об ошибках валидации и требуется ли их локализация?',
+		),
 	);
 
 	return $contract;
+}
+
+/**
+ * Return the open questions recorded by the product validation contract.
+ *
+ * @return string[]
+ */
+function velotok_core_product_validation_open_questions() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['open_questions'];
 }
 
 /**
@@ -336,7 +355,7 @@ function velotok_core_validate_title( $title ) {
 /**
  * Return the mocked description validation rule.
  *
- * The rule is a fixed in-memory stub for spec clarify-41b1da6d and is the
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
  * single source for description validation. It never reads the database,
  * files, media library or remote services.
  *
@@ -386,7 +405,7 @@ function velotok_core_validate_description( $description ) {
 /**
  * Return the mocked price validation rule.
  *
- * The rule is a fixed in-memory stub for spec clarify-41b1da6d and is the
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
  * single source for price validation. It never reads the database, files,
  * currency services or remote price feeds.
  *
@@ -486,6 +505,21 @@ function velotok_core_photo_parts( $photo ) {
 }
 
 /**
+ * Return the mocked photo validation rule.
+ *
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
+ * single source for photo validation. It never reads the database, files,
+ * media library or remote image storage.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_photo_validation_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['attributes']['photo'];
+}
+
+/**
  * Check whether a photo id is present.
  *
  * @param mixed $id Attachment id.
@@ -518,7 +552,7 @@ function velotok_core_photo_id_is_present( $id ) {
  * @return array<string,mixed>
  */
 function velotok_core_validate_product_photo( $photo, $mime = null ) {
-	$rule  = velotok_core_product_attribute_rule( 'photo' );
+	$rule  = velotok_core_photo_validation_contract();
 	$parts = velotok_core_photo_parts( $photo );
 
 	if ( null === $mime && null !== $parts['mime'] ) {
@@ -685,6 +719,122 @@ function velotok_core_missing_product_attributes( $product, $category = '' ) {
 	return $result['missing_attributes'];
 }
 
+/**
+ * Extract the mandatory attributes of a product card.
+ *
+ * This is the data that is validated and saved by the product card service:
+ * photo, title, description and price. The values are returned unchanged so
+ * the saved card always contains the mandatory attributes that were checked.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @return array<string,mixed>
+ */
+function velotok_core_product_card_attributes( $product ) {
+	if ( ! is_array( $product ) ) {
+		$product = array();
+	}
+
+	return array(
+		'photo'       => velotok_core_product_value( $product, array( 'photo', 'photo_id', 'image', 'image_id', 'thumbnail_id', 'attachment_id' ) ),
+		'photo_mime'  => velotok_core_product_value( $product, array( 'photo_mime', 'image_mime', 'mime', 'mime_type' ) ),
+		'title'       => velotok_core_product_value( $product, array( 'title', 'name', 'product_title' ) ),
+		'description' => velotok_core_product_value( $product, array( 'description', 'product_description', 'body' ) ),
+		'price'       => velotok_core_product_value( $product, array( 'price', 'regular_price' ) ),
+	);
+}
+
+/**
+ * Return the mocked product card save service contract.
+ *
+ * The service validates the required product card attributes on the server
+ * before a card is saved. It is a fixed in-memory stub and never depends on
+ * client-side validation, the database or external services.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_product_card_service_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return array(
+		'spec'                     => 'clarify-41b1da6d',
+		'parent_spec'              => $contract['spec'],
+		'source'                   => 'stub',
+		'mocked'                   => true,
+		'service'                  => 'product_card',
+		'required_attributes'      => $contract['required_attributes'],
+		'validate_on_save'         => true,
+		'server_side'              => true,
+		'client_validation_only'   => false,
+		'saved_status'             => 'saved',
+		'blocked_status'           => 'blocked',
+		'missing_attributes_key'   => 'missing_attributes',
+		'invalid_attributes_key'   => 'invalid_attributes',
+		'card_attributes_key'      => 'card_attributes',
+		'error_codes'              => velotok_core_validation_error_codes(),
+	);
+}
+
+/**
+ * Validate and save a product card through the mocked server-side service.
+ *
+ * A card is saved only when every required attribute is present and valid.
+ * Missing attributes are reported in `missing_attributes`; attributes that are
+ * present but invalid are reported in `invalid_attributes`.
+ *
+ * @param array<string,mixed> $product  Product data.
+ * @param mixed               $category Category slug or term.
+ * @return array<string,mixed>
+ */
+function velotok_core_save_product_card( $product, $category = '' ) {
+	$validation = velotok_core_validate_product( $product, $category );
+	$card       = velotok_core_product_card_attributes( $product );
+	$missing    = array();
+	$invalid    = array();
+
+	foreach ( $validation['attributes'] as $attribute => $result ) {
+		if ( ! empty( $result['valid'] ) ) {
+			continue;
+		}
+
+		$code = isset( $result['code'] ) ? (string) $result['code'] : '';
+
+		if ( '_REQUIRED' === substr( $code, -9 ) ) {
+			$missing[] = $attribute;
+			continue;
+		}
+
+		$invalid[] = $attribute;
+	}
+
+	$valid = (bool) $validation['valid'];
+
+	return array(
+		'saved'                => $valid,
+		'blocked'              => ! $valid,
+		'status'               => $valid ? 'saved' : 'blocked',
+		'valid'                => $valid,
+		'spec'                 => 'clarify-41b1da6d',
+		'parent_spec'          => $validation['spec'],
+		'source'               => 'stub',
+		'mocked'               => true,
+		'service'              => 'product_card',
+		'server_side'          => true,
+		'validated_on_save'    => true,
+		'category'             => $validation['category'],
+		'required_attributes'  => $validation['required_attributes'],
+		'card'                 => $card,
+		'card_attributes'      => $card,
+		'attributes'           => $validation['attributes'],
+		'errors'               => $validation['errors'],
+		'error_codes'          => $validation['errors'],
+		'errors_by_attribute'  => $validation['errors_by_attribute'],
+		'missing_attributes'   => array_values( $missing ),
+		'invalid_attributes'   => array_values( $invalid ),
+		'missing'              => array_values( $missing ),
+		'invalid'              => array_values( $invalid ),
+	);
+}
+
 if ( ! function_exists( 'getRequiredAttributes' ) ) {
 	/**
 	 * Short global alias for the category attribute directory.
@@ -769,5 +919,18 @@ if ( ! function_exists( 'validateProductForPublication' ) ) {
 	 */
 	function validateProductForPublication( $product, $category = '' ) {
 		return velotok_core_validate_product_publication( $product, $category );
+	}
+}
+
+if ( ! function_exists( 'saveProductCard' ) ) {
+	/**
+	 * Short global alias for the mocked product card save service.
+	 *
+	 * @param array<string,mixed> $product  Product data.
+	 * @param mixed               $category Category slug or term.
+	 * @return array<string,mixed>
+	 */
+	function saveProductCard( $product, $category = '' ) {
+		return velotok_core_save_product_card( $product, $category );
 	}
 }

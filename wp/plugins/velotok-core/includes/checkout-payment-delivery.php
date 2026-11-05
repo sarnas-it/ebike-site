@@ -19,6 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
 }
 
+require_once __DIR__ . '/delivery-options.php';
+
 /**
  * Return the checkout, delivery and payment contract.
  *
@@ -71,6 +73,18 @@ function velotok_core_checkout_contract() {
 		),
 	);
 
+	$delivery_tariffs = function_exists( 'velotok_core_delivery_tariffs' ) ? velotok_core_delivery_tariffs() : array();
+
+	foreach ( $delivery_methods as $method_id => &$delivery_method ) {
+		$delivery_method['source'] = 'stub';
+
+		if ( isset( $delivery_tariffs[ $method_id ] ) ) {
+			$delivery_method['tariff']      = $delivery_tariffs[ $method_id ];
+			$delivery_method['provider_id'] = 'stub';
+		}
+	}
+	unset( $delivery_method );
+
 	$contract = array(
 		'spec'             => 'clarify-096bb945',
 		'source'           => 'stub',
@@ -102,24 +116,54 @@ function velotok_core_checkout_contract() {
 		'payment_system_slug' => 'yookassa',
 		'delivery'         => array(
 			'methods'        => $delivery_methods,
+			'tariffs'        => $delivery_tariffs,
+			'tariff_grid'    => $delivery_tariffs,
 			'default'        => 'russian_post',
 			'source'         => 'stub',
+			'provider'       => 'stub',
+			'provider_label' => 'Stub delivery provider',
 			'mocked'         => true,
 			'required'       => true,
 			'future_source'  => 'provider_api',
 			'missing_method' => 'DELIVERY_METHOD_REQUIRED',
 			'invalid_method' => 'DELIVERY_METHOD_INVALID',
+			'currency'       => 'RUB',
+			'free_shipping_threshold' => 50000.0,
+			'tariffs'        => $delivery_tariffs,
+			'tariff_grid'    => $delivery_tariffs,
 			'cost'           => array(
-				'source'     => 'manual',
+				'source'     => 'stub',
+				'provider'   => 'stub',
 				'mocked'     => true,
 				'amount'     => null,
 				'currency'   => 'RUB',
-				'calculated' => false,
+				'calculated' => true,
+				'grid'       => 'tariff_grid',
+				'tariffs'    => $delivery_tariffs,
+			),
+			'order'          => array(
+				'source'     => 'stub',
+				'mocked'     => true,
+				'persisted'  => false,
+				'fields'     => array(
+					'delivery_method'       => 'string',
+					'delivery_method_label' => 'string',
+					'delivery_cost'         => 'float',
+					'delivery_currency'     => 'string',
+				),
+				'aliases'    => array(
+					'delivery_method'       => array( 'shipping_method', 'delivery_method_id' ),
+					'delivery_method_label' => array( 'shipping_method_label' ),
+					'delivery_cost'         => array( 'shipping_cost', 'delivery_cost_amount' ),
+					'delivery_currency'     => array( 'shipping_currency' ),
+				),
 			),
 		),
 		'delivery_methods'      => $delivery_methods,
 		'delivery_method_ids'   => array_keys( $delivery_methods ),
 		'delivery_options'      => array_values( $delivery_methods ),
+		'delivery_tariffs'      => $delivery_tariffs,
+		'delivery_tariff_grid'  => $delivery_tariffs,
 		'delivery_default'      => 'russian_post',
 		'delivery_required'     => true,
 		'content_acceptance'    => array(
@@ -131,6 +175,7 @@ function velotok_core_checkout_contract() {
 			'enforced_by'   => 'human',
 			'field'         => 'velotok_content_accepted',
 			'error_code'    => 'CONTENT_ACCEPTANCE_REQUIRED',
+			'role_error_code' => 'CONTENT_ACCEPTANCE_ROLE_FORBIDDEN',
 			'source'        => 'human',
 			'mocked'        => true,
 		),
@@ -276,6 +321,13 @@ function velotok_core_payment_env_name( $key ) {
 	return $contract['env'][ $key ];
 }
 
+/*
+ * The delivery helpers live in includes/delivery-options.php. The block below is
+ * kept only as a fallback for environments that load this file without the
+ * delivery stub; it is skipped when the stub helpers are already available.
+ */
+if ( ! function_exists( 'velotok_core_delivery_methods' ) ) {
+
 /**
  * Return every delivery method declared by the contract.
  *
@@ -321,7 +373,31 @@ function velotok_core_delivery_method_labels() {
 }
 
 /**
- * Resolve a delivery method by identifier or a small set of aliases.
+ * Normalize a contract key for case-insensitive comparisons.
+ *
+ * @param mixed $value Raw key.
+ * @return string Normalized key or an empty string.
+ */
+function velotok_core_checkout_normalize_key( $value ) {
+	if ( ! is_scalar( $value ) ) {
+		return '';
+	}
+
+	$value = trim( (string) $value );
+
+	if ( '' === $value ) {
+		return '';
+	}
+
+	if ( function_exists( 'mb_strtolower' ) ) {
+		return mb_strtolower( $value, 'UTF-8' );
+	}
+
+	return strtolower( $value );
+}
+
+/**
+ * Resolve a delivery method by identifier, label or a small set of aliases.
  *
  * @param mixed $method Delivery method identifier.
  * @return array<string,mixed>|null Null for an unknown method.
@@ -331,27 +407,36 @@ function velotok_core_delivery_method( $method ) {
 		return null;
 	}
 
-	$key = strtolower( trim( $method ) );
+	$key = velotok_core_checkout_normalize_key( $method );
+
+	if ( '' === $key ) {
+		return null;
+	}
 
 	$aliases = array(
-		'russian-post'   => 'russian_post',
-		'russianpost'    => 'russian_post',
-		'russian_post'   => 'russian_post',
-		'post'           => 'russian_post',
-		'pochta'         => 'russian_post',
-		'pochta_rf'      => 'russian_post',
-		'rf_post'        => 'russian_post',
-		'почта рф'       => 'russian_post',
-		'Почта РФ'       => 'russian_post',
-		'cdek'           => 'cdek',
-		'sdek'           => 'cdek',
-		'СДЭК'           => 'cdek',
-		'other'          => 'other',
-		'other_logistic' => 'other',
-		'other_logist'   => 'other',
+		'russian-post'    => 'russian_post',
+		'russian post'    => 'russian_post',
+		'russianpost'     => 'russian_post',
+		'russian_post'    => 'russian_post',
+		'post'            => 'russian_post',
+		'pochta'          => 'russian_post',
+		'pochta_rf'       => 'russian_post',
+		'pochta rf'       => 'russian_post',
+		'rf_post'         => 'russian_post',
+		'rf post'         => 'russian_post',
+		'почта рф'        => 'russian_post',
+		'почта россии'    => 'russian_post',
+		'почта'           => 'russian_post',
+		'cdek'            => 'cdek',
+		'sdek'            => 'cdek',
+		'сдэк'            => 'cdek',
+		'other'           => 'other',
+		'other_logistic'  => 'other',
+		'other_logist'    => 'other',
 		'other_logistics' => 'other',
-		'иной логист'    => 'other',
-		'Иной логист'    => 'other',
+		'other logist'    => 'other',
+		'иной логист'     => 'other',
+		'иной'            => 'other',
 	);
 
 	if ( isset( $aliases[ $key ] ) ) {
@@ -360,11 +445,23 @@ function velotok_core_delivery_method( $method ) {
 
 	$methods = velotok_core_delivery_methods();
 
-	if ( ! isset( $methods[ $key ] ) ) {
-		return null;
+	if ( isset( $methods[ $key ] ) ) {
+		return $methods[ $key ];
 	}
 
-	return $methods[ $key ];
+	foreach ( $methods as $method_contract ) {
+		foreach ( array( 'id', 'slug', 'code', 'label', 'provider' ) as $field ) {
+			if ( ! isset( $method_contract[ $field ] ) ) {
+				continue;
+			}
+
+			if ( velotok_core_checkout_normalize_key( $method_contract[ $field ] ) === $key ) {
+				return $method_contract;
+			}
+		}
+	}
+
+	return null;
 }
 
 /**
@@ -425,10 +522,10 @@ function velotok_core_validate_delivery_method( $method, $required = true ) {
 }
 
 /**
- * Return a mocked delivery cost for a method.
+ * Return the mocked delivery tariff grid keyed by method identifier.
  *
- * Tariffs are an open question, so the stub always returns a zero amount and
- * marks the result as manual and mocked.
+ * The result is deterministic and explicitly marked as mocked. No provider is
+ * contacted and no order is persisted.
  *
  * @param mixed               $method Delivery method identifier.
  * @param array<string,mixed> $order  Optional order data.
@@ -437,19 +534,146 @@ function velotok_core_validate_delivery_method( $method, $required = true ) {
 function velotok_core_delivery_cost( $method, $order = array() ) {
 	$contract = velotok_core_delivery_contract();
 	$resolved = velotok_core_delivery_method( $method );
+	$tariff   = null === $resolved ? null : velotok_core_delivery_tariff( $resolved['id'] );
+	$total    = velotok_core_payment_order_amount( $order );
+	$tier     = null === $tariff ? null : velotok_core_delivery_tariff_tier( $tariff, $total );
+	$amount   = null;
+
+	if ( null !== $resolved && is_array( $tariff ) ) {
+		if ( null !== $tier && isset( $tier['amount'] ) && is_numeric( $tier['amount'] ) ) {
+			$amount = round( (float) $tier['amount'], 2 );
+		} elseif ( isset( $tariff['amount'] ) && is_numeric( $tariff['amount'] ) ) {
+			$amount = round( (float) $tariff['amount'], 2 );
+		}
+	}
 
 	return array(
-		'valid'    => null !== $resolved,
-		'code'     => null === $resolved ? $contract['invalid_method'] : null,
-		'error'    => null === $resolved ? $contract['invalid_method'] : null,
-		'method'   => null === $resolved ? '' : $resolved['id'],
-		'amount'   => null === $resolved ? null : 0.0,
-		'currency' => $contract['cost']['currency'],
-		'source'   => $contract['cost']['source'],
-		'mocked'   => true,
-		'order'    => is_array( $order ) ? $order : array(),
+		'valid'      => null !== $resolved,
+		'code'       => null === $resolved ? $contract['invalid_method'] : null,
+		'error'      => null === $resolved ? $contract['invalid_method'] : null,
+		'method'     => null === $resolved ? '' : $resolved['id'],
+		'label'      => null === $resolved ? '' : $resolved['label'],
+		'amount'     => $amount,
+		'cost'       => $amount,
+		'currency'   => $contract['currency'],
+		'source'     => 'stub',
+		'provider'   => 'stub',
+		'mocked'     => true,
+		'calculated' => true,
+		'free'       => null !== $amount && 0.0 === (float) $amount,
+		'order_total' => $total,
+		'tariff'     => $tariff,
+		'tier'       => $tier,
+		'order'      => is_array( $order ) ? $order : array(),
 	);
 }
+
+/**
+ * Alias for callers that prefer an explicit calculation name.
+ *
+ * @param mixed               $method Delivery method identifier.
+ * @param array<string,mixed> $order  Optional order data.
+ * @return array<string,mixed>
+ */
+function velotok_core_calculate_delivery_cost( $method, $order = array() ) {
+	return velotok_core_delivery_cost( $method, $order );
+}
+
+/**
+ * Short alias for delivery cost calculation.
+ *
+ * @param mixed               $method Delivery method identifier.
+ * @param array<string,mixed> $order  Optional order data.
+ * @return array<string,mixed>
+ */
+function velotok_core_calculate_delivery( $method, $order = array() ) {
+	return velotok_core_delivery_cost( $method, $order );
+}
+
+/**
+ * Apply the selected delivery method and calculated cost to order data.
+ *
+ * This is a mocked persistence contract: it returns an order-shaped array with
+ * the delivery fields filled in and never writes to the database.
+ *
+ * @param mixed $order  Order data (array or object).
+ * @param mixed $method Delivery method identifier.
+ * @return array<string,mixed>
+ */
+function velotok_core_delivery_apply_to_order( $order, $method ) {
+	$contract = velotok_core_delivery_contract();
+
+	if ( is_array( $method ) && ! is_array( $order ) ) {
+		$swap   = $order;
+		$order  = $method;
+		$method = $swap;
+	}
+
+	$order = is_array( $order ) ? $order : array();
+	$cost  = velotok_core_delivery_cost( $method, $order );
+	$label    = '' !== $cost['method'] ? velotok_core_delivery_method_labels()[ $cost['method'] ] : '';
+
+	$order['delivery_method']       = $cost['method'];
+	$order['delivery_method_id']    = $cost['method'];
+	$order['delivery_method_label'] = $label;
+	$order['shipping_method']       = $cost['method'];
+	$order['shipping_method_label'] = $label;
+	$order['delivery_cost']         = $cost['amount'];
+	$order['delivery_cost_amount']  = $cost['amount'];
+	$order['shipping_cost']         = $cost['amount'];
+	$order['delivery_currency']     = $cost['currency'];
+	$order['shipping_currency']     = $cost['currency'];
+	$order['delivery']              = array(
+		'method'   => $cost['method'],
+		'label'    => $label,
+		'cost'     => $cost['amount'],
+		'currency' => $cost['currency'],
+		'mocked'   => true,
+		'source'   => 'stub',
+	);
+	$order['delivery_options_saved'] = true;
+	$order['delivery_mocked']        = true;
+
+	return $order;
+}
+
+/**
+ * Save the selected delivery method and cost in an order.
+ *
+ * The stub returns the order-shaped result and does not persist anything.
+ *
+ * @param mixed $order  Order data (array or object).
+ * @param mixed $method Delivery method identifier.
+ * @return array<string,mixed>
+ */
+function velotok_core_save_delivery_option( $order, $method ) {
+	return velotok_core_delivery_apply_to_order( $order, $method );
+}
+
+/**
+ * Alias for callers that use an explicit selection name.
+ *
+ * @param mixed $order  Order data (array or object).
+ * @param mixed $method Delivery method identifier.
+ * @return array<string,mixed>
+ */
+function velotok_core_save_delivery_selection( $order, $method ) {
+	return velotok_core_delivery_apply_to_order( $order, $method );
+}
+
+/**
+ * Alias for callers that use an order-prefixed name.
+ *
+ * @param mixed $order  Order data (array or object).
+ * @param mixed $method Delivery method identifier.
+ * @return array<string,mixed>
+ */
+function velotok_core_order_delivery( $order, $method ) {
+	return velotok_core_delivery_apply_to_order( $order, $method );
+}
+
+}
+
 
 /**
  * Read an order total from an array or an object without external calls.
@@ -625,18 +849,55 @@ function velotok_core_content_accepted( $acceptance ) {
 }
 
 /**
+ * Check whether a role is allowed to accept content.
+ *
+ * Accepts both the machine slug and the human label of the project manager.
+ *
+ * @param mixed $role Role identifier or label.
+ * @return bool
+ */
+function velotok_core_content_acceptance_role_is_valid( $role ) {
+	$contract = velotok_core_content_acceptance_contract();
+	$key      = velotok_core_checkout_normalize_key( $role );
+
+	if ( '' === $key ) {
+		return false;
+	}
+
+	$allowed = array(
+		$contract['role'],
+		$contract['role_slug'],
+		$contract['role_label'],
+		$contract['required_role'],
+	);
+
+	foreach ( $allowed as $candidate ) {
+		if ( velotok_core_checkout_normalize_key( $candidate ) === $key ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
  * Validate content acceptance by a human project manager.
  *
  * @param mixed $acceptance Acceptance value.
  * @return array<string,mixed>
  */
 function velotok_core_validate_content_acceptance( $acceptance ) {
-	$contract = velotok_core_content_acceptance_contract();
-	$accepted = velotok_core_content_accepted( $acceptance );
-	$code     = $accepted ? null : $contract['error_code'];
-	$role     = is_array( $acceptance ) && isset( $acceptance['role'] ) && is_scalar( $acceptance['role'] )
-		? (string) $acceptance['role']
-		: $contract['role'];
+	$contract      = velotok_core_content_acceptance_contract();
+	$role_provided = is_array( $acceptance )
+		&& isset( $acceptance['role'] )
+		&& is_scalar( $acceptance['role'] )
+		&& '' !== trim( (string) $acceptance['role'] );
+	$role          = $role_provided ? (string) $acceptance['role'] : $contract['role'];
+	$role_valid    = ! $role_provided || velotok_core_content_acceptance_role_is_valid( $role );
+	$accepted      = velotok_core_content_accepted( $acceptance ) && $role_valid;
+	$code          = $accepted
+		? null
+		: ( $role_provided && ! $role_valid ? $contract['role_error_code'] : $contract['error_code'] );
 
 	return array(
 		'valid'       => $accepted,
@@ -646,9 +907,47 @@ function velotok_core_validate_content_acceptance( $acceptance ) {
 		'error'       => $code,
 		'role'        => $role,
 		'role_label'  => $contract['role_label'],
+		'role_valid'  => $role_valid,
 		'enforced_by' => $contract['enforced_by'],
 		'mocked'      => true,
 	);
+}
+
+/**
+ * Check whether a payment provider refers to the supported ЮKassa provider.
+ *
+ * Accepts the machine slug and the human-readable label.
+ *
+ * @param mixed $provider Provider identifier or label.
+ * @return bool
+ */
+function velotok_core_payment_provider_is_supported( $provider ) {
+	$contract = velotok_core_payment_contract();
+	$key      = velotok_core_checkout_normalize_key( $provider );
+
+	if ( '' === $key ) {
+		return false;
+	}
+
+	$allowed = array(
+		$contract['provider'],
+		$contract['provider_name'],
+		$contract['provider_label'],
+		'yoo-kassa',
+		'yoo_kassa',
+		'юkassa',
+		'юкасса',
+		'ю-касса',
+		'ю касса',
+	);
+
+	foreach ( $allowed as $candidate ) {
+		if ( velotok_core_checkout_normalize_key( $candidate ) === $key ) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /**
@@ -689,7 +988,7 @@ function velotok_core_validate_checkout( $data = array() ) {
 	$accept_result   = velotok_core_validate_content_acceptance( $acceptance );
 	$errors          = array();
 
-	if ( $payment['provider'] !== $provider ) {
+	if ( ! velotok_core_payment_provider_is_supported( $provider ) ) {
 		$errors[] = 'PAYMENT_PROVIDER_UNSUPPORTED';
 	}
 
