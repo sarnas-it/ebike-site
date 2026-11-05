@@ -146,6 +146,29 @@ php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
 ```
 
+= Провижининг (stub) =
+
+Единая точка доступа — `velotok_core_provisioning_contract()` в `includes/provisioning.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-497c0475` и родительскую спецификацию `clarify-096bb945`.
+
+Операция — `provision`, вызывается только через фасад `velotok_core_provision()`. Обязательное поле запроса — `resource_type`; необязательные — `resource_id`, `attributes`, `idempotency_key`. Для обратной совместимости принимаются псевдонимы (`type`, `id`, `params`, `idempotency` и другие из контракта).
+
+Правила контракта:
+
+* при валидном вводе заглушка возвращает ответ по контракту: `ok`, `status = provisioned`, `request_id`, `resource_id`, `idempotency_key`, `mocked => true`;
+* одинаковый ввод всегда даёт одинаковые идентификаторы (`deterministic_input_hash`), состояние между запусками не сохраняется;
+* сетевые вызовы не выполняются, env, файлы, БД и внешние сервисы не читаются;
+* пустой ввод даёт `PROVISIONING_MISSING_PARAMETER`, неверные типы полей — `PROVISIONING_INVALID_INPUT`;
+* замена заглушки на совместимого провайдера выполняется через `velotok_core_provisioning_register_provider()`, вызывающий код продолжает использовать `velotok_core_provision()`.
+
+Имена будущих env-переменных (`VELOTOK_PROVISIONING_PROVIDER`, `VELOTOK_PROVISIONING_ENDPOINT`, `VELOTOK_PROVISIONING_TOKEN`, `VELOTOK_PROVISIONING_TIMEOUT`) только вычисляются, env не читается. Открытые вопросы о провайдере и протоколе, семантике ошибок, персистентности и нефункциональных требованиях перечислены в `velotok_core_provisioning_open_questions()`.
+
+Запуск контрактного теста провижининга:
+
+```bash
+php wp/plugins/velotok-core/tests/provisioning-contract-test.php
+node wp/plugins/velotok-core/tests/provisioning-contract.test.js
+```
+
 == Installation ==
 
 1. Убедитесь, что установлен и активирован WooCommerce.
