@@ -106,6 +106,8 @@ services:
         wp eval-file wp-content/plugins/velotok-core/tests/content-articles-contract-test.php --allow-root
         echo "Running product catalog contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/catalog-contract-test.php --allow-root
+        echo "Running shopping cart contract test:"
+        wp eval-file wp-content/plugins/velotok-core/tests/cart-contract-test.php --allow-root
         echo "Running provisioning stub contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/provisioning-contract-test.php --allow-root
         exec tail -f /dev/null
