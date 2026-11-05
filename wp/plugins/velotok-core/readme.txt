@@ -150,6 +150,28 @@ php wp/plugins/velotok-core/tests/delivery-options-contract-test.php
 node wp/plugins/velotok-core/tests/delivery-options-contract.test.js
 ```
 
+= Стоимость доставки в итоговой сумме заказа (stub) =
+
+Единая точка доступа — `velotok_core_delivery_order_total_contract()` в `includes/delivery-order-total.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-b0e1a6d7` и родительскую спецификацию `clarify-a8fe76a0`.
+
+Правила контракта:
+
+* итоговая сумма заказа всегда включает стоимость доставки: `includes_delivery => true`, `total_includes_delivery => true`;
+* `velotok_core_delivery_order_total()` рассчитывает подытог и стоимость доставки через тарифную сетку stub-провайдера способов доставки, а затем возвращает итог как `subtotal + delivery_cost`;
+* результат содержит строки вывода `subtotal`, `delivery`, `total` с подписями «Товары», «Доставка», «Итого» и отформатированными суммами; бесплатная доставка помечается подписью «Бесплатно»;
+* стоимость доставки можно явно передать в `options['delivery_cost']` (например, уже сохранённую стоимость в заказе WooCommerce) без сетевых запросов;
+* разметку для витрины возвращает `velotok_core_render_delivery_order_total()` с пометкой `data-mocked="true"`; страница «Спасибо» выводит строку доставки, если у заказа есть способ доставки;
+* для неизвестного способа возвращается `DELIVERY_METHOD_INVALID` и пустая итоговая сумма; сетевые вызовы, env, файлы, БД и внешние сервисы не читаются.
+
+Реальные службы доставки, тарифная сетка, интеграция и зависимость способов доставки от адреса и параметров заказа остаются в открытых вопросах `velotok_core_delivery_order_total_open_questions()`.
+
+Запуск контрактного теста стоимости доставки в итоговой сумме:
+
+```bash
+php wp/plugins/velotok-core/tests/delivery-order-total-contract-test.php
+node wp/plugins/velotok-core/tests/delivery-order-total-contract.test.js
+```
+
 = Оформление доставки заказа (stub) =
 
 Единая точка доступа — `velotok_core_order_delivery_contract()` в `includes/order-delivery.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-b0e1a6d7`, родительскую спецификацию `clarify-a8fe76a0` и спецификацию оформления заказа `clarify-096bb945`.
