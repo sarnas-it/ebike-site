@@ -67,6 +67,8 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 Каждое правило обязательного атрибута хранится в заглушке отдельно, помечено `mocked => true` и ссылается на спеку; перечень категории возвращает `velotok_core_required_attributes_contract()`.
 
+Правило цены вынесено в отдельную заглушку `velotok_core_price_validation_contract()` с пометкой `mocked => true`; `velotok_core_validate_product_price()` читает коды ошибок из этого правила, разрешает ноль (`allow_zero => true`) и запрещает отрицательные значения (`allow_negative => false`).
+
 Запуск контрактных тестов валидации:
 
 ```bash
@@ -76,6 +78,8 @@ php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
 node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
 php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
+php wp/plugins/velotok-core/tests/product-price-validation-contract-test.php
+node wp/plugins/velotok-core/tests/product-price-validation-contract.test.js
 ```
 
 = Дополнительные атрибуты товара (stub) =
@@ -123,6 +127,29 @@ php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
 node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
 ```
 
+= Способы доставки (stub) =
+
+Единая точка доступа — `velotok_core_delivery_options_contract()` в `includes/delivery-options.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-a8fe76a0` и родительскую спецификацию `clarify-096bb945`.
+
+Stub-провайдер отдаёт фиксированный список способов доставки:
+
+* `russian_post` — «Почта РФ»;
+* `cdek` — «СДЭК»;
+* `other` — «Иной логист».
+
+Каждый способ содержит тариф из тарифной сетки stub-провайдера (`velotok_core_delivery_tariffs()`): базовую стоимость, ставку за килограмм, порог бесплатной доставки и валюту. Стоимость рассчитывает `velotok_core_calculate_delivery_cost()` как базовая стоимость плюс ставка за килограмм с округлением веса вверх; при достижении порога по сумме заказа доставка бесплатная. Сетевые вызовы, env, файлы, БД и внешние сервисы не используются.
+
+Выбранный способ и стоимость сохраняет `velotok_core_save_delivery_selection()`: для массива заказа возвращается обновлённый массив с `delivery_method`, `delivery_method_label`, `delivery_cost`, `delivery_currency`, `shipping_method`, `shipping_cost` и meta-полями; для объекта с методами WooCommerce (`update_meta_data`, `set_shipping_total`) значения записываются в объект. Неизвестный способ не сохраняется и даёт `DELIVERY_METHOD_INVALID`, пустой — `DELIVERY_METHOD_REQUIRED`.
+
+Реальные службы доставки, правила тарификации и интеграция (создание отправления, трекинг, ошибки, формат данных) остаются в открытых вопросах `velotok_core_delivery_open_questions()`.
+
+Запуск контрактного теста способов доставки:
+
+```bash
+php wp/plugins/velotok-core/tests/delivery-options-contract-test.php
+node wp/plugins/velotok-core/tests/delivery-options-contract.test.js
+```
+
 = Тематический охват контента (stub) =
 
 Единая точка доступа — `velotok_core_content_thematic_contract()` в `includes/content-thematic-coverage.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-a2fd2f66` и родительскую спецификацию `ecommerce-store`.
@@ -148,6 +175,29 @@ node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
 ```bash
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
+```
+
+= Провижининг (stub) =
+
+Единая точка доступа — `velotok_core_provisioning_contract()` в `includes/provisioning.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-497c0475` и родительскую спецификацию `clarify-096bb945`.
+
+Операция — `provision`, вызывается только через фасад `velotok_core_provision()`. Обязательное поле запроса — `resource_type`; необязательные — `resource_id`, `attributes`, `idempotency_key`. Для обратной совместимости принимаются псевдонимы (`type`, `id`, `params`, `idempotency` и другие из контракта).
+
+Правила контракта:
+
+* при валидном вводе заглушка возвращает ответ по контракту: `ok`, `status = provisioned`, `request_id`, `resource_id`, `idempotency_key`, `mocked => true`;
+* одинаковый ввод всегда даёт одинаковые идентификаторы (`deterministic_input_hash`), состояние между запусками не сохраняется;
+* сетевые вызовы не выполняются, env, файлы, БД и внешние сервисы не читаются;
+* пустой ввод даёт `PROVISIONING_MISSING_PARAMETER`, неверные типы полей — `PROVISIONING_INVALID_INPUT`;
+* замена заглушки на совместимого провайдера выполняется через `velotok_core_provisioning_register_provider()`, вызывающий код продолжает использовать `velotok_core_provision()`.
+
+Имена будущих env-переменных (`VELOTOK_PROVISIONING_PROVIDER`, `VELOTOK_PROVISIONING_ENDPOINT`, `VELOTOK_PROVISIONING_TOKEN`, `VELOTOK_PROVISIONING_TIMEOUT`) только вычисляются, env не читается. Открытые вопросы о провайдере и протоколе, семантике ошибок, персистентности и нефункциональных требованиях перечислены в `velotok_core_provisioning_open_questions()`.
+
+Запуск контрактного теста провижининга:
+
+```bash
+php wp/plugins/velotok-core/tests/provisioning-contract-test.php
+node wp/plugins/velotok-core/tests/provisioning-contract.test.js
 ```
 
 == Installation ==
