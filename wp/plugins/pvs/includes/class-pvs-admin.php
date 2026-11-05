@@ -1,5 +1,21 @@
 <?php
 
+if ( ! function_exists( 'pvs_contract' ) ) {
+	$pvs_contract_file = __DIR__ . '/class-pvs-contract.php';
+
+	if ( is_readable( $pvs_contract_file ) ) {
+		require_once $pvs_contract_file;
+	}
+}
+
+if ( ! function_exists( 'pvs_scan_all_plugins' ) ) {
+	$pvs_scanner_file = __DIR__ . '/class-pvs-scanner.php';
+
+	if ( is_readable( $pvs_scanner_file ) ) {
+		require_once $pvs_scanner_file;
+	}
+}
+
 if ( ! function_exists( 'pvs_admin_state' ) ) {
 	function &pvs_admin_state() {
 		static $state = array( 'result' => null );
@@ -56,19 +72,42 @@ if ( ! function_exists( 'pvs_admin_render_report' ) ) {
 			return function_exists( 'esc_html' ) ? esc_html( $value ) : htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
 		};
 
-		$html = '<div class="pvs-report" data-mocked="true">';
+		$html  = '<div class="pvs-report" data-mocked="true" data-network="false" data-source="stub" data-all-plugins="' . ( ! empty( $result['all_plugins'] ) ? 'true' : 'false' ) . '" data-scan-id="' . $escape( isset( $result['scan_id'] ) ? $result['scan_id'] : '' ) . '">';
 		$html .= '<p>' . $escape( sprintf( 'Проверено плагинов: %d. Найдено уязвимостей: %d.', isset( $result['plugins_scanned'] ) ? $result['plugins_scanned'] : 0, isset( $result['vulnerability_count'] ) ? $result['vulnerability_count'] : 0 ) ) . '</p>';
+
+		if ( ! empty( $result['severity_counts'] ) && is_array( $result['severity_counts'] ) ) {
+			$html .= '<p class="pvs-risk-summary">';
+
+			foreach ( $result['severity_counts'] as $severity => $count ) {
+				$severity = is_scalar( $severity ) ? strtolower( trim( (string) $severity ) ) : '';
+				$label    = function_exists( 'pvs_severity_label' ) ? pvs_severity_label( $severity ) : $severity;
+				$html    .= '<span class="pvs-risk pvs-risk-' . $escape( $severity ) . '" data-severity="' . $escape( $severity ) . '">' . $escape( $label . ': ' . (int) $count ) . '</span> ';
+			}
+
+			$html .= '</p>';
+		}
 
 		if ( ! empty( $result['plugins'] ) && is_array( $result['plugins'] ) ) {
 			$html .= '<table class="widefat"><thead><tr><th>' . $escape( 'Плагин' ) . '</th><th>' . $escape( 'Версия' ) . '</th><th>' . $escape( 'Статус' ) . '</th><th>' . $escape( 'Уязвимости' ) . '</th></tr></thead><tbody>';
 
 			foreach ( $result['plugins'] as $plugin ) {
-				$html .= '<tr>';
-				$html .= '<td>' . $escape( isset( $plugin['name'] ) ? $plugin['name'] : '' ) . '</td>';
-				$html .= '<td>' . $escape( isset( $plugin['version'] ) ? $plugin['version'] : '' ) . '</td>';
-				$html .= '<td>' . $escape( ! empty( $plugin['active'] ) ? 'Активен' : 'Неактивен' ) . '</td>';
-				$html .= '<td>' . $escape( isset( $plugin['vulnerability_count'] ) ? (string) $plugin['vulnerability_count'] : '0' ) . '</td>';
-				$html .= '</tr>';
+				if ( ! is_array( $plugin ) ) {
+					continue;
+				}
+
+				$risk_level = isset( $plugin['risk_level'] ) && is_scalar( $plugin['risk_level'] ) ? (string) $plugin['risk_level'] : '';
+				$row_class  = ! empty( $plugin['vulnerable'] ) ? 'pvs-plugin-vulnerable pvs-risk-highlight' : 'pvs-plugin-safe';
+
+				if ( '' !== $risk_level && 'none' !== $risk_level ) {
+					$row_class .= ' pvs-severity-' . $risk_level;
+				}
+
+				$html .= '<tr class="' . $escape( $row_class ) . '" data-risk="' . ( ! empty( $plugin['vulnerable'] ) ? 'true' : 'false' ) . '" data-severity="' . $escape( $risk_level ) . '">';
+				$html     .= '<td>' . $escape( isset( $plugin['name'] ) ? $plugin['name'] : '' ) . '</td>';
+				$html     .= '<td>' . $escape( isset( $plugin['version'] ) ? $plugin['version'] : '' ) . '</td>';
+				$html     .= '<td>' . $escape( ! empty( $plugin['active'] ) ? 'Активен' : 'Неактивен' ) . '</td>';
+				$html     .= '<td>' . $escape( isset( $plugin['vulnerability_count'] ) ? (string) $plugin['vulnerability_count'] : '0' ) . '</td>';
+				$html     .= '</tr>';
 			}
 
 			$html .= '</tbody></table>';
@@ -78,11 +117,39 @@ if ( ! function_exists( 'pvs_admin_render_report' ) ) {
 			$html .= '<ul class="pvs-vulnerabilities">';
 
 			foreach ( $result['vulnerabilities'] as $vulnerability ) {
-				$html .= '<li>';
-				$html .= $escape( isset( $vulnerability['plugin'] ) ? $vulnerability['plugin'] : '' );
+				if ( ! is_array( $vulnerability ) ) {
+					continue;
+				}
+
+				$severity = isset( $vulnerability['severity'] ) && is_scalar( $vulnerability['severity'] ) ? strtolower( trim( (string) $vulnerability['severity'] ) ) : 'low';
+				$label    = isset( $vulnerability['severity_label'] ) ? $vulnerability['severity_label'] : ( function_exists( 'pvs_severity_label' ) ? pvs_severity_label( $severity ) : $severity );
+
+				$html .= '<li class="pvs-vulnerability pvs-severity-' . $escape( $severity ) . '" data-severity="' . $escape( $severity ) . '" data-risk="' . $escape( $severity ) . '">';
+				$html .= '<span class="pvs-vulnerability-plugin">' . $escape( isset( $vulnerability['plugin'] ) ? $vulnerability['plugin'] : '' ) . '</span>';
 				$html .= ': ' . $escape( isset( $vulnerability['title'] ) ? $vulnerability['title'] : '' );
-				$html .= ' (' . $escape( isset( $vulnerability['severity_label'] ) ? $vulnerability['severity_label'] : '' ) . ')';
+				$html .= ' <span class="pvs-risk pvs-risk-' . $escape( $severity ) . '">(' . $escape( $label ) . ')</span>';
+
+				if ( ! empty( $vulnerability['fixed_in'] ) && is_scalar( $vulnerability['fixed_in'] ) ) {
+					$html .= ' — ' . $escape( sprintf( 'исправлено в %s', (string) $vulnerability['fixed_in'] ) );
+				}
+
 				$html .= '</li>';
+			}
+
+			$html .= '</ul>';
+		}
+
+		if ( ! empty( $result['errors'] ) && is_array( $result['errors'] ) ) {
+			$html .= '<ul class="pvs-errors">';
+
+			foreach ( $result['errors'] as $error ) {
+				if ( is_array( $error ) ) {
+					$message = isset( $error['message'] ) ? $error['message'] : ( isset( $error['code'] ) ? $error['code'] : '' );
+				} else {
+					$message = $error;
+				}
+
+				$html .= '<li class="pvs-error">' . $escape( $message ) . '</li>';
 			}
 
 			$html .= '</ul>';
