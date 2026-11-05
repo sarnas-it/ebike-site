@@ -65,6 +65,8 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 Правило описания вынесено в отдельную заглушку `velotok_core_description_validation_contract()` с пометкой `mocked => true`; `velotok_core_validate_product_description()` читает код ошибки из этого правила.
 
+Правило цены вынесено в отдельную заглушку `velotok_core_price_validation_contract()` с пометкой `mocked => true`; `velotok_core_validate_product_price()` читает коды ошибок из этого правила, разрешает ноль (`allow_zero => true`) и запрещает отрицательные значения (`allow_negative => false`).
+
 Запуск контрактных тестов валидации:
 
 ```bash
@@ -72,6 +74,8 @@ php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
 php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
+php wp/plugins/velotok-core/tests/product-price-validation-contract-test.php
+node wp/plugins/velotok-core/tests/product-price-validation-contract.test.js
 ```
 
 = Дополнительные атрибуты товара (stub) =

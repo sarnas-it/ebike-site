@@ -67,9 +67,15 @@ function velotok_core_product_validation_contract() {
 			),
 		),
 		'price'       => array(
-			'required'    => true,
-			'type'        => 'number',
-			'error_codes' => array(
+			'required'         => true,
+			'type'             => 'number',
+			'mocked'           => true,
+			'spec'             => 'clarify-9e1a1acd',
+			'trim'             => true,
+			'blank_is_missing' => true,
+			'allow_zero'       => true,
+			'allow_negative'   => false,
+			'error_codes'      => array(
 				'required' => 'PRICE_REQUIRED',
 				'format'   => 'PRICE_INVALID_FORMAT',
 				'negative' => 'PRICE_NEGATIVE',
@@ -326,36 +332,54 @@ function velotok_core_validate_description( $description ) {
 }
 
 /**
+ * Return the mocked price validation rule.
+ *
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
+ * single source for price validation. It never reads the database, files,
+ * currency services or remote price feeds.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_price_validation_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['attributes']['price'];
+}
+
+/**
  * Validate a product price.
  *
  * Numeric values are accepted, including zero. A non-numeric value produces
  * PRICE_INVALID_FORMAT, a negative value produces PRICE_NEGATIVE and a missing
- * value produces PRICE_REQUIRED.
+ * value produces PRICE_REQUIRED. The rule is taken from the mocked price
+ * validation contract.
  *
  * @param mixed $price Product price.
  * @return array<string,mixed>
  */
 function velotok_core_validate_product_price( $price ) {
+	$rule = velotok_core_price_validation_contract();
+
 	if ( null === $price || ( is_string( $price ) && '' === trim( $price ) ) ) {
-		return velotok_core_validation_result( false, 'PRICE_REQUIRED', $price );
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $price );
 	}
 
 	if ( is_string( $price ) ) {
 		$normalized = trim( $price );
 
 		if ( ! preg_match( '/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/', $normalized ) ) {
-			return velotok_core_validation_result( false, 'PRICE_INVALID_FORMAT', $price );
+			return velotok_core_validation_result( false, $rule['error_codes']['format'], $price );
 		}
 
 		$number = (float) str_replace( ',', '.', $normalized );
 	} elseif ( is_int( $price ) || ( is_float( $price ) && is_finite( $price ) ) ) {
 		$number = (float) $price;
 	} else {
-		return velotok_core_validation_result( false, 'PRICE_INVALID_FORMAT', $price );
+		return velotok_core_validation_result( false, $rule['error_codes']['format'], $price );
 	}
 
 	if ( $number < 0 ) {
-		return velotok_core_validation_result( false, 'PRICE_NEGATIVE', $price );
+		return velotok_core_validation_result( false, $rule['error_codes']['negative'], $price );
 	}
 
 	return velotok_core_validation_result( true, null, $price );
