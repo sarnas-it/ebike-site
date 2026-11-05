@@ -34,10 +34,12 @@ php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
 php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
 php wp/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php
+php wp/plugins/velotok-core/tests/provisioning-contract-test.php
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
 node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
 node wp/plugins/velotok-core/tests/content-thematic-coverage-contract.test.js
+node wp/plugins/velotok-core/tests/provisioning-contract.test.js
 ```
 
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
