@@ -9,6 +9,7 @@ permissions:
   checks: write
   statuses: write
   pull-requests: write
+  actions: read
 
 concurrency:
   group: recover-pr-5
@@ -41,7 +42,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: actions/setup-php@v2
         with:
           php-version: "8.2"
           coverage: none
@@ -51,13 +52,29 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Record checked commit
+        run: |
+          set -euo pipefail
+          checked="$(git -C target rev-parse HEAD)"
+          test "$checked" = "$TARGET_SHA"
+          echo "Checked commit: $checked" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run repository checks against stale commit
         run: |
           set -euo pipefail
           mkdir -p target/scripts
           cp tooling/scripts/ci-check.sh target/scripts/ci-check.sh
           cd target
-          bash scripts/ci-check.sh
+          bash scripts/ci-check.sh | tee "$RUNNER_TEMP/ci-check.log"
+          {
+            echo "### Repository checks"
+            echo ""
+            echo "Commit: \`$TARGET_SHA\`"
+            echo ""
+            echo '```'
+            tail -n 20 "$RUNNER_TEMP/ci-check.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish check results and complete deferred merge
         env:
