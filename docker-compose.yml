@@ -1,0 +1,97 @@
+name: velotok
+
+x-wordpress-env: &wordpress-env
+  WORDPRESS_DB_HOST: db:3306
+  WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-wordpress}
+  WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-wordpress}
+  WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress}
+  WORDPRESS_TABLE_PREFIX: wp_
+  WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-1}
+  WORDPRESS_CONFIG_EXTRA: |
+    define( 'WP_ENVIRONMENT_TYPE', 'local' );
+    define( 'DISALLOW_FILE_EDIT', true );
+    define( 'FS_METHOD', 'direct' );
+
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${WORDPRESS_DB_NAME:-wordpress}
+      MARIADB_USER: ${WORDPRESS_DB_USER:-wordpress}
+      MARIADB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress}
+      MARIADB_ROOT_PASSWORD: ${WORDPRESS_DB_ROOT_PASSWORD:-root}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  wordpress:
+    build:
+      context: ./wp/docker/wordpress
+    image: velotok-wordpress:local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${WORDPRESS_PORT:-8080}:80"
+    environment:
+      <<: *wordpress-env
+    volumes:
+      - wp_data:/var/www/html
+      - ./wp/themes:/var/www/html/wp-content/themes
+      - ./wp/plugins:/var/www/html/wp-content/plugins
+      - ./wp/uploads:/var/www/html/wp-content/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 80) ? 0 : 1);'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  setup:
+    image: wordpress:cli-php8.2
+    user: "0:0"
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    environment:
+      <<: *wordpress-env
+      WORDPRESS_URL: ${WORDPRESS_URL:-http://localhost:8080}
+      WORDPRESS_ADMIN_USER: ${WORDPRESS_ADMIN_USER:-admin}
+      WORDPRESS_ADMIN_PASSWORD: ${WORDPRESS_ADMIN_PASSWORD:-velotok-local}
+      WORDPRESS_ADMIN_EMAIL: ${WORDPRESS_ADMIN_EMAIL:-admin@velotok.local}
+    volumes:
+      - wp_data:/var/www/html
+      - ./wp:/opt/velotok:ro
+      - ./wp/themes:/var/www/html/wp-content/themes
+      - ./wp/plugins:/var/www/html/wp-content/plugins
+      - ./wp/uploads:/var/www/html/wp-content/uploads
+    entrypoint: ["/bin/sh", "/opt/velotok/cli/setup.sh"]
+    restart: "no"
+
+  wpcli:
+    image: wordpress:cli-php8.2
+    user: "0:0"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    environment:
+      <<: *wordpress-env
+    volumes:
+      - wp_data:/var/www/html
+      - ./wp:/opt/velotok:ro
+      - ./wp/themes:/var/www/html/wp-content/themes
+      - ./wp/plugins:/var/www/html/wp-content/plugins
+      - ./wp/uploads:/var/www/html/wp-content/uploads
+    entrypoint: ["/bin/sh", "/opt/velotok/cli/wp-entrypoint.sh"]
+    restart: "no"
+
+volumes:
+  db_data:
+  wp_data:
