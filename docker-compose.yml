@@ -81,6 +81,8 @@ services:
         wp eval-file wp-content/plugins/velotok-core/tests/product-validation-contract-test.php --allow-root
         echo "Running product description validation contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/product-description-validation-contract-test.php --allow-root
+        echo "Running product price validation contract test:"
+        wp eval-file wp-content/plugins/velotok-core/tests/product-price-validation-contract-test.php --allow-root
         echo "Running product extra attributes contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/product-extra-attributes-contract-test.php --allow-root
         echo "Running checkout, delivery and payment contract test:"
