@@ -19,12 +19,17 @@ function includes(fragment, message) {
 }
 
 includes('clarify-a8fe76a0', 'Contract must reference spec clarify-a8fe76a0');
-includes('velotok_core_delivery_options_contract', 'Contract accessor is missing');
-includes('velotok_core_delivery_options', 'Delivery options helper is missing');
+includes('velotok_core_delivery_options_contract', 'Delivery options contract accessor is missing');
+includes('velotok_core_delivery_options', 'Delivery options list helper is missing');
 includes('velotok_core_delivery_options_tariffs', 'Tariff grid helper is missing');
 includes('velotok_core_delivery_options_cost', 'Delivery cost helper is missing');
 includes('velotok_core_delivery_options_apply_to_order', 'Order persistence helper is missing');
 includes('velotok_core_delivery_options_open_questions', 'Open questions helper is missing');
+includes('velotok_core_delivery_option', 'Delivery option resolver is missing');
+includes('velotok_core_delivery_tariffs', 'Tariff grid helper is missing');
+includes('velotok_core_calculate_delivery_cost', 'Delivery cost calculation helper is missing');
+includes('velotok_core_save_delivery_selection', 'Delivery selection persistence helper is missing');
+includes('velotok_core_validate_delivery_option', 'Delivery option validation helper is missing');
 
 includes("'mocked'", 'Contract must declare the mocked marker');
 includes("'source'", 'Contract must declare its source');
@@ -33,6 +38,7 @@ includes("'provider'", 'Contract must declare its provider');
 includes("'tariffs'", 'Contract must declare the tariff grid');
 includes("'tariff_grid'", 'Contract must declare a tariff grid alias');
 includes("'order'", 'Contract must declare the order persistence shape');
+includes("'order_fields'", 'Contract must declare order persistence fields');
 
 includes('russian_post', 'Delivery method Почта РФ is missing');
 includes('Почта РФ', 'Delivery label Почта РФ is missing');

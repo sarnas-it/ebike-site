@@ -19,6 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
 }
 
+require_once __DIR__ . '/delivery-options.php';
+
 /**
  * Return the checkout, delivery and payment contract.
  *
@@ -71,62 +73,17 @@ function velotok_core_checkout_contract() {
 		),
 	);
 
-	$delivery_tariffs = array(
-		'russian_post' => array(
-			'id'                      => 'russian_post',
-			'method'                  => 'russian_post',
-			'label'                   => 'Почта РФ',
-			'provider'                => 'stub',
-			'mocked'                  => true,
-			'source'                  => 'stub',
-			'currency'                => 'RUB',
-			'base_amount'             => 350.0,
-			'amount'                  => 350.0,
-			'free_from'               => 50000.0,
-			'free_shipping_threshold' => 50000.0,
-			'tiers'                   => array(
-				array( 'min_total' => 0.0, 'max_total' => 19999.99, 'amount' => 350.0 ),
-				array( 'min_total' => 20000.0, 'max_total' => 49999.99, 'amount' => 250.0 ),
-				array( 'min_total' => 50000.0, 'max_total' => null, 'amount' => 0.0 ),
-			),
-		),
-		'cdek'         => array(
-			'id'                      => 'cdek',
-			'method'                  => 'cdek',
-			'label'                   => 'СДЭК',
-			'provider'                => 'stub',
-			'mocked'                  => true,
-			'source'                  => 'stub',
-			'currency'                => 'RUB',
-			'base_amount'             => 490.0,
-			'amount'                  => 490.0,
-			'free_from'               => 50000.0,
-			'free_shipping_threshold' => 50000.0,
-			'tiers'                   => array(
-				array( 'min_total' => 0.0, 'max_total' => 19999.99, 'amount' => 490.0 ),
-				array( 'min_total' => 20000.0, 'max_total' => 49999.99, 'amount' => 390.0 ),
-				array( 'min_total' => 50000.0, 'max_total' => null, 'amount' => 0.0 ),
-			),
-		),
-		'other'        => array(
-			'id'                      => 'other',
-			'method'                  => 'other',
-			'label'                   => 'Иной логист',
-			'provider'                => 'stub',
-			'mocked'                  => true,
-			'source'                  => 'stub',
-			'currency'                => 'RUB',
-			'base_amount'             => 790.0,
-			'amount'                  => 790.0,
-			'free_from'               => null,
-			'free_shipping_threshold' => null,
-			'tiers'                   => array(
-				array( 'min_total' => 0.0, 'max_total' => 19999.99, 'amount' => 790.0 ),
-				array( 'min_total' => 20000.0, 'max_total' => 49999.99, 'amount' => 690.0 ),
-				array( 'min_total' => 50000.0, 'max_total' => null, 'amount' => 590.0 ),
-			),
-		),
-	);
+	$delivery_tariffs = function_exists( 'velotok_core_delivery_tariffs' ) ? velotok_core_delivery_tariffs() : array();
+
+	foreach ( $delivery_methods as $method_id => &$delivery_method ) {
+		$delivery_method['source'] = 'stub';
+
+		if ( isset( $delivery_tariffs[ $method_id ] ) ) {
+			$delivery_method['tariff']      = $delivery_tariffs[ $method_id ];
+			$delivery_method['provider_id'] = 'stub';
+		}
+	}
+	unset( $delivery_method );
 
 	$contract = array(
 		'spec'             => 'clarify-096bb945',
@@ -163,6 +120,8 @@ function velotok_core_checkout_contract() {
 			'tariff_grid'    => $delivery_tariffs,
 			'default'        => 'russian_post',
 			'source'         => 'stub',
+			'provider'       => 'stub',
+			'provider_label' => 'Stub delivery provider',
 			'mocked'         => true,
 			'required'       => true,
 			'future_source'  => 'provider_api',
@@ -170,6 +129,8 @@ function velotok_core_checkout_contract() {
 			'invalid_method' => 'DELIVERY_METHOD_INVALID',
 			'currency'       => 'RUB',
 			'free_shipping_threshold' => 50000.0,
+			'tariffs'        => $delivery_tariffs,
+			'tariff_grid'    => $delivery_tariffs,
 			'cost'           => array(
 				'source'     => 'stub',
 				'provider'   => 'stub',
@@ -178,6 +139,7 @@ function velotok_core_checkout_contract() {
 				'currency'   => 'RUB',
 				'calculated' => true,
 				'grid'       => 'tariff_grid',
+				'tariffs'    => $delivery_tariffs,
 			),
 			'order'          => array(
 				'source'     => 'stub',
@@ -358,6 +320,13 @@ function velotok_core_payment_env_name( $key ) {
 
 	return $contract['env'][ $key ];
 }
+
+/*
+ * The delivery helpers live in includes/delivery-options.php. The block below is
+ * kept only as a fallback for environments that load this file without the
+ * delivery stub; it is skipped when the stub helpers are already available.
+ */
+if ( ! function_exists( 'velotok_core_delivery_methods' ) ) {
 
 /**
  * Return every delivery method declared by the contract.
@@ -555,86 +524,6 @@ function velotok_core_validate_delivery_method( $method, $required = true ) {
 /**
  * Return the mocked delivery tariff grid keyed by method identifier.
  *
- * The grid is an in-memory stub of a logistics provider tariff table. It is
- * deliberately deterministic and does not call any external service.
- *
- * @return array<string,array<string,mixed>>
- */
-function velotok_core_delivery_tariffs() {
-	$contract = velotok_core_delivery_contract();
-
-	return $contract['tariffs'];
-}
-
-/**
- * Alias for callers that use an explicit grid name.
- *
- * @return array<string,array<string,mixed>>
- */
-function velotok_core_delivery_tariff_grid() {
-	return velotok_core_delivery_tariffs();
-}
-
-/**
- * Alias for callers that use a getter-style name.
- *
- * @return array<string,array<string,mixed>>
- */
-function velotok_core_get_delivery_tariffs() {
-	return velotok_core_delivery_tariffs();
-}
-
-/**
- * Return the tariff definition for a delivery method.
- *
- * @param mixed $method Delivery method identifier.
- * @return array<string,mixed>|null Null for an unknown method.
- */
-function velotok_core_delivery_tariff( $method ) {
-	$resolved = velotok_core_delivery_method( $method );
-
-	if ( null === $resolved ) {
-		return null;
-	}
-
-	$tariffs = velotok_core_delivery_tariffs();
-
-	return isset( $tariffs[ $resolved['id'] ] ) ? $tariffs[ $resolved['id'] ] : null;
-}
-
-/**
- * Select the tariff tier for an order amount.
- *
- * @param array<string,mixed> $tariff Tariff definition.
- * @param float               $amount Order amount.
- * @return array<string,mixed>|null
- */
-function velotok_core_delivery_tariff_tier( $tariff, $amount ) {
-	if ( ! is_array( $tariff ) || empty( $tariff['tiers'] ) || ! is_array( $tariff['tiers'] ) ) {
-		return null;
-	}
-
-	$amount = is_numeric( $amount ) ? (float) $amount : 0.0;
-
-	foreach ( $tariff['tiers'] as $tier ) {
-		if ( ! is_array( $tier ) || ! isset( $tier['amount'] ) ) {
-			continue;
-		}
-
-		$min = isset( $tier['min_total'] ) && is_numeric( $tier['min_total'] ) ? (float) $tier['min_total'] : 0.0;
-		$max = isset( $tier['max_total'] ) && is_numeric( $tier['max_total'] ) ? (float) $tier['max_total'] : null;
-
-		if ( $amount >= $min && ( null === $max || $amount <= $max ) ) {
-			return $tier;
-		}
-	}
-
-	return null;
-}
-
-/**
- * Return a mocked delivery cost for a method using the stub tariff grid.
- *
  * The result is deterministic and explicitly marked as mocked. No provider is
  * contacted and no order is persisted.
  *
@@ -781,6 +670,8 @@ function velotok_core_save_delivery_selection( $order, $method ) {
  */
 function velotok_core_order_delivery( $order, $method ) {
 	return velotok_core_delivery_apply_to_order( $order, $method );
+}
+
 }
 
 
