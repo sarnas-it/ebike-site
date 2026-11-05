@@ -60,7 +60,31 @@ if ( ! function_exists( 'velotok_core_order_delivery_contract' ) ) {
 	velotok_order_delivery_assert( isset( $contract['totals']['include_delivery'] ) && true === $contract['totals']['include_delivery'], 'Стоимость доставки должна включаться в итоговую сумму.' );
 	velotok_order_delivery_assert( isset( $contract['display']['show_delivery_cost'] ) && true === $contract['display']['show_delivery_cost'], 'Стоимость доставки должна отображаться.' );
 	velotok_order_delivery_assert( isset( $contract['real_integration']['required'] ) && false === $contract['real_integration']['required'], 'Реальная интеграция не должна требоваться.' );
+	velotok_order_delivery_assert( isset( $contract['stub_contract']['mocked'] ) && true === $contract['stub_contract']['mocked'], 'Stub-контракт не помечен mocked: true.' );
+	velotok_order_delivery_assert( isset( $contract['stub_contract']['network'] ) && false === $contract['stub_contract']['network'], 'Stub-контракт не должен ходить в сеть.' );
 	velotok_order_delivery_assert( ! empty( $contract['open_questions'] ) && is_array( $contract['open_questions'] ), 'Не зафиксированы открытые вопросы.' );
+}
+
+if ( function_exists( 'velotok_core_delivery_options_contract' ) ) {
+	$delivery_contract = velotok_core_delivery_options_contract();
+
+	velotok_order_delivery_assert( isset( $delivery_contract['mocked'] ) && true === $delivery_contract['mocked'], 'Контракт способов доставки не помечен mocked: true.' );
+	velotok_order_delivery_assert( isset( $delivery_contract['source'] ) && 'stub' === $delivery_contract['source'], 'Контракт способов доставки должен ссылаться на stub.' );
+	velotok_order_delivery_assert( isset( $delivery_contract['network'] ) && false === $delivery_contract['network'], 'Контракт способов доставки не должен ходить в сеть.' );
+	velotok_order_delivery_assert( isset( $delivery_contract['provider_contract']['mocked'] ) && true === $delivery_contract['provider_contract']['mocked'], 'Провайдер способов доставки не помечен mocked: true.' );
+	velotok_order_delivery_assert( isset( $delivery_contract['provider_contract']['network'] ) && false === $delivery_contract['provider_contract']['network'], 'Провайдер способов доставки не должен ходить в сеть.' );
+	velotok_order_delivery_assert( isset( $delivery_contract['order'] ) && is_array( $delivery_contract['order'] ), 'Не описан формат сохранения доставки в заказе.' );
+	velotok_order_delivery_assert( isset( $delivery_contract['order']['mocked'] ) && true === $delivery_contract['order']['mocked'], 'Блок заказа в контракте не помечен mocked: true.' );
+	velotok_order_delivery_assert( isset( $delivery_contract['order']['source'] ) && 'stub' === $delivery_contract['order']['source'], 'Блок заказа должен ссылаться на stub.' );
+	velotok_order_delivery_assert( isset( $delivery_contract['tariffs'] ) && is_array( $delivery_contract['tariffs'] ) && ! empty( $delivery_contract['tariffs'] ), 'Не описана тарифная сетка заглушки.' );
+
+	foreach ( $delivery_contract['tariffs'] as $tariff_id => $tariff ) {
+		velotok_order_delivery_assert( isset( $tariff['mocked'] ) && true === $tariff['mocked'], sprintf( 'Тариф «%s» не помечен mocked: true.', $tariff_id ) );
+		velotok_order_delivery_assert( isset( $tariff['source'] ) && 'stub' === $tariff['source'], sprintf( 'Тариф «%s» должен ссылаться на stub.', $tariff_id ) );
+		velotok_order_delivery_assert( isset( $tariff['provider'] ) && 'stub' === $tariff['provider'], sprintf( 'Тариф «%s» должен приходить из stub-провайдера.', $tariff_id ) );
+	}
+} else {
+	velotok_order_delivery_assert( false, 'Отсутствует контракт способов доставки, на который опирается оформление заказа.' );
 }
 
 if ( function_exists( 'velotok_core_order_delivery_options' ) ) {
@@ -160,7 +184,29 @@ if ( function_exists( 'velotok_core_save_checkout_delivery' ) ) {
 	velotok_order_delivery_assert( 10550.0 === (float) $applied['total'], 'Применение выбора должно включать доставку в итог.' );
 }
 
-$source = (string) file_get_contents( $stub_path );
+foreach (
+	array(
+		'velotok_core_order_delivery_contract',
+		'velotok_core_order_delivery_options',
+		'velotok_core_validate_order_delivery_method',
+		'velotok_core_order_delivery_cost',
+		'velotok_core_order_delivery_totals',
+		'velotok_core_save_checkout_delivery',
+		'velotok_core_apply_checkout_delivery',
+	) as $helper
+) {
+	velotok_order_delivery_assert( function_exists( $helper ), sprintf( 'Отсутствует функция контракта оформления доставки: %s.', $helper ) );
+}
+
+$source        = (string) file_get_contents( $stub_path );
+$dependency    = dirname( __DIR__ ) . '/includes/delivery-options.php';
+$dependencies  = array( $source );
+
+if ( is_readable( $dependency ) ) {
+	$dependencies[] = (string) file_get_contents( $dependency );
+} else {
+	velotok_order_delivery_assert( false, 'Отсутствует stub-контракт способов доставки.' );
+}
 
 $forbidden = array(
 	'get' . 'env(',
@@ -175,10 +221,18 @@ $forbidden = array(
 	'fsockopen(',
 	'stream_socket_' . 'client(',
 	'socket_' . 'create(',
+	'$wp' . 'db',
+	'get_option(',
+	'update_option(',
+	'wp_insert_post(',
+	'get_post_meta(',
+	'update_post_meta(',
 );
 
-foreach ( $forbidden as $needle ) {
-	velotok_order_delivery_assert( false === strpos( $source, $needle ), sprintf( 'Stub не должен обращаться к внешнему источнику: %s', $needle ) );
+foreach ( $dependencies as $dependency_source ) {
+	foreach ( $forbidden as $needle ) {
+		velotok_order_delivery_assert( false === strpos( $dependency_source, $needle ), sprintf( 'Stub не должен обращаться к внешнему источнику или БД: %s', $needle ) );
+	}
 }
 
 if ( $failures ) {
