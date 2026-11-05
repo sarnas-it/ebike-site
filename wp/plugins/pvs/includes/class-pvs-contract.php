@@ -30,9 +30,138 @@ if ( ! function_exists( 'pvs_contract' ) ) {
 			'network'           => false,
 		);
 
+		$providers = array(
+			'wpscan' => array(
+				'id'               => 'wpscan',
+				'slug'             => 'wpscan',
+				'name'             => 'WPScan',
+				'label'            => 'WPScan',
+				'type'             => 'external_service',
+				'kind'             => 'scanner',
+				'mode'             => 'api',
+				'description'      => 'Внешняя база уязвимостей WPScan.',
+				'enabled'          => true,
+				'available'        => true,
+				'selected'         => false,
+				'manual'           => false,
+				'requires_account' => true,
+				'requires_api_token' => true,
+				'mocked'           => true,
+				'source'           => 'stub',
+				'network'          => false,
+				'real_integration' => false,
+				'env'              => array(
+					'api_url'   => 'VELOTOK_PVS_WPSCAN_API_URL',
+					'api_token' => 'VELOTOK_PVS_WPSCAN_API_TOKEN',
+				),
+			),
+			'patchstack' => array(
+				'id'               => 'patchstack',
+				'slug'             => 'patchstack',
+				'name'             => 'Patchstack',
+				'label'            => 'Patchstack',
+				'type'             => 'external_service',
+				'kind'             => 'scanner',
+				'mode'             => 'api',
+				'description'      => 'Внешняя база уязвимостей Patchstack.',
+				'enabled'          => true,
+				'available'        => true,
+				'selected'         => false,
+				'manual'           => false,
+				'requires_account' => true,
+				'requires_api_token' => true,
+				'mocked'           => true,
+				'source'           => 'stub',
+				'network'          => false,
+				'real_integration' => false,
+				'env'              => array(
+					'api_url'   => 'VELOTOK_PVS_PATCHSTACK_API_URL',
+					'api_token' => 'VELOTOK_PVS_PATCHSTACK_API_TOKEN',
+				),
+			),
+			'manual' => array(
+				'id'               => 'manual',
+				'slug'             => 'manual',
+				'name'             => 'Ручной аудит',
+				'label'            => 'Ручной аудит',
+				'type'             => 'manual_audit',
+				'kind'             => 'manual',
+				'mode'             => 'manual',
+				'description'      => 'Ручной аудит плагинов с внесением находок в отчёт.',
+				'enabled'          => true,
+				'available'        => true,
+				'selected'         => false,
+				'manual'           => true,
+				'requires_account' => false,
+				'requires_api_token' => false,
+				'mocked'           => true,
+				'source'           => 'stub',
+				'network'          => false,
+				'real_integration' => false,
+				'env'              => array(),
+			),
+		);
+
+		$highlight_format = array(
+			'risk_class_prefix'     => 'pvs-risk-',
+			'severity_class_prefix' => 'pvs-severity-',
+			'vulnerable_row_class'  => 'pvs-plugin-vulnerable',
+			'safe_row_class'        => 'pvs-plugin-safe',
+			'highlight_class'       => 'pvs-risk-highlight',
+			'data_highlight'        => 'data-highlight',
+			'data_severity'         => 'data-severity',
+			'data_risk'             => 'data-risk',
+			'classes'               => array(
+				'critical' => 'pvs-risk-critical',
+				'high'     => 'pvs-risk-high',
+				'medium'   => 'pvs-risk-medium',
+				'low'      => 'pvs-risk-low',
+			),
+			'severity_classes'      => array(
+				'critical' => 'pvs-severity-critical',
+				'high'     => 'pvs-severity-high',
+				'medium'   => 'pvs-severity-medium',
+				'low'      => 'pvs-severity-low',
+			),
+			'colors'                => array(
+				'critical' => array( 'color' => $severity_levels['critical']['color'], 'background' => $severity_levels['critical']['background'], 'border' => $severity_levels['critical']['border'] ),
+				'high'     => array( 'color' => $severity_levels['high']['color'], 'background' => $severity_levels['high']['background'], 'border' => $severity_levels['high']['border'] ),
+				'medium'   => array( 'color' => $severity_levels['medium']['color'], 'background' => $severity_levels['medium']['background'], 'border' => $severity_levels['medium']['border'] ),
+				'low'      => array( 'color' => $severity_levels['low']['color'], 'background' => $severity_levels['low']['background'], 'border' => $severity_levels['low']['border'] ),
+			),
+			'mocked'                => true,
+			'source'                => 'stub',
+			'network'               => false,
+		);
+
+		$manual_audit = array(
+			'supported'        => true,
+			'provider'         => 'manual',
+			'provider_id'      => 'manual',
+			'input_field'      => 'manual_findings',
+			'aliases'          => array( 'manual_audit', 'manual_vulnerabilities', 'findings', 'audit_findings' ),
+			'fields'           => array(
+				'plugin'      => array( 'required' => true, 'aliases' => array( 'slug', 'plugin_slug' ) ),
+				'title'       => array( 'required' => true, 'aliases' => array( 'description', 'name' ) ),
+				'severity'    => array( 'required' => false, 'default' => 'low' ),
+				'version'     => array( 'required' => false, 'aliases' => array( 'affected_version' ) ),
+				'fixed_in'    => array( 'required' => false ),
+				'id'          => array( 'required' => false ),
+			),
+			'highlighted'      => true,
+			'mocked'           => true,
+			'source'           => 'stub',
+			'network'          => false,
+			'real_integration' => false,
+		);
+
 		$contract = array(
 			'spec'                  => 'ecommerce-store',
 			'requirement'           => 'TESTEB-154',
+			'requirement_ref'       => 'TESTEB-162',
+			'clarification'         => 'TESTEB-162',
+			'clarification_requirement' => 'TESTEB-162',
+			'requirement_ids'       => array( 'TESTEB-154', 'TESTEB-162' ),
 			'parent_spec'           => 'ecommerce-store',
 			'security_spec'         => 'ecommerce-store',
 			'mocked'                => true,
@@ -56,6 +185,28 @@ if ( ! function_exists( 'pvs_contract' ) ) {
 			),
 			'highest_risk_field'    => 'highest_risk',
 			'risk_summary_field'    => 'risk_summary',
+			'providers'             => $providers,
+			'tools'                 => $providers,
+			'scanners'              => $providers,
+			'audit_tools'           => $providers,
+			'provider_ids'          => array_keys( $providers ),
+			'supported_providers'   => array_keys( $providers ),
+			'provider'              => 'wpscan',
+			'provider_id'           => 'wpscan',
+			'provider_name'         => 'WPScan',
+			'default_provider'      => 'wpscan',
+			'provider_aliases'      => array(
+				'manual_audit' => 'manual',
+				'manual-audit' => 'manual',
+				'patchstack_db' => 'patchstack',
+				'wpscan_api'   => 'wpscan',
+			),
+			'manual_audit'          => $manual_audit,
+			'highlight_format'      => $highlight_format,
+			'risk_highlight_format' => $highlight_format,
+			'risk_highlight'        => $highlight_format,
+			'highlight'             => $highlight_format,
+			'highlight_styles'      => $highlight_format,
 			'scan'                  => $coverage,
 			'coverage'              => $coverage,
 			'real_integration'      => array(
@@ -298,6 +449,135 @@ if ( ! function_exists( 'pvs_risk_highlight' ) ) {
 	}
 }
 
+if ( ! function_exists( 'pvs_providers' ) ) {
+	function pvs_providers() {
+		$contract = pvs_contract();
+
+		return $contract['providers'];
+	}
+}
+
+if ( ! function_exists( 'pvs_supported_providers' ) ) {
+	function pvs_supported_providers() {
+		$contract = pvs_contract();
+
+		return $contract['supported_providers'];
+	}
+}
+
+if ( ! function_exists( 'pvs_get_providers' ) ) {
+	function pvs_get_providers() {
+		return pvs_providers();
+	}
+}
+
+if ( ! function_exists( 'pvs_available_providers' ) ) {
+	function pvs_available_providers() {
+		return pvs_providers();
+	}
+}
+
+if ( ! function_exists( 'pvs_audit_providers' ) ) {
+	function pvs_audit_providers() {
+		return pvs_providers();
+	}
+}
+
+if ( ! function_exists( 'pvs_tools' ) ) {
+	function pvs_tools() {
+		return pvs_providers();
+	}
+}
+
+if ( ! function_exists( 'pvs_normalize_provider' ) ) {
+	function pvs_normalize_provider( $provider ) {
+		$provider = is_scalar( $provider ) ? strtolower( trim( (string) $provider ) ) : '';
+
+		if ( '' === $provider ) {
+			return '';
+		}
+
+		$contract  = pvs_contract();
+		$providers = $contract['providers'];
+
+		if ( isset( $providers[ $provider ] ) ) {
+			return $provider;
+		}
+
+		if ( isset( $contract['provider_aliases'][ $provider ] ) ) {
+			return $contract['provider_aliases'][ $provider ];
+		}
+
+		$provider = str_replace( array( '-', ' ' ), '_', $provider );
+
+		if ( isset( $contract['provider_aliases'][ $provider ] ) ) {
+			return $contract['provider_aliases'][ $provider ];
+		}
+
+		return '';
+	}
+}
+
+if ( ! function_exists( 'pvs_provider' ) ) {
+	function pvs_provider( $provider = null ) {
+		$contract = pvs_contract();
+
+		if ( null === $provider || '' === $provider ) {
+			$provider = $contract['default_provider'];
+		}
+
+		$provider = pvs_normalize_provider( $provider );
+
+		if ( '' === $provider || ! isset( $contract['providers'][ $provider ] ) ) {
+			return array();
+		}
+
+		return $contract['providers'][ $provider ];
+	}
+}
+
+if ( ! function_exists( 'pvs_default_provider' ) ) {
+	function pvs_default_provider() {
+		$contract = pvs_contract();
+
+		return $contract['default_provider'];
+	}
+}
+
+if ( ! function_exists( 'pvs_highlight_format' ) ) {
+	function pvs_highlight_format() {
+		$contract = pvs_contract();
+
+		return $contract['highlight_format'];
+	}
+}
+
+if ( ! function_exists( 'pvs_risk_highlight_format' ) ) {
+	function pvs_risk_highlight_format() {
+		return pvs_highlight_format();
+	}
+}
+
+if ( ! function_exists( 'pvs_get_highlight_format' ) ) {
+	function pvs_get_highlight_format() {
+		return pvs_highlight_format();
+	}
+}
+
+if ( ! function_exists( 'pvs_manual_audit_contract' ) ) {
+	function pvs_manual_audit_contract() {
+		$contract = pvs_contract();
+
+		return $contract['manual_audit'];
+	}
+}
+
+if ( ! function_exists( 'pvs_get_manual_audit_contract' ) ) {
+	function pvs_get_manual_audit_contract() {
+		return pvs_manual_audit_contract();
+	}
+}
+
 if ( ! class_exists( 'PVS_Contract', false ) ) {
 	class PVS_Contract {
 		public static function get_contract() {
@@ -352,6 +632,46 @@ if ( ! class_exists( 'PVS_Contract', false ) ) {
 
 		public static function risk_highlight( $severity ) {
 			return pvs_risk_highlight( $severity );
+		}
+
+		public static function providers() {
+			return pvs_providers();
+		}
+
+		public static function get_providers() {
+			return pvs_providers();
+		}
+
+		public static function available_providers() {
+			return pvs_providers();
+		}
+
+		public static function tools() {
+			return pvs_providers();
+		}
+
+		public static function supported_providers() {
+			return pvs_supported_providers();
+		}
+
+		public static function provider( $provider = null ) {
+			return pvs_provider( $provider );
+		}
+
+		public static function default_provider() {
+			return pvs_default_provider();
+		}
+
+		public static function highlight_format() {
+			return pvs_highlight_format();
+		}
+
+		public static function risk_highlight_format() {
+			return pvs_highlight_format();
+		}
+
+		public static function manual_audit() {
+			return pvs_manual_audit_contract();
 		}
 
 		public static function env_name( $key ) {

@@ -62,6 +62,43 @@ if ( ! function_exists( 'pvs_admin_run_scan' ) ) {
 	}
 }
 
+if ( ! function_exists( 'pvs_admin_request_options' ) ) {
+	function pvs_admin_request_options( $source = null ) {
+		$source  = is_array( $source ) ? $source : $_POST;
+		$options = array();
+
+		foreach ( array( 'provider', 'provider_id' ) as $provider_key ) {
+			if ( isset( $source[ $provider_key ] ) && is_scalar( $source[ $provider_key ] ) ) {
+				$provider = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $source[ $provider_key ] ) : strtolower( trim( (string) $source[ $provider_key ] ) );
+
+				if ( '' !== $provider ) {
+					$options['provider'] = $provider;
+				}
+
+				break;
+			}
+		}
+
+		if ( isset( $source['manual_findings'] ) ) {
+			$manual = $source['manual_findings'];
+
+			if ( is_string( $manual ) ) {
+				$decoded = json_decode( $manual, true );
+
+				if ( is_array( $decoded ) ) {
+					$manual = $decoded;
+				}
+			}
+
+			if ( is_array( $manual ) ) {
+				$options['manual_findings'] = $manual;
+			}
+		}
+
+		return $options;
+	}
+}
+
 if ( ! function_exists( 'pvs_admin_styles' ) ) {
 	function pvs_admin_styles() {
 		$levels = function_exists( 'pvs_severity_levels' ) ? pvs_severity_levels() : array();
@@ -101,7 +138,10 @@ if ( ! function_exists( 'pvs_admin_render_report' ) ) {
 			return function_exists( 'esc_html' ) ? esc_html( $value ) : htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
 		};
 
-		$html  = '<div class="pvs-report" data-mocked="true" data-network="false" data-source="stub" data-all-plugins="' . ( ! empty( $result['all_plugins'] ) ? 'true' : 'false' ) . '" data-scan-id="' . $escape( isset( $result['scan_id'] ) ? $result['scan_id'] : '' ) . '">';
+		$provider = isset( $result['provider'] ) && is_scalar( $result['provider'] ) ? (string) $result['provider'] : 'wpscan';
+
+		$html  = '<div class="pvs-report" data-mocked="true" data-network="false" data-source="stub" data-provider="' . $escape( $provider ) . '" data-all-plugins="' . ( ! empty( $result['all_plugins'] ) ? 'true' : 'false' ) . '" data-scan-id="' . $escape( isset( $result['scan_id'] ) ? $result['scan_id'] : '' ) . '">';
+		$html .= '<p class="pvs-provider">' . $escape( sprintf( 'Источник проверки: %s.', isset( $result['provider_label'] ) ? $result['provider_label'] : $provider ) ) . '</p>';
 		$html .= '<p>' . $escape( sprintf( 'Проверено плагинов: %d. Найдено уязвимостей: %d.', isset( $result['plugins_scanned'] ) ? $result['plugins_scanned'] : 0, isset( $result['vulnerability_count'] ) ? $result['vulnerability_count'] : 0 ) ) . '</p>';
 
 		if ( ! empty( $result['severity_counts'] ) && is_array( $result['severity_counts'] ) ) {
@@ -264,11 +304,34 @@ if ( ! class_exists( 'PVS_Admin', false ) ) {
 				return function_exists( 'esc_html' ) ? esc_html( $value ) : htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
 			};
 
+			$providers = function_exists( 'pvs_providers' ) ? pvs_providers() : array();
+			$selected  = isset( $result['provider'] ) && is_scalar( $result['provider'] ) ? (string) $result['provider'] : 'wpscan';
+
 			echo '<div class="wrap">';
 			echo '<h1>' . $escape( 'Проверка всех плагинов на уязвимости' ) . '</h1>';
 			echo '<form method="post" action="' . $escape( function_exists( 'admin_url' ) ? admin_url( 'admin-post.php' ) : '' ) . '">';
 			echo '<input type="hidden" name="action" value="pvs_scan" />';
 			self::nonce_field();
+
+			if ( ! empty( $providers ) && is_array( $providers ) ) {
+				echo '<p><label for="pvs-provider">' . $escape( 'Источник проверки' ) . '</label> ';
+				echo '<select id="pvs-provider" name="provider">';
+
+				foreach ( $providers as $provider_id => $provider ) {
+					if ( ! is_array( $provider ) ) {
+						continue;
+					}
+
+					$label = isset( $provider['label'] ) ? $provider['label'] : $provider_id;
+
+					echo '<option value="' . $escape( $provider_id ) . '"' . ( $provider_id === $selected ? ' selected="selected"' : '' ) . '>' . $escape( $label ) . '</option>';
+				}
+
+				echo '</select></p>';
+			}
+
+			echo '<p><label for="pvs-manual-findings">' . $escape( 'Находки ручного аудита (JSON)' ) . '</label><br />';
+			echo '<textarea id="pvs-manual-findings" name="manual_findings" rows="4" cols="80" placeholder=\'[{"plugin":"slug","title":"...","severity":"high"}]\'></textarea></p>';
 			echo '<button type="submit" class="button button-primary">' . $escape( 'Проверить все плагины' ) . '</button>';
 			echo '</form>';
 			echo pvs_admin_render_report( $result );
@@ -285,7 +348,7 @@ if ( ! class_exists( 'PVS_Admin', false ) ) {
 			}
 
 			self::verify_nonce();
-			pvs_admin_run_scan();
+			pvs_admin_run_scan( null, pvs_admin_request_options( $_POST ) );
 
 			if ( function_exists( 'wp_safe_redirect' ) && function_exists( 'admin_url' ) ) {
 				wp_safe_redirect( admin_url( 'tools.php?page=pvs' ) );
@@ -306,7 +369,7 @@ if ( ! class_exists( 'PVS_Admin', false ) ) {
 				check_ajax_referer( 'pvs_scan', 'pvs_nonce' );
 			}
 
-			$result = pvs_admin_run_scan();
+			$result = pvs_admin_run_scan( null, pvs_admin_request_options( $_REQUEST ) );
 
 			if ( function_exists( 'wp_send_json_success' ) ) {
 				wp_send_json_success( $result );

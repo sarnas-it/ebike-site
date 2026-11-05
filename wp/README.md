@@ -66,6 +66,7 @@ php wp/plugins/velotok-core/tests/provisioning-contract-test.php
 php wp/plugins/pvs/tests/pvs-contract-test.php
 php wp/plugins/pvs/tests/pvs-all-plugins-contract-test.php
 php wp/plugins/pvs/tests/pvs-risk-highlighting-contract-test.php
+php wp/plugins/pvs/tests/pvs-providers-manual-contract-test.php
 node wp/themes/velotok/tests/theme-design-variants-contract.test.js
 node wp/themes/velotok/tests/theme-design-variants-rejected-redgreen.test.js
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
@@ -116,10 +117,14 @@ docker compose down -v    # остановить и удалить базу, ф�
 `wp/plugins/pvs/includes/class-pvs-contract.php`; запуск проверки —
 `pvs_scan_all_plugins()` / `PVS_Scanner::scan()`. Контракт и отчёт помечены
 `mocked => true`, `source => stub`, `network => false`, `all_plugins => true`.
-Страница «Инструменты → Проверка плагинов» защищена nonce и правом
-`manage_options`. Риски подсвечиваются по важности (`critical`, `high`,
-`medium`, `low`) в отчёте и таблице плагинов; CSS подключается в админке.
-Реальная сеть, env, файлы и БД не читаются.
+Поддерживаются источники WPScan, Patchstack и ручной аудит
+(`pvs_contract()['providers']`); провайдер выбирается опцией `provider`, а
+находки ручного аудита передаются в `manual_findings` и подсвечиваются так же,
+как остальные риски. Страница «Инструменты → Проверка плагинов» защищена nonce
+и правом `manage_options`. Риски подсвечиваются по важности (`critical`, `high`,
+`medium`, `low`) в отчёте и таблице плагинов по формату
+`pvs_contract()['highlight_format']`; CSS подключается в админке. Реальная сеть,
+env, файлы и БД не читаются.
 
 ## Структура
 
