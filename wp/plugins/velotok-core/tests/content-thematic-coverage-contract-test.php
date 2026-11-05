@@ -58,8 +58,9 @@ function velotok_content_material( $topic ) {
 			'summary' => 'Сравнение характеристик и линейки оборудования для зелёной энергетики.',
 		),
 		'legal_requirements' => array(
-			'title'   => 'Требования законодательства к ветроэнергетике',
-			'summary' => 'Новые нормативы регулирования и сертификации зелёной энергетики.',
+			'title'      => 'Требования законодательства к ветроэнергетике',
+			'summary'    => 'Новые нормативы регулирования и сертификации зелёной энергетики.',
+			'source_url' => 'https://example.test/legal/wind',
 		),
 		'green_energy_news'  => array(
 			'title'   => 'Новости зелёной энергетики: запущена солнечная электростанция',
@@ -135,6 +136,16 @@ if ( function_exists( 'velotok_core_validate_content_topic' ) ) {
 		velotok_content_contract_assert( false === $negative['matched'], sprintf( 'Посторонний материал не должен получать совпадение с тематикой «%s».', $topic ) );
 		velotok_content_contract_assert( null !== $negative['code'], sprintf( 'Для несоответствия тематике «%s» должен быть код ошибки.', $topic ) );
 	}
+
+	$legal_without_source = velotok_core_validate_content_topic(
+		array(
+			'title'   => 'Требования законодательства к ветроэнергетике',
+			'summary' => 'Нормативы регулирования и сертификации зелёной энергетики.',
+		),
+		'legal_requirements'
+	);
+	velotok_content_contract_assert( false === $legal_without_source['valid'], 'Материал о требованиях законодательства без ссылки на источник не должен признаваться соответствующим.' );
+	velotok_content_contract_assert( in_array( 'source_link', $legal_without_source['missing'], true ), 'Отсутствие ссылки на источник должно фиксироваться в результате.' );
 
 	$promotional = velotok_core_validate_content_topic(
 		array( 'title' => 'Обзор моделей солнечных панелей: купить со скидкой' ),

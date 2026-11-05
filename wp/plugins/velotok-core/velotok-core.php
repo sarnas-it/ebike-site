@@ -36,6 +36,7 @@ require_once VELOTOK_CORE_PATH . 'includes/delivery-order-total.php';
 require_once VELOTOK_CORE_PATH . 'includes/order-delivery.php';
 require_once VELOTOK_CORE_PATH . 'includes/checkout-delivery.php';
 require_once VELOTOK_CORE_PATH . 'includes/content-thematic-coverage.php';
+require_once VELOTOK_CORE_PATH . 'includes/legal-requirements.php';
 require_once VELOTOK_CORE_PATH . 'includes/content-articles.php';
 require_once VELOTOK_CORE_PATH . 'includes/provisioning.php';
 require_once VELOTOK_CORE_PATH . 'includes/class-pvs-contract.php';
