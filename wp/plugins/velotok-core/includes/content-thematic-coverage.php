@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
 }
 
+require_once __DIR__ . '/legal-requirements.php';
+
 /**
  * Return the content thematic coverage contract.
  *
@@ -82,7 +84,8 @@ function velotok_core_content_thematic_contract() {
 				'topic_terms'     => array( 'закон', 'законодательств', 'норматив', 'регулир', 'требован', 'сертифик', 'лиценз', 'гост', 'стандарт' ),
 				'context_terms'   => $context_terms,
 				'forbidden_terms' => array(),
-				'match'           => 'legal term AND green energy context term',
+				'require_source'  => true,
+				'match'           => 'legal term AND green energy context term AND source reference',
 			),
 			'mismatch_code'      => 'LEGAL_REQUIREMENTS_MISMATCH',
 			'promotion_code'     => null,
@@ -413,6 +416,10 @@ function velotok_core_validate_content_topic( $material, $topic ) {
 
 	if ( ! $context_matches && $manual !== $key ) {
 		$missing[] = 'context_signal';
+	}
+
+	if ( ! empty( $criteria['require_source'] ) && '' === velotok_core_legal_requirements_source( $material ) ) {
+		$missing[] = 'source_link';
 	}
 
 	$matched        = array() === $missing;

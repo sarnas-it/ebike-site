@@ -111,6 +111,8 @@ services:
         wp eval-file wp-content/plugins/velotok-core/tests/order-delivery-contract-test.php --allow-root
         echo "Running content thematic coverage contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php --allow-root
+        echo "Running legal requirements contract test:"
+        wp eval-file wp-content/plugins/velotok-core/tests/legal-requirements-contract-test.php --allow-root
         echo "Running content articles contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/content-articles-contract-test.php --allow-root
         echo "Running product catalog contract test:"
