@@ -286,6 +286,27 @@ php wp/plugins/velotok-core/tests/provisioning-contract-test.php
 node wp/plugins/velotok-core/tests/provisioning-contract.test.js
 ```
 
+= Интеграция с платёжной системой (stub) =
+
+Единая точка доступа — `velotok_core_payment_integration_contract()` в `includes/payment-integration.php`. Контракт помечен `mocked => true`, ссылается на спеку `ecommerce-store` и требование `TESTEB-153`.
+
+Правила контракта:
+
+* платёжная система — ЮKassa (`yookassa`, «ЮKassa»); реальное списание денег не выполняется (`network => false`, `real_integration.required => false`);
+* поддерживаемые статусы оплаты: `pending`, `waiting_for_capture`, `succeeded`, `canceled`; `succeeded` — финальный оплаченный статус;
+* `velotok_core_payment_integration_create()` / `velotok_core_payment_integration_process()` создают mocked-платёж из суммы заказа с валютой RUB и внутренней ссылкой подтверждения `mock://yookassa/...`; платёж создаётся в статусе `pending` и не считается оплаченным;
+* `velotok_core_payment_integration_status()` разрешает статус, `velotok_core_payment_integration_confirm()` применяет mocked-переход, а `velotok_core_payment_integration_is_paid()` возвращает `true` только для `succeeded`;
+* `velotok_core_payment_integration_validate()` проверяет провайдера, валюту, сумму и статус; ошибки: `PAYMENT_PROVIDER_UNSUPPORTED`, `PAYMENT_AMOUNT_INVALID`, `PAYMENT_CURRENCY_UNSUPPORTED`, `PAYMENT_STATUS_INVALID`;
+* имена будущих env-переменных (`VELOTOK_YOOKASSA_SHOP_ID`, `VELOTOK_YOOKASSA_SECRET_KEY`, `VELOTOK_YOOKASSA_MODE`) только вычисляются, env не читается;
+* реальная интеграция не требуется; открытые вопросы о провайдере, режимах, статусах, подтверждении и синхронизации заказа перечислены в `velotok_core_payment_integration_open_questions()` (`clarify-096bb945`).
+
+Запуск контрактного теста интеграции с платёжной системой:
+
+```bash
+php wp/plugins/velotok-core/tests/payment-integration-contract-test.php
+node wp/plugins/velotok-core/tests/payment-integration-contract.test.js
+```
+
 == Installation ==
 
 1. Убедитесь, что установлен и активирован WooCommerce.

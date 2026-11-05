@@ -44,6 +44,7 @@ php wp/plugins/velotok-core/tests/product-price-validation-contract-test.php
 php wp/plugins/velotok-core/tests/product-extra-attributes-contract-test.php
 php wp/themes/velotok/tests/extra-attributes-card-test.php
 php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
+php wp/plugins/velotok-core/tests/payment-integration-contract-test.php
 php wp/plugins/velotok-core/tests/delivery-options-contract-test.php
 php wp/plugins/velotok-core/tests/delivery-order-total-contract-test.php
 php wp/plugins/velotok-core/tests/order-delivery-contract-test.php
@@ -62,6 +63,7 @@ node wp/plugins/velotok-core/tests/product-description-validation-contract.test.
 node wp/plugins/velotok-core/tests/product-price-validation-contract.test.js
 node wp/plugins/velotok-core/tests/product-extra-attributes-contract.test.js
 node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
+node wp/plugins/velotok-core/tests/payment-integration-contract.test.js
 node wp/plugins/velotok-core/tests/delivery-options-contract.test.js
 node wp/plugins/velotok-core/tests/delivery-order-total-contract.test.js
 node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
@@ -94,6 +96,7 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/plugins/velotok-core/includes/content-articles.php` — mocked-контракт контентных статей о товарах и магазине;
 * `wp/plugins/velotok-core/includes/catalog.php` — mocked-контракт каталога электровелосипедов;
 * `wp/plugins/velotok-core/includes/cart.php` — mocked-контракт корзины для оформления заказа;
+* `wp/plugins/velotok-core/includes/payment-integration.php` — mocked-контракт интеграции с платёжной системой для оплаты заказов;
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
 * `wp/cli/wp-entrypoint.sh` — обёртка WP-CLI для контейнера `wpcli`;
