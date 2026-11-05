@@ -3,6 +3,7 @@
 
 const assert = require('assert');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
@@ -87,6 +88,19 @@ if (php.status === 0) {
 
   assert.strictEqual(result.status, 0, 'PHP contract test failed');
   console.log('PASS: checkout delivery stub contract verified with PHP');
+
+  const redGreenRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'velotok-order-delivery-'));
+  try {
+    const redGreenTest = path.join(redGreenRoot, 'tests', 'order-delivery-contract-test.php');
+    fs.mkdirSync(path.dirname(redGreenTest), { recursive: true });
+    fs.copyFileSync(phpTestPath, redGreenTest);
+
+    const redGreen = spawnSync('php', [redGreenTest], { encoding: 'utf8' });
+    assert.notStrictEqual(redGreen.status, 0, 'Contract test must fail when the delivery stub is missing');
+    console.log('PASS: contract test fails without the delivery stub (red-green)');
+  } finally {
+    fs.rmSync(redGreenRoot, { recursive: true, force: true });
+  }
 } else {
   console.log('PASS: checkout delivery stub structure and mocked markers verified (PHP not available)');
 }

@@ -42,10 +42,14 @@ echo "Running delivery options contract test:"
 wp eval-file wp-content/plugins/velotok-core/tests/delivery-options-contract-test.php --allow-root
 echo "Running delivery order total contract test:"
 wp eval-file wp-content/plugins/velotok-core/tests/delivery-order-total-contract-test.php --allow-root
+echo "Running order delivery stub contract test:"
+wp eval-file wp-content/plugins/velotok-core/tests/order-delivery-contract-test.php --allow-root
 echo "Running content thematic coverage contract test:"
 wp eval-file wp-content/plugins/velotok-core/tests/content-thematic-coverage-contract-test.php --allow-root
 echo "Running content articles contract test:"
 wp eval-file wp-content/plugins/velotok-core/tests/content-articles-contract-test.php --allow-root
+echo "Running product catalog contract test:"
+wp eval-file wp-content/plugins/velotok-core/tests/catalog-contract-test.php --allow-root
 echo "Running provisioning stub contract test:"
 wp eval-file wp-content/plugins/velotok-core/tests/provisioning-contract-test.php --allow-root
 exec tail -f /dev/null
