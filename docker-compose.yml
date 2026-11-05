@@ -67,7 +67,7 @@ services:
       - ./scripts:/var/www/html/scripts:ro
       - ./content:/var/www/html/content:ro
       - ./assets:/var/www/html/assets:ro
-    entrypoint: ["/opt/velotok/cli/wp-entrypoint.sh"]
+    entrypoint: ["/bin/sh", "/opt/velotok/cli/wp-entrypoint.sh"]
     command: ["bootstrap"]
 
 volumes:

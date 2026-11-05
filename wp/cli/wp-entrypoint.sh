@@ -7,7 +7,7 @@ set -eu
 
 if [ "${1:-}" = "bootstrap" ]; then
 	shift
-	exec /opt/velotok/cli/bootstrap.sh
+	exec /bin/sh /opt/velotok/cli/bootstrap.sh
 fi
 
 if [ "$#" -eq 0 ]; then

@@ -90,6 +90,24 @@ assert.ok(
   'Selection helper must persist the selected variant in the manifest'
 );
 
+const composePath = path.resolve(wpRoot, '..', 'docker-compose.yml');
+const entrypointPath = path.join(wpRoot, 'cli', 'wp-entrypoint.sh');
+const bootstrapPath = path.join(wpRoot, 'cli', 'bootstrap.sh');
+const compose = fs.readFileSync(composePath, 'utf8');
+const entrypoint = fs.readFileSync(entrypointPath, 'utf8');
+const isExecutable = (file) => (fs.statSync(file).mode & 0o111) !== 0;
+
+assert.ok(
+  /entrypoint:\s*\["\/bin\/sh",\s*"\/opt\/velotok\/cli\/wp-entrypoint\.sh"\]/.test(compose),
+  'wpcli entrypoint must invoke the script through /bin/sh so it runs even without the executable bit'
+);
+assert.ok(
+  entrypoint.includes('/bin/sh /opt/velotok/cli/bootstrap.sh'),
+  'wp-entrypoint.sh must run bootstrap.sh through /bin/sh instead of executing it directly'
+);
+assert.ok(isExecutable(entrypointPath), 'wp-entrypoint.sh must be executable');
+assert.ok(isExecutable(bootstrapPath), 'bootstrap.sh must be executable');
+
 const php = spawnSync('php', ['-v'], { encoding: 'utf8' });
 
 if (php.status === 0) {
