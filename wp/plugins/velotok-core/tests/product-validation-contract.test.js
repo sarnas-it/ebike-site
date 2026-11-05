@@ -20,6 +20,8 @@ function includes(fragment, message) {
 
 includes('clarify-9e1a1acd', 'Contract must reference spec clarify-9e1a1acd');
 includes('velotok_core_product_validation_contract', 'Contract accessor is missing');
+includes('velotok_core_product_attribute_rule', 'Per-attribute rule accessor is missing');
+includes('velotok_core_required_attributes_contract', 'Category attributes contract accessor is missing');
 includes('velotok_core_get_required_attributes', 'Required attributes accessor is missing');
 includes('velotok_core_validate_product_title', 'Dedicated title validator is missing');
 includes('velotok_core_validate_product_description', 'Description validator is missing');
@@ -45,6 +47,12 @@ for (const code of [
 assert.ok(
   /'mocked'\s*=>\s*true/.test(source),
   'Contract root must be explicitly marked mocked: true'
+);
+
+const mockedMarkers = source.match(/'mocked'\s*=>\s*true/g) || [];
+assert.ok(
+  mockedMarkers.length >= 5,
+  'Contract root and every required attribute rule must be explicitly marked mocked: true'
 );
 
 const forbidden = [

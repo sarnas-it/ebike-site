@@ -65,6 +65,8 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 Правило описания вынесено в отдельную заглушку `velotok_core_description_validation_contract()` с пометкой `mocked => true`; `velotok_core_validate_product_description()` читает код ошибки из этого правила.
 
+Каждое правило обязательного атрибута хранится в заглушке отдельно, помечено `mocked => true` и ссылается на спеку; перечень категории возвращает `velotok_core_required_attributes_contract()`.
+
 Правило цены вынесено в отдельную заглушку `velotok_core_price_validation_contract()` с пометкой `mocked => true`; `velotok_core_validate_product_price()` читает коды ошибок из этого правила, разрешает ноль (`allow_zero => true`) и запрещает отрицательные значения (`allow_negative => false`).
 
 Запуск контрактных тестов валидации:
@@ -72,6 +74,8 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 ```bash
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
+php wp/plugins/velotok-core/tests/product-required-attributes-contract-test.php
+node wp/plugins/velotok-core/tests/product-required-attributes-contract.test.js
 php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
 php wp/plugins/velotok-core/tests/product-price-validation-contract-test.php
@@ -166,6 +170,26 @@ node wp/plugins/velotok-core/tests/delivery-options-contract.test.js
 ```bash
 php wp/plugins/velotok-core/tests/delivery-order-total-contract-test.php
 node wp/plugins/velotok-core/tests/delivery-order-total-contract.test.js
+```
+
+= Оформление доставки заказа (stub) =
+
+Единая точка доступа — `velotok_core_order_delivery_contract()` в `includes/order-delivery.php`. Контракт помечен `mocked => true`, ссылается на спеку `clarify-b0e1a6d7`, родительскую спецификацию `clarify-a8fe76a0` и спецификацию оформления заказа `clarify-096bb945`.
+
+Правила контракта:
+
+* при оформлении заказа доступны способы доставки stub-провайдера: `russian_post` («Почта РФ»), `cdek` («СДЭК») и `other` («Иной логист»); список отдаёт `velotok_core_order_delivery_options()`;
+* выбранный способ проверяет `velotok_core_validate_order_delivery_method()`: пустой выбор даёт `DELIVERY_METHOD_REQUIRED`, неизвестный — `DELIVERY_METHOD_INVALID`;
+* стоимость доставки рассчитывает `velotok_core_order_delivery_cost()` по тарифной сетке stub-провайдера; расчёт не обращается к сети, env, файлам и БД;
+* `velotok_core_order_delivery_totals()` возвращает подытог, стоимость доставки и итоговую сумму заказа, в которую стоимость доставки включена (`delivery_in_total => true`); без явного выбора применяется способ по умолчанию;
+* `velotok_core_save_checkout_delivery()` сохраняет способ и стоимость в полях заказа (`delivery_method`, `delivery_cost`, `shipping_method`, `shipping_cost`) и meta-полях; `velotok_core_apply_checkout_delivery()` обновляет массив заказа по ссылке;
+* реальная интеграция со службами доставки не выполняется (`real_integration.required => false`); открытые вопросы о перечне служб, тарифах, протоколах и зависимости от адреса перечислены в `velotok_core_order_delivery_open_questions()`.
+
+Запуск контрактного теста оформления доставки заказа:
+
+```bash
+php wp/plugins/velotok-core/tests/order-delivery-contract-test.php
+node wp/plugins/velotok-core/tests/order-delivery-contract.test.js
 ```
 
 = Тематический охват контента (stub) =
