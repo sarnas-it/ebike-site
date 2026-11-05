@@ -63,11 +63,15 @@ node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 
 Валидаторы не читают базу данных, файлы, медиатеку и внешние сервисы. Реальная интеграция с хранилищем изображений и справочником категорий не требуется.
 
-Запуск контрактного теста валидации:
+Правило описания вынесено в отдельную заглушку `velotok_core_description_validation_contract()` с пометкой `mocked => true`; `velotok_core_validate_product_description()` читает код ошибки из этого правила.
+
+Запуск контрактных тестов валидации:
 
 ```bash
 php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
+php wp/plugins/velotok-core/tests/product-description-validation-contract-test.php
+node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
 ```
 
 = Оформление заказа, доставка и оплата (stub) =

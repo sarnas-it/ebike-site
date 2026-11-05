@@ -56,9 +56,13 @@ function velotok_core_product_validation_contract() {
 			),
 		),
 		'description' => array(
-			'required'    => true,
-			'type'        => 'string',
-			'error_codes' => array(
+			'required'         => true,
+			'type'             => 'string',
+			'mocked'           => true,
+			'spec'             => 'clarify-9e1a1acd',
+			'trim'             => true,
+			'blank_is_missing' => true,
+			'error_codes'      => array(
 				'required' => 'DESCRIPTION_REQUIRED',
 			),
 		),
@@ -204,7 +208,13 @@ function velotok_core_validation_strlen( $value ) {
 		return (int) mb_strlen( $value, 'UTF-8' );
 	}
 
-	return (int) strlen( $value );
+	$matched = preg_match_all( '/./us', (string) $value, $characters );
+
+	if ( false !== $matched ) {
+		return (int) $matched;
+	}
+
+	return (int) strlen( (string) $value );
 }
 
 /**
@@ -266,19 +276,40 @@ function velotok_core_validate_title( $title ) {
 }
 
 /**
+ * Return the mocked description validation rule.
+ *
+ * The rule is a fixed in-memory stub for spec clarify-9e1a1acd and is the
+ * single source for description validation. It never reads the database,
+ * files, media library or remote services.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_description_validation_contract() {
+	$contract = velotok_core_product_validation_contract();
+
+	return $contract['attributes']['description'];
+}
+
+/**
  * Validate a product description.
  *
  * Empty strings, whitespace-only strings and non-scalar values produce
- * DESCRIPTION_REQUIRED.
+ * DESCRIPTION_REQUIRED. The rule is taken from the mocked description
+ * validation contract.
  *
  * @param mixed $description Product description.
  * @return array<string,mixed>
  */
 function velotok_core_validate_product_description( $description ) {
-	$value = is_scalar( $description ) ? trim( (string) $description ) : '';
+	$rule  = velotok_core_description_validation_contract();
+	$value = is_scalar( $description ) ? (string) $description : '';
+
+	if ( ! empty( $rule['trim'] ) ) {
+		$value = trim( $value );
+	}
 
 	if ( '' === $value ) {
-		return velotok_core_validation_result( false, 'DESCRIPTION_REQUIRED', $description );
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $description );
 	}
 
 	return velotok_core_validation_result( true, null, $description );
