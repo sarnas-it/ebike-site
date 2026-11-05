@@ -74,6 +74,28 @@ php wp/plugins/velotok-core/tests/product-description-validation-contract-test.p
 node wp/plugins/velotok-core/tests/product-description-validation-contract.test.js
 ```
 
+= Дополнительные атрибуты товара (stub) =
+
+Единая точка доступа — `velotok_core_product_extra_attributes_contract()` в `includes/product-extra-attributes.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-2c698d44`.
+
+Обязательные атрибуты карточки (`photo`, `title`, `description`, `price`) не входят в набор дополнительных. Дополнительные атрибуты задаются произвольно: контракт разрешает любые ключи, известные ключи получают подпись и порядок из справочника, неизвестные — человекочитаемую подпись.
+
+Правила контракта:
+
+* `velotok_core_get_product_extra_attributes()` возвращает готовый к выводу список `key`, `label`, `value`, `type`; принимает данные товара, slug, объект, id или явный массив атрибутов;
+* пустые значения скрываются (`empty_value => hidden`), произвольные ключи выводятся (`unknown_attribute => rendered_humanized`);
+* значения берутся из mocked-набора `stub_values` по slug товара; реальная БД, файлы, seller API и env не читаются;
+* шаблон карточки выводит блок `.model-extra`, страница товара — `.product-extra`; при отсутствии плагина дополнительный блок просто не показывается.
+
+Открытые вопросы об обязательных атрибутах после появления продавцов, источнике данных и фильтрации каталога перечислены в `velotok_core_extra_attributes_open_questions()`.
+
+Запуск контрактного теста дополнительных атрибутов:
+
+```bash
+php wp/plugins/velotok-core/tests/product-extra-attributes-contract-test.php
+node wp/plugins/velotok-core/tests/product-extra-attributes-contract.test.js
+```
+
 = Оформление заказа, доставка и оплата (stub) =
 
 Единая точка доступа — `velotok_core_checkout_contract()` в `includes/checkout-payment-delivery.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-096bb945`.

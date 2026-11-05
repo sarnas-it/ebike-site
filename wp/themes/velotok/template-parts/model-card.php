@@ -36,6 +36,24 @@ if ( empty( $velotok_model['name'] ) ) {
 				<li><span><?php echo esc_html( $velotok_spec[0] ); ?></span><strong><?php echo esc_html( $velotok_spec[1] ); ?></strong></li>
 			<?php endforeach; ?>
 		</ul>
+		<?php if ( ! empty( $velotok_model['extra_attributes'] ) && is_array( $velotok_model['extra_attributes'] ) ) : ?>
+			<dl class="model-extra">
+				<?php foreach ( $velotok_model['extra_attributes'] as $velotok_extra ) : ?>
+					<?php
+					$velotok_extra_label = isset( $velotok_extra['label'] ) ? $velotok_extra['label'] : ( isset( $velotok_extra[0] ) ? $velotok_extra[0] : '' );
+					$velotok_extra_value = isset( $velotok_extra['value'] ) ? $velotok_extra['value'] : ( isset( $velotok_extra[1] ) ? $velotok_extra[1] : '' );
+
+					if ( '' === trim( (string) $velotok_extra_value ) ) {
+						continue;
+					}
+					?>
+					<div class="model-extra-row">
+						<dt><?php echo esc_html( $velotok_extra_label ); ?></dt>
+						<dd><?php echo esc_html( $velotok_extra_value ); ?></dd>
+					</div>
+				<?php endforeach; ?>
+			</dl>
+		<?php endif; ?>
 		<div class="model-foot">
 			<div class="price">
 				<?php echo wp_kses_post( $velotok_model['price_html'] ); ?>

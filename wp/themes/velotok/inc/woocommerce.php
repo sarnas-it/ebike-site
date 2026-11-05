@@ -172,6 +172,28 @@ function velotok_product_image_html( $product, $alt ) {
 }
 
 /**
+ * Дополнительные атрибуты товара из mocked-контракта плагина.
+ *
+ * Если плагин не активирован, карточка просто не показывает дополнительный
+ * блок: обязательные атрибуты остаются на месте.
+ *
+ * @param mixed $product Товар, slug или данные товара.
+ * @param mixed $values  Явные дополнительные атрибуты.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_product_extra_attributes( $product = 0, $values = null ) {
+	if ( function_exists( 'velotok_core_get_product_extra_attributes' ) ) {
+		$items = velotok_core_get_product_extra_attributes( $product, $values );
+
+		if ( is_array( $items ) ) {
+			return $items;
+		}
+	}
+
+	return array();
+}
+
+/**
  * Собирает характеристики товара из post meta.
  *
  * @param int $product_id ID товара.
@@ -294,7 +316,7 @@ function velotok_normalize_product( $product, $index = 0 ) {
 	$price      = (float) $product->get_price();
 	$price_html = $product->get_price_html();
 	$note       = '';
-	$months     = max( 1, (int) velotok_spec_value( 'installment_months', 24 ) );
+	$months     = max( 1, (int) ( function_exists( 'velotok_spec_value' ) ? velotok_spec_value( 'installment_months', 24 ) : 24 ) );
 
 	if ( $price > 0 ) {
 		$note = sprintf(
@@ -305,6 +327,7 @@ function velotok_normalize_product( $product, $index = 0 ) {
 	}
 
 	$badge = trim( (string) get_post_meta( $product->get_id(), '_velotok_badge', true ) );
+	$extra = velotok_product_extra_attributes( $product->get_slug() );
 
 	return array(
 		'id'             => (int) $product->get_id(),
@@ -317,9 +340,10 @@ function velotok_normalize_product( $product, $index = 0 ) {
 		'category_label' => velotok_product_category_label( $product ),
 		'badge'          => $badge,
 		'badge_lime'     => in_array( $badge, array( 'Хит', 'Выбор механиков', 'Новинка' ), true ),
-		'number'         => $index ? sprintf( '%02d', (int) $index ) : '',
-		'specs'          => velotok_product_specs( $product->get_id() ),
-		'price_html'     => $price_html ? $price_html : esc_html__( 'Цена по запросу', 'velotok' ),
+		'number'           => $index ? sprintf( '%02d', (int) $index ) : '',
+		'specs'            => velotok_product_specs( $product->get_id() ),
+		'extra_attributes' => $extra,
+		'price_html'       => $price_html ? $price_html : esc_html__( 'Цена по запросу', 'velotok' ),
 		'price_note'     => $note,
 		'add_html'       => velotok_product_add_button( $product ),
 	);
@@ -442,7 +466,7 @@ function velotok_fallback_models() {
  */
 function velotok_normalize_fallback_model( $model, $index = 0 ) {
 	$price  = isset( $model['price'] ) ? (int) $model['price'] : 0;
-	$months = max( 1, (int) velotok_spec_value( 'installment_months', 24 ) );
+	$months = max( 1, (int) ( function_exists( 'velotok_spec_value' ) ? velotok_spec_value( 'installment_months', 24 ) : 24 ) );
 	$specs  = array();
 
 	if ( ! empty( $model['range'] ) ) {
@@ -483,6 +507,8 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 		esc_attr( sprintf( __( 'Электровелосипед «%s»', 'velotok' ), $model['name'] ) )
 	);
 
+	$extra = velotok_product_extra_attributes( $model['slug'] );
+
 	return array(
 		'id'             => 0,
 		'card_id'        => 'model-' . $model['slug'],
@@ -494,9 +520,10 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 		'category_label' => $model['category_label'],
 		'badge'          => $model['badge'],
 		'badge_lime'     => ! empty( $model['badge_lime'] ),
-		'number'         => $index ? sprintf( '%02d', (int) $index ) : '',
-		'specs'          => $specs,
-		'price_html'     => number_format_i18n( $price, 0 ) . ' ₽',
+		'number'           => $index ? sprintf( '%02d', (int) $index ) : '',
+		'specs'            => $specs,
+		'extra_attributes' => $extra,
+		'price_html'       => number_format_i18n( $price, 0 ) . ' ₽',
 		'price_note'     => $price > 0
 			/* translators: %s: сумма ежемесячного платежа. */
 			? sprintf( __( 'в рассрочку %s ₽/мес', 'velotok' ), number_format_i18n( (int) round( $price / $months ), 0 ) )
