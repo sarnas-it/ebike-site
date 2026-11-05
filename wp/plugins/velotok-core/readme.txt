@@ -70,6 +70,28 @@ php wp/plugins/velotok-core/tests/product-validation-contract-test.php
 node wp/plugins/velotok-core/tests/product-validation-contract.test.js
 ```
 
+= Оформление заказа, доставка и оплата (stub) =
+
+Единая точка доступа — `velotok_core_checkout_contract()` в `includes/checkout-payment-delivery.php`. Контракт помечен `mocked => true` и ссылается на спеку `clarify-096bb945`.
+
+Правила контракта:
+
+* оплата выполняется через ЮKassa (`velotok_core_payment_provider()`); реальный запрос не отправляется, `velotok_core_create_payment_intent()` возвращает mocked-намерение со статусом `pending`;
+* доступны три способа доставки: `russian_post` («Почта РФ»), `cdek` («СДЭК») и `other` («Иной логист»); выбор проверяет `velotok_core_validate_delivery_method()`;
+* без выбранного способа доставки возвращается `DELIVERY_METHOD_REQUIRED`, для неизвестного способа — `DELIVERY_METHOD_INVALID`;
+* контент требует приёмки человеком с ролью руководитель проекта (`project_manager`); без приёмки возвращается `CONTENT_ACCEPTANCE_REQUIRED`;
+* стоимость доставки в заглушке не рассчитывается: возвращается нулевая сумма с пометкой `mocked => true`;
+* имена будущих env-переменных ЮKassa (`VELOTOK_YOOKASSA_SHOP_ID`, `VELOTOK_YOOKASSA_SECRET_KEY`, `VELOTOK_YOOKASSA_MODE`) только вычисляются, env не читается.
+
+Нерешённые вопросы по test/prod режимам ЮKassa, API Почты РФ и СДЭК и расчёту стоимости доставки перечислены в `velotok_core_checkout_open_questions()`.
+
+Запуск контрактного теста оформления заказа:
+
+```bash
+php wp/plugins/velotok-core/tests/checkout-payment-delivery-contract-test.php
+node wp/plugins/velotok-core/tests/checkout-payment-delivery-contract.test.js
+```
+
 == Installation ==
 
 1. Убедитесь, что установлен и активирован WooCommerce.
