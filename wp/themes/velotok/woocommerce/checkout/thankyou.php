@@ -25,7 +25,7 @@ if ( $order->has_status( 'failed' ) ) {
 	?>
 	<div class="thankyou-card">
 		<h2><?php esc_html_e( 'Оплата не прошла', 'velotok' ); ?></h2>
-		<p><?php esc_html_e( 'Попробуйте оформить заказ ещё раз или свяжитесь с менеджером. Если оплата не нужна — выберите оплату при получении.', 'velotok' ); ?></p>
+		<p><?php esc_html_e( 'Попробуйте оформить заказ ещё раз или свяжитесь с менеджером.', 'velotok' ); ?></p>
 		<a class="btn btn-dark" href="<?php echo esc_url( $order->get_checkout_payment_url() ); ?>"><?php esc_html_e( 'Повторить оплату', 'velotok' ); ?></a>
 	</div>
 	<?php
@@ -57,7 +57,7 @@ do_action( 'woocommerce_before_thankyou', $order->get_id() );
 		<li><span><?php esc_html_e( 'Почта', 'velotok' ); ?></span><strong><?php echo esc_html( $order->get_billing_email() ); ?></strong></li>
 	</ul>
 
-	<p class="cart-note"><?php esc_html_e( 'Оплата при получении. Если нужно что-то изменить в заказе, просто скажите менеджеру.', 'velotok' ); ?></p>
+	<p class="cart-note"><?php esc_html_e( 'Если нужно что-то изменить в заказе, просто скажите менеджеру.', 'velotok' ); ?></p>
 
 	<div class="thankyou-actions">
 		<a class="btn btn-primary" href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>"><?php esc_html_e( 'Вернуться в каталог', 'velotok' ); ?></a>
