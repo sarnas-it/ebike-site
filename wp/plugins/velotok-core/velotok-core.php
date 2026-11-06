@@ -28,6 +28,7 @@ require_once VELOTOK_CORE_PATH . 'includes/cart.php';
 require_once VELOTOK_CORE_PATH . 'includes/guest-cart-registration.php';
 require_once VELOTOK_CORE_PATH . 'includes/guest-cart-checkout-redirect.php';
 require_once VELOTOK_CORE_PATH . 'includes/product-validation.php';
+require_once VELOTOK_CORE_PATH . 'includes/catalog-validation.php';
 require_once VELOTOK_CORE_PATH . 'includes/product-extra-attributes.php';
 require_once VELOTOK_CORE_PATH . 'includes/checkout-payment-delivery.php';
 require_once VELOTOK_CORE_PATH . 'includes/payment-integration.php';

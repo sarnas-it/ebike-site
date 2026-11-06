@@ -36,7 +36,7 @@ function velotok_core_product_validation_contract() {
 		return $contract;
 	}
 
-	$required = array( 'photo', 'title', 'description', 'price' );
+	$required = array( 'model', 'photo', 'title', 'description', 'price' );
 
 	$attributes = array(
 		'photo'       => array(
@@ -78,7 +78,7 @@ function velotok_core_product_validation_contract() {
 			'spec'             => 'clarify-9e1a1acd',
 			'trim'             => true,
 			'blank_is_missing' => true,
-			'allow_zero'       => true,
+			'allow_zero'       => false,
 			'allow_negative'   => false,
 			'error_codes'      => array(
 				'required' => 'PRICE_REQUIRED',
@@ -103,15 +103,13 @@ function velotok_core_product_validation_contract() {
 		'required_attributes'          => $required,
 		'attributes'                   => $attributes,
 		'limits'                       => array(
-			'title_max_length'       => 200,
-			'description_max_length' => null,
+			'title_max_length'       => 120,
+			'description_max_length' => 5000,
 		),
 		'supported_image_mime_types'   => array(
 			'image/jpeg',
 			'image/png',
-			'image/gif',
 			'image/webp',
-			'image/avif',
 		),
 		'category_required_attributes' => $category_attributes,
 		'category_source'              => 'local_stub',
