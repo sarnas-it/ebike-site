@@ -18,8 +18,16 @@ while ( have_posts() ) :
 	}
 
 	$velotok_tagline = trim( (string) get_post_meta( $product->get_id(), '_velotok_tagline', true ) );
+	$velotok_color   = '';
+	$velotok_attrs   = $product->get_attributes();
+	if ( isset( $velotok_attrs['pa_color'] ) && $velotok_attrs['pa_color']->is_taxonomy() ) {
+		$velotok_color_terms = wc_get_product_terms( $product->get_id(), 'pa_color', array( 'fields' => 'names' ) );
+		if ( ! is_wp_error( $velotok_color_terms ) ) {
+			$velotok_color = implode( ', ', $velotok_color_terms );
+		}
+	}
 	?>
-	<main id="main" class="page-main">
+	<main id="main" class="page-main" data-product-model="<?php echo esc_attr( $product->get_sku() ); ?>" data-product-color="<?php echo esc_attr( $velotok_color ); ?>">
 		<div class="wrap product-breadcrumbs">
 			<?php
 			woocommerce_breadcrumb( array(
@@ -35,22 +43,22 @@ while ( have_posts() ) :
 				<?php do_action( 'woocommerce_before_single_product' ); ?>
 
 				<div class="product-layout">
-					<div class="product-gallery">
+					<div class="product-gallery" data-product-photo>
 						<?php woocommerce_show_product_sale_flash(); ?>
 						<?php woocommerce_show_product_images(); ?>
 					</div>
 
 					<div class="product-summary">
 						<p class="label"><?php echo esc_html( velotok_product_category_label( $product ) ); ?></p>
-						<?php woocommerce_template_single_title(); ?>
+						<div data-product-title><?php woocommerce_template_single_title(); ?></div>
 
 						<?php if ( '' !== $velotok_tagline ) : ?>
 							<p class="product-tagline"><?php echo esc_html( $velotok_tagline ); ?></p>
 						<?php endif; ?>
 
 						<?php woocommerce_template_single_rating(); ?>
-						<div class="product-price"><?php woocommerce_template_single_price(); ?></div>
-						<?php woocommerce_template_single_excerpt(); ?>
+						<div class="product-price" data-product-price="<?php echo esc_attr( $product->get_price() ); ?>"><?php woocommerce_template_single_price(); ?></div>
+						<div data-product-description><?php woocommerce_template_single_excerpt(); ?></div>
 
 						<ul class="product-specs">
 							<?php foreach ( velotok_product_specs( $product->get_id() ) as $velotok_spec ) : ?>

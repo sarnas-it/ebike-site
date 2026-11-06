@@ -18,6 +18,8 @@ $velotok_includes = array(
 	'inc/security.php',
 	'inc/woocommerce.php',
 	'inc/theme-design-variants.php',
+	'inc/catalog-rules.php',
+	'inc/catalog-query.php',
 );
 
 foreach ( $velotok_includes as $velotok_file ) {

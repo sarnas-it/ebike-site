@@ -483,6 +483,7 @@ function velotok_normalize_product( $product, $index = 0 ) {
 
 	return array(
 		'id'               => (int) $product->get_id(),
+		'sku'              => (string) $product->get_sku(),
 		'card_id'          => 'model-' . $product->get_slug(),
 		'slug'             => $product->get_slug(),
 		'name'             => $name,

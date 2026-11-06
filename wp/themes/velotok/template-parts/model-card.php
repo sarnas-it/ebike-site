@@ -38,7 +38,7 @@ $velotok_required_attributes = function_exists( 'velotok_product_card_required_a
 $velotok_card_id = isset( $velotok_model['card_id'] ) ? $velotok_model['card_id'] : '';
 $velotok_url     = isset( $velotok_model['url'] ) ? $velotok_model['url'] : '';
 ?>
-<article class="model-card" id="<?php echo esc_attr( $velotok_card_id ); ?>" data-product-card="true" data-required-attributes="<?php echo esc_attr( implode( ' ', $velotok_required_attributes ) ); ?>">
+<article class="model-card" id="<?php echo esc_attr( $velotok_card_id ); ?>" data-product-card="true" data-sku="<?php echo esc_attr( isset( $velotok_model['sku'] ) ? $velotok_model['sku'] : '' ); ?>" data-required-attributes="<?php echo esc_attr( implode( ' ', $velotok_required_attributes ) ); ?>">
 	<div class="model-media" data-card-attribute="photo">
 		<?php if ( ! empty( $velotok_model['badge'] ) ) : ?>
 			<span class="badge<?php echo ! empty( $velotok_model['badge_lime'] ) ? ' badge--lime' : ''; ?>"><?php echo esc_html( $velotok_model['badge'] ); ?></span>
@@ -48,7 +48,7 @@ $velotok_url     = isset( $velotok_model['url'] ) ? $velotok_model['url'] : '';
 	<div class="model-body">
 		<div class="model-top">
 			<span><?php echo esc_html( isset( $velotok_model['category_label'] ) ? $velotok_model['category_label'] : '' ); ?></span>
-			<span><?php echo esc_html( isset( $velotok_model['number'] ) ? $velotok_model['number'] : '' ); ?></span>
+			<span data-card-attribute="model"><?php echo esc_html( isset( $velotok_model['sku'] ) ? $velotok_model['sku'] : '' ); ?></span>
 		</div>
 		<h3 class="model-title" data-card-attribute="title"><a href="<?php echo esc_url( $velotok_url ); ?>"><?php echo esc_html( $velotok_card['title'] ); ?></a></h3>
 		<p class="model-description" data-card-attribute="description"><?php echo esc_html( $velotok_card['description'] ); ?></p>
