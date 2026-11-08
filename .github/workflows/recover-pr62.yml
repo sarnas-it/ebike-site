@@ -1,4 +1,5 @@
 name: Recover PR #62 checks
+run-name: Recover PR #62 checks for 578e87b5a8587d6078aade92d26bd449448dd1d3
 
 # The pull request #62 head commit 578e87b predates any workflow file, so GitHub
 # never created a run for it and will not do so retroactively. This workflow
@@ -81,6 +82,33 @@ jobs:
             --sha "$TARGET_SHA" \
             --results "$RUNNER_TEMP/checks.json" \
             --details-url "$CI_RUN_URL" \
-            --summary "Recovered checks for PR #${TARGET_PR} at ${TARGET_SHA}" \
+            --summary "Recovered checks for PR #${TARGET_PR} at ${TARGET_SHA}"
+
+      - name: Publish evidence comment with this run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tooling/scripts/ci/publish-evidence.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$TARGET_PR" \
+            --sha "$TARGET_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --workflow .github/workflows/recover-pr62.yml \
             --comment-file tooling/docs/testeb-63-comment.md \
-            --comment-marker '<!-- testeb-63-recovery -->'
+            --comment-marker '<!-- testeb-63-recovery -->' \
+            --allow-running
+
+      - name: Verify recorded recovery evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tooling/scripts/ci/publish-evidence.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$TARGET_PR" \
+            --sha "$TARGET_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --workflow .github/workflows/recover-pr62.yml \
+            --allow-running \
+            --dry-run

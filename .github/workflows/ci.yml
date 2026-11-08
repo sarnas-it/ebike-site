@@ -72,7 +72,7 @@ jobs:
       - name: Test CI repair tooling
         run: |
           set -e
-          node scripts/ci/tests/repair-pr-checks.test.mjs
-          node scripts/ci/tests/recover-pr.test.mjs
-          node scripts/ci/tests/run-checks.test.mjs
-          node scripts/ci/tests/workflow-triggers.test.mjs
+          for test in scripts/ci/tests/*.test.mjs; do
+            echo "== ${test}"
+            node "${test}"
+          done

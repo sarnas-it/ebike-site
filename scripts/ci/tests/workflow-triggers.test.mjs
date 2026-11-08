@@ -152,6 +152,10 @@ function recoveryWorkflowChecks(text) {
     checksOutExactSha: /ref:\s*(?:\$\{\{\s*env\.TARGET_SHA\s*\}\}|578e87b5a8587d6078aade92d26bd449448dd1d3)/.test(text),
     runsSharedChecks: /scripts\/ci\/run-checks\.sh/.test(text),
     publishesAndMerges: /scripts\/ci\/recover-pr\.mjs/.test(text),
+    publishesRealRunEvidence: /scripts\/ci\/publish-evidence\.mjs/.test(text),
+    allowsRunningEvidenceStep: /--allow-running/.test(text),
+    runNameNamesTargetSha:
+      /^run-name:.*578e87b5a8587d6078aade92d26bd449448dd1d3/m.test(text),
   };
 }
 
@@ -179,6 +183,9 @@ function testBrokenRecoveryWorkflowIsRed() {
   assert.strictEqual(checks.checksOutExactSha, false);
   assert.strictEqual(checks.runsSharedChecks, false);
   assert.strictEqual(checks.publishesAndMerges, false);
+  assert.strictEqual(checks.publishesRealRunEvidence, false);
+  assert.strictEqual(checks.allowsRunningEvidenceStep, false);
+  assert.strictEqual(checks.runNameNamesTargetSha, false);
   console.log('PASS: a recovery workflow without write permissions and exact checkout is red');
 }
 
@@ -221,11 +228,26 @@ function testRecoveryWorkflowIsGreen() {
     true,
     'recovery must publish checks and complete the deferred merge',
   );
+  assert.strictEqual(
+    checks.publishesRealRunEvidence,
+    true,
+    'recovery must verify a real workflow run before confirming the result',
+  );
+  assert.strictEqual(
+    checks.allowsRunningEvidenceStep,
+    true,
+    'the evidence step must be able to record its own in-progress run',
+  );
+  assert.strictEqual(
+    checks.runNameNamesTargetSha,
+    true,
+    'the run name must identify the target SHA so the run is auditable',
+  );
   assert.ok(
     text.includes('docs/testeb-63-comment.md'),
     'recovery must post a confirmed comment on the pull request',
   );
-  console.log('PASS: recovery workflow targets PR #62 at the exact SHA and publishes checks');
+  console.log('PASS: recovery workflow targets PR #62 at the exact SHA and publishes verified evidence');
 }
 
 function testSharedCheckRunnerCoversAllGroups() {

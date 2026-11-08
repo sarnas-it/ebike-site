@@ -170,6 +170,38 @@ export async function getWorkflows({
   );
 }
 
+export async function getWorkflowRunsForWorkflow({
+  owner,
+  repo,
+  workflow,
+  token,
+  fetchImpl = globalThis.fetch,
+}) {
+  return requestJson(
+    fetchImpl,
+    apiUrl(
+      owner,
+      repo,
+      `/actions/workflows/${encodeURIComponent(workflow)}/runs?per_page=100`,
+    ),
+    { headers: headers(token) },
+  );
+}
+
+export async function getWorkflowRun({
+  owner,
+  repo,
+  runId,
+  token,
+  fetchImpl = globalThis.fetch,
+}) {
+  return requestJson(
+    fetchImpl,
+    apiUrl(owner, repo, `/actions/runs/${encodeURIComponent(runId)}`),
+    { headers: headers(token) },
+  );
+}
+
 export async function getCheckRuns({
   owner,
   repo,
@@ -634,6 +666,68 @@ export async function createIssueComment({
       body: JSON.stringify({ body }),
     },
   );
+}
+
+export async function updateIssueComment({
+  owner,
+  repo,
+  commentId,
+  body,
+  token,
+  fetchImpl = globalThis.fetch,
+}) {
+  return requestJson(
+    fetchImpl,
+    apiUrl(owner, repo, `/issues/comments/${encodeURIComponent(commentId)}`),
+    {
+      method: 'PATCH',
+      headers: { ...headers(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    },
+  );
+}
+
+export async function upsertIssueComment({
+  owner,
+  repo,
+  pullNumber,
+  body,
+  marker,
+  token,
+  fetchImpl = globalThis.fetch,
+}) {
+  if (marker) {
+    const comments = await listIssueComments({
+      owner,
+      repo,
+      pullNumber,
+      token,
+      fetchImpl,
+    });
+    const existing = (Array.isArray(comments) ? comments : []).find((comment) =>
+      (comment?.body || '').includes(marker),
+    );
+    if (existing) {
+      const updated = await updateIssueComment({
+        owner,
+        repo,
+        commentId: existing.id,
+        body,
+        token,
+        fetchImpl,
+      });
+      return { created: false, updated: true, id: updated?.id ?? existing.id };
+    }
+  }
+  const comment = await createIssueComment({
+    owner,
+    repo,
+    pullNumber,
+    body,
+    token,
+    fetchImpl,
+  });
+  return { created: true, updated: false, id: comment?.id ?? null };
 }
 
 export async function ensureIssueComment({
