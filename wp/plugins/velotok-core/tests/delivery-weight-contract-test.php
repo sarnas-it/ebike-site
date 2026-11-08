@@ -130,6 +130,18 @@ velotok_delivery_weight_assert( true === $comma_weight['ok'] && 1.5 === (float) 
 $total_weight = velotok_core_delivery_zones_order_weight( array( 'total_weight' => 3 ) );
 velotok_delivery_weight_assert( true === $total_weight['ok'] && 3.0 === (float) $total_weight['weight'], 'Альтернативное поле total_weight должно читаться однозначно.' );
 
+$empty_primary_weight = velotok_core_delivery_zones_order_weight(
+	array(
+		'weight'       => '',
+		'total_weight' => 2.7,
+	)
+);
+velotok_delivery_weight_assert( true === $empty_primary_weight['ok'] && 2.7 === (float) $empty_primary_weight['weight'], 'Пустое поле weight не должно скрывать заполненное total_weight.' );
+
+$malformed_weight = velotok_core_delivery_zones_order_weight( array( 'weight' => 'тяжёлый' ) );
+velotok_delivery_weight_assert( false === $malformed_weight['ok'], 'Нечисловой вес заказа не должен молча становиться нулём.' );
+velotok_delivery_weight_assert( 'DELIVERY_WEIGHT_AMBIGUOUS' === $malformed_weight['code'], 'Нечисловой вес заказа должен давать явную ошибку.' );
+
 $negative_order = velotok_core_delivery_zones_order_weight( array( 'weight' => -1 ) );
 velotok_delivery_weight_assert( false === $negative_order['ok'], 'Отрицательный вес заказа не должен давать тариф.' );
 velotok_delivery_weight_assert( isset( $negative_order['code'] ) && 'DELIVERY_WEIGHT_AMBIGUOUS' === $negative_order['code'], 'Отрицательный вес заказа должен давать явную ошибку.' );
@@ -246,6 +258,8 @@ $item_tariff = velotok_core_delivery_zone_methods(
 velotok_delivery_weight_assert( true === $item_tariff['methods']['cdek']['available'], 'Вес товаров должен давать доступный тариф.' );
 velotok_delivery_weight_assert( 800.0 === (float) $item_tariff['methods']['cdek']['cost'], 'Тариф должен использовать округлённый вверх вес товаров.' );
 velotok_delivery_weight_assert( 3.0 === (float) $item_tariff['methods']['cdek']['tariff']['billable_weight'], 'В тарифе должен сохраняться оплачиваемый вес.' );
+velotok_delivery_weight_assert( 2.2 === (float) $item_tariff['methods']['cdek']['weight_kg'], 'Способ доставки должен отдавать точный вес заказа.' );
+velotok_delivery_weight_assert( 3.0 === (float) $item_tariff['methods']['cdek']['billable_weight'], 'Способ доставки должен отдавать оплачиваемый вес.' );
 
 $order_tariff = velotok_core_delivery_zone_methods(
 	$address,
@@ -258,6 +272,32 @@ $order_tariff = velotok_core_delivery_zone_methods(
 	)
 );
 velotok_delivery_weight_assert( 700.0 === (float) $order_tariff['methods']['cdek']['cost'], 'Тариф должен использовать вес заказа с округлением вверх.' );
+
+$captured_order = null;
+$provider       = function ( $method, $provider_order ) use ( &$captured_order ) {
+	$captured_order = $provider_order;
+
+	return array( 'amount' => 425 );
+};
+$provider_zone = velotok_delivery_weight_zone( $settings );
+
+$provider_zone[0]['shipping_methods'][0]['rate_provider'] = $provider;
+
+$provider_tariff = velotok_core_delivery_zone_methods(
+	$address,
+	$provider_zone,
+	array(
+		'order' => array(
+			'subtotal' => 1000,
+			'items'    => array(
+				array( 'weight' => 1.2, 'quantity' => 2 ),
+			),
+		),
+	)
+);
+velotok_delivery_weight_assert( 425.0 === (float) $provider_tariff['methods']['cdek']['cost'], 'Провайдер должен получать тариф по однозначному весу.' );
+velotok_delivery_weight_assert( is_array( $captured_order ) && 2.4 === (float) $captured_order['weight'], 'Провайдер должен получать нормализованный вес заказа.' );
+velotok_delivery_weight_assert( 3.0 === (float) $provider_tariff['methods']['cdek']['tariff']['billable_weight'], 'Тариф провайдера должен сохранять оплачиваемый вес.' );
 
 $ambiguous_tariff = velotok_core_delivery_zone_methods(
 	$address,

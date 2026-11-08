@@ -707,7 +707,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_weight_number' ) ) {
 	 */
 	function velotok_core_delivery_zones_weight_number( $value ) {
 		if ( is_int( $value ) || is_float( $value ) ) {
-			return (float) $value;
+			$number = (float) $value;
+
+			return is_finite( $number ) ? $number : null;
 		}
 
 		if ( ! is_string( $value ) ) {
@@ -724,7 +726,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_weight_number' ) ) {
 			$value = str_replace( ',', '.', $value );
 		}
 
-		return is_numeric( $value ) ? (float) $value : null;
+		$number = is_numeric( $value ) ? (float) $value : null;
+
+		return null !== $number && is_finite( $number ) ? $number : null;
 	}
 }
 
@@ -801,10 +805,43 @@ if ( ! function_exists( 'velotok_core_delivery_zones_order_weight' ) ) {
 	 * @return array<string,mixed>
 	 */
 	function velotok_core_delivery_zones_order_weight( $order = array() ) {
-		$contract = velotok_core_delivery_zones_contract();
-		$weight   = velotok_core_delivery_zones_weight_number(
-			velotok_core_delivery_zones_value( $order, $contract['weight']['keys'], null )
-		);
+		$contract         = velotok_core_delivery_zones_contract();
+		$weight           = null;
+		$invalid_explicit = false;
+		$sentinel         = new \stdClass();
+
+		foreach ( (array) $contract['weight']['keys'] as $weight_key ) {
+			$raw_weight = velotok_core_delivery_zones_value( $order, array( $weight_key ), $sentinel );
+
+			if ( $raw_weight === $sentinel || null === $raw_weight ) {
+				continue;
+			}
+
+			if ( is_string( $raw_weight ) && '' === trim( $raw_weight ) ) {
+				continue;
+			}
+
+			$normalized = velotok_core_delivery_zones_weight_number( $raw_weight );
+
+			if ( null === $normalized ) {
+				$invalid_explicit = true;
+				continue;
+			}
+
+			$weight = $normalized;
+			break;
+		}
+
+		if ( null === $weight && $invalid_explicit ) {
+			return array(
+				'ok'     => false,
+				'weight' => null,
+				'source' => 'order.weight',
+				'unit'   => $contract['weight']['unit'],
+				'code'   => $contract['weight']['ambiguous_code'],
+				'error'  => 'Вес заказа задан некорректно.',
+			);
+		}
 
 		if ( null !== $weight ) {
 			if ( $weight < 0 ) {
@@ -1043,9 +1080,11 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 		$base_total = $subtotal > 0 ? $subtotal : $total;
 		$free_from  = velotok_core_delivery_zones_free_shipping_threshold( $method );
 		$free       = null !== $free_from && $base_total >= $free_from;
+		$round_weight = 'ceil' === $contract['weight']['rounding'] ? ceil( $weight['weight'] ) : $weight['weight'];
 		$weight_info = array(
 			'weight'                  => $weight['weight'],
 			'weight_kg'               => $weight['weight'],
+			'billable_weight'         => $round_weight,
 			'subtotal'                => $base_total,
 			'free_from'               => $free_from,
 			'free_shipping_threshold' => $free_from,
@@ -1066,7 +1105,13 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 			);
 		}
 
-		$provider = velotok_core_delivery_zones_provider_rate( $method, $order, $context );
+		$provider_order = $order;
+
+		if ( is_array( $provider_order ) ) {
+			$provider_order['weight'] = $weight['weight'];
+		}
+
+		$provider = velotok_core_delivery_zones_provider_rate( $method, $provider_order, $context );
 
 		if ( ! empty( $provider['ok'] ) ) {
 			$provider_amount = (float) $provider['amount'];
@@ -1115,7 +1160,6 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 				isset( $settings['per_kg'] ) ? $settings['per_kg'] : 0
 			)
 		);
-		$round_weight = 'ceil' === $contract['weight']['rounding'] ? ceil( $weight['weight'] ) : $weight['weight'];
 		$amount = $base + $per_kg * $round_weight;
 
 		if ( $free ) {
@@ -1194,6 +1238,8 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 			'mocked'         => false,
 			'test_mode'      => isset( $context['test_mode'] ) ? (bool) $context['test_mode'] : false,
 			'weight'         => null,
+			'weight_kg'      => null,
+			'billable_weight'=> null,
 			'settings'       => $settings,
 		);
 
@@ -1205,8 +1251,10 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 				$option['amount']   = $cost['amount'];
 				$option['currency'] = $cost['currency'];
 				$option['free']     = $cost['free'];
-				$option['weight']   = $cost['weight'];
-				$option['tariff']   = $cost;
+				$option['weight']          = $cost['weight'];
+				$option['weight_kg']       = $cost['weight'];
+				$option['billable_weight'] = isset( $cost['billable_weight'] ) ? $cost['billable_weight'] : null;
+				$option['tariff']          = $cost;
 			} else {
 				$option['available'] = false;
 				$option['error']     = $cost['error'];
