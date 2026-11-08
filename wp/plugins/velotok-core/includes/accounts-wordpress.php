@@ -334,9 +334,7 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		$options  = isset( $request['options'] ) && is_array( $request['options'] ) ? $request['options'] : $options;
 	}
 
-	if ( ! is_array( $options ) ) {
-		$options = array();
-	}
+	$options = velotok_core_account_registration_options( $options );
 
 	$email = velotok_core_wp_normalize_email( $email );
 
