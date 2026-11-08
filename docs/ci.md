@@ -652,10 +652,17 @@ bash scripts/ci/run-checks.sh .
 * `.github/workflows/ci.yml` не отменяет предыдущий прогон
   (`cancel-in-progress: false`), чтобы отменённые джобы не оставляли вечные
   `in_progress`.
-* `.github/workflows/recover-pr.yml` — общий recovery после завершения `ci` и
-  вручную. Он определяет PR по событию или коммиту, проверяет только зависшие
-  или отсутствующие результаты (`scripts/ci/should-recover.mjs`) и не маскирует
-  настоящие падения.
+* `.github/workflows/recover-pr.yml` — общий recovery после завершения `ci`, на
+  события `pull_request` (`opened`, `synchronize`, `reopened`,
+  `ready_for_review`) и вручную. Он определяет PR по событию или коммиту,
+  проверяет только зависшие или отсутствующие результаты
+  (`scripts/ci/should-recover.mjs`) и не маскирует настоящие падения. Событие
+  `pull_request` нужно именно для класса `no_checks`: у коммита без прогона
+  `ci` никогда не появится событие `workflow_run`, поэтому recovery сам
+  запускает проверки. Флаг `--require-missing-ci-run` заставляет recovery
+  сработать только когда прогона `ci` на коммите нет вообще; если прогон уже
+  есть (даже `queued` или упавший), результат остаётся за штатным workflow и
+  recovery не подменяет его.
 * `.github/workflows/recover-pr78.yml` — recovery текущего PR #78. Он берёт
   актуальный head через GitHub API, прогоняет полный `scripts/ci/run-checks.sh`
   и завершает отложенный мерж при зелёных проверках.
