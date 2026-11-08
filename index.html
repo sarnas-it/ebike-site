@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#12211a">
+<title>ВЕЛОТОК — электровелосипеды для города, гор и дачи</title>
+<meta name="description" content="Электровелосипеды для города, гор, дачи и работы. Семь моделей в наличии, тест-драйв, своя мастерская, доставка по России.">
+<style>
+:root{
+  --pad:clamp(20px,4.5vw,56px);
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --serif:Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --ink:#12211a;
+  --ink-2:#1d3127;
+  --paper:#f3f0e7;
+  --card:#fbf9f3;
+  --muted:#58655d;
+  --line:#d9d3c4;
+  --lime:#d8f26a;
+  --lime-soft:#e9f1c9;
+  --orange:#d9531f;
+  --radius:24px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:92px;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.5;overflow-x:clip;-webkit-font-smoothing:antialiased}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+ul,ol{margin:0;padding:0;list-style:none}
+h1,h2,h3,p,dl,dd{margin:0}
+[hidden]{display:none!important}
+::selection{background:var(--lime);color:var(--ink)}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:4px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.sr-only:focus{position:fixed;top:12px;left:12px;width:auto;height:auto;margin:0;padding:12px 16px;clip:auto;overflow:visible;white-space:normal;background:var(--ink);color:var(--paper);border-radius:8px;z-index:200}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:var(--pad)}
+.section{padding-block:clamp(64px,8.5vw,116px)}
+.label{display:inline-flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+.label::before{content:"";width:28px;height:1px;background:currentColor;flex:none}
+h2{font-size:clamp(32px,4.7vw,58px);line-height:1.01;letter-spacing:-.035em;font-weight:800;max-width:20ch}
+.serif{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.02em}
+.section-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:clamp(28px,4vw,52px)}
+.section-head h2{max-width:780px}
+.text-link{display:inline-flex;align-items:center;gap:9px;font-size:14px;font-weight:600;padding-bottom:4px;border-bottom:1px solid currentColor;white-space:nowrap;transition:gap .2s}
+.text-link:hover{gap:14px}
+.text-link svg{width:16px;height:16px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:15px 24px;border:1px solid transparent;border-radius:999px;font-size:15px;font-weight:650;line-height:1.2;transition:transform .2s,background-color .2s,border-color .2s,color .2s}
+.btn svg{width:17px;height:17px;flex:none}
+.btn-primary{background:var(--lime);color:var(--ink)}
+.btn-primary:hover{background:#e6ff90;transform:translateY(-2px)}
+.btn-ghost{border-color:rgba(255,255,255,.38);color:#fff}
+.btn-ghost:hover{background:rgba(255,255,255,.12)}
+.btn-dark{background:var(--ink);color:var(--paper)}
+.btn-dark:hover{background:var(--ink-2);transform:translateY(-2px)}
+.btn-block{width:100%}
+
+.topbar{background:var(--ink);color:#c8d1c9;font-size:11px}
+.topbar-inner{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.topbar-inner p{display:flex;align-items:center;gap:8px}
+.topbar-inner p::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--lime);flex:none}
+.topbar-right{display:flex;align-items:center;gap:18px}
+.topbar a{color:#f3f0e7}
+.topbar a:hover{color:var(--lime)}
+.topbar-right span{color:#8e9b92}
+
+.site-header{position:sticky;top:0;z-index:50;background:rgba(243,240,231,.93);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.header-inner{min-height:74px;display:flex;align-items:center;gap:26px}
+.logo{display:flex;align-items:center;gap:11px;flex:none}
+.logo-mark{width:38px;height:38px;flex:none}
+.logo-text{display:block;font-size:18px;font-weight:800;letter-spacing:.13em;line-height:1}
+.logo-text small{display:block;margin-top:5px;font-family:var(--mono);font-size:8px;font-weight:400;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.nav{display:flex;align-items:center;gap:26px;margin-left:auto}
+.nav a{position:relative;padding:8px 0;font-size:14px;font-weight:600}
+.nav a::after{content:"";position:absolute;left:0;bottom:2px;width:0;height:1px;background:var(--ink);transition:width .25s}
+.nav a:hover::after{width:100%}
+.header-actions{display:flex;align-items:center;gap:12px;flex:none}
+.header-phone{font-size:14px;font-weight:650;white-space:nowrap;padding-bottom:2px;border-bottom:1px solid var(--ink)}
+.header-phone:hover{color:var(--muted)}
+.cart-btn{position:relative;width:44px;height:44px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:transparent;transition:background-color .2s,color .2s}
+.cart-btn:hover{background:var(--ink);color:var(--paper)}
+.cart-btn svg{width:21px;height:21px}
+.cart-count{position:absolute;top:-2px;right:-2px;min-width:19px;height:19px;padding:0 5px;display:grid;place-items:center;border-radius:999px;background:var(--lime);color:var(--ink);font-size:10px;font-weight:800;border:2px solid var(--paper)}
+.menu-btn{display:none;width:44px;height:44px;padding:0;border:1px solid var(--line);border-radius:50%;background:transparent;align-items:center;justify-content:center;flex-direction:column;gap:4px}
+.menu-btn span{width:18px;height:2px;background:var(--ink);transition:transform .2s,opacity .2s}
+.menu-btn[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.menu-btn[aria-expanded="true"] span:nth-child(2){opacity:0}
+.menu-btn[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+
+.hero{position:relative;min-height:clamp(620px,86vh,820px);display:flex;align-items:stretch;color:#fbfaf4;overflow:hidden;background:var(--ink)}
+.hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:58% 55%}
+.hero-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,18,13,.94) 0%,rgba(8,18,13,.8) 34%,rgba(8,18,13,.28) 66%,rgba(8,18,13,.04) 100%),linear-gradient(0deg,rgba(8,18,13,.62) 0%,rgba(8,18,13,0) 42%)}
+.hero-inner{position:relative;z-index:2;width:100%;max-width:1280px;margin:0 auto;padding:clamp(64px,9vw,110px) var(--pad);display:flex;flex-direction:column;justify-content:center}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--lime);margin-bottom:26px}
+.eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px rgba(216,242,106,.16)}
+.hero h1{font-size:clamp(46px,6.9vw,92px);line-height:.94;letter-spacing:-.045em;font-weight:800;max-width:780px;text-wrap:balance}
+.hero h1 em{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.03em;color:var(--lime)}
+.hero-lead{max-width:530px;margin-top:26px;font-size:clamp(16px,1.5vw,19px);line-height:1.55;color:#d8dfd7}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}
+.hero-stats{display:flex;flex-wrap:wrap;gap:clamp(22px,4vw,56px);margin-top:clamp(36px,5vw,52px);padding-top:24px;border-top:1px solid rgba(255,255,255,.22);max-width:680px}
+.hero-stats div{display:grid;gap:3px}
+.hero-stats dt{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#b8c3ba}
+.hero-stats dd{font-size:clamp(19px,2vw,25px);font-weight:750;letter-spacing:-.02em}
+.hero-offer{position:absolute;z-index:3;right:var(--pad);bottom:clamp(28px,4vw,46px);width:232px;padding:18px 20px;display:grid;gap:3px;border:1px solid rgba(255,255,255,.25);border-radius:20px;background:rgba(10,21,15,.72);backdrop-filter:blur(12px);transition:transform .25s,border-color .25s}
+.hero-offer:hover{transform:translateY(-4px);border-color:var(--lime)}
+.hero-offer svg{position:absolute;top:18px;right:18px;width:18px;height:18px;color:var(--lime)}
+.offer-label{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--lime)}
+.offer-name{font-size:20px;font-weight:750;letter-spacing:-.02em}
+.offer-price{font-size:13px;color:#c8d2c9}
+
+.ticker{background:var(--lime);color:var(--ink);overflow:hidden;border-block:1px solid var(--ink)}
+.ticker-track{display:flex;width:max-content;animation:marquee 36s linear infinite}
+.ticker-group{display:flex;align-items:center;gap:26px;padding:14px 13px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.ticker-group svg{width:13px;height:13px;flex:none}
+@keyframes marquee{to{transform:translateX(-50%)}}
+
+.cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.cat-card{display:flex;flex-direction:column;min-height:242px;padding:26px;border:1px solid var(--line);border-radius:20px;background:var(--card);transition:transform .25s,background-color .25s,color .25s,border-color .25s,box-shadow .25s}
+.cat-card:hover,.cat-card:focus-visible{transform:translateY(-4px);background:var(--ink);color:var(--paper);border-color:var(--ink);box-shadow:0 18px 40px -24px rgba(18,33,26,.7)}
+.cat-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:50%;background:var(--lime);color:var(--ink);margin-bottom:auto}
+.cat-icon svg{width:26px;height:26px}
+.cat-card h3{font-size:23px;line-height:1.1;letter-spacing:-.025em;margin-top:30px}
+.cat-card p{margin-top:8px;font-size:13.5px;line-height:1.45;color:var(--muted);transition:color .25s}
+.cat-card:hover p,.cat-card:focus-visible p{color:#b8c4bb}
+.cat-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.cat-meta svg{width:17px;height:17px;transition:transform .25s}
+.cat-card:hover .cat-meta svg{transform:translate(3px,-3px)}
+
+.section--models{background:#eeeade;border-block:1px solid var(--line)}
+.model-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.model-card{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);background:var(--card);transition:transform .25s,box-shadow .25s}
+.model-card:hover{transform:translateY(-4px);box-shadow:0 24px 44px -30px rgba(18,33,26,.65)}
+.model-media{position:relative;aspect-ratio:4/3;overflow:hidden;background:#e5e0d3}
+.model-media img{width:100%;height:100%;object-fit:cover;transition:transform .45s}
+.model-card:hover .model-media img{transform:scale(1.035)}
+.badge{position:absolute;top:14px;left:14px;z-index:2;padding:7px 11px;border-radius:999px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase}
+.badge--lime{background:var(--lime);color:var(--ink)}
+.model-body{display:flex;flex-direction:column;flex:1;padding:22px}
+.model-top{display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.model-body h3{font-size:28px;line-height:1.05;letter-spacing:-.03em;margin:7px 0 18px}
+.specs{display:grid;gap:7px}
+.specs li{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding-bottom:7px;border-bottom:1px dashed var(--line);font-size:12.5px}
+.specs span{color:var(--muted)}
+.specs strong{font-weight:650;text-align:right}
+.model-foot{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:auto;padding-top:20px}
+.price{font-size:21px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.price small{display:block;margin-top:4px;font-size:10.5px;font-weight:500;letter-spacing:0;color:var(--muted);white-space:normal}
+.btn-add{padding:11px 15px;border:1px solid var(--ink);border-radius:999px;background:transparent;font-size:12.5px;font-weight:650;white-space:nowrap;transition:background-color .2s,color .2s}
+.btn-add:hover{background:var(--ink);color:var(--paper)}
+.model-cta{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;min-height:420px;padding:32px;border-radius:var(--radius);background:var(--ink);color:var(--paper)}
+.model-cta::after{content:"";position:absolute;width:260px;height:260px;right:-100px;bottom:-110px;border-radius:50%;border:1px solid rgba(216,242,106,.4);background:radial-gradient(circle at 30% 30%,rgba(216,242,106,.2),transparent 70%)}
+.model-cta .label{color:var(--lime)}
+.model-cta h3{font-size:clamp(28px,2.5vw,36px);line-height:1.04;letter-spacing:-.03em;max-width:12ch}
+.model-cta p{margin-top:14px;font-size:14px;line-height:1.5;color:#b8c4bb;max-width:30ch}
+.model-cta .btn{margin-top:26px;align-self:flex-start;position:relative;z-index:1}
+
+.section--dark{background:var(--ink);color:var(--paper)}
+.section--dark .label{color:#a7b4ab}
+.section--dark h2 em{color:var(--lime)}
+.adv-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:clamp(36px,6vw,84px);align-items:start}
+.adv-intro p{max-width:390px;margin-top:22px;font-size:16px;line-height:1.6;color:#b6c1b8}
+.adv-intro .btn{margin-top:28px}
+.adv-list{border-top:1px solid rgba(255,255,255,.16)}
+.adv-item{display:grid;grid-template-columns:56px 1fr;gap:18px;padding:26px 0;border-bottom:1px solid rgba(255,255,255,.16)}
+.adv-num{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--lime);padding-top:5px}
+.adv-item h3{font-size:21px;line-height:1.2;letter-spacing:-.02em}
+.adv-item p{margin-top:7px;font-size:14px;line-height:1.55;color:#a9b5ac;max-width:48ch}
+
+.section--picker{background:var(--lime-soft)}
+.picker-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:clamp(32px,5vw,72px);align-items:start}
+.picker-intro p{max-width:390px;margin-top:20px;font-size:16px;line-height:1.6;color:#3f4c44}
+.picker-note{margin-top:26px;padding-top:20px;border-top:1px solid rgba(18,33,26,.2);font-size:13px;color:#4d5a52;max-width:360px}
+.quiz{background:var(--card);border:1px solid rgba(18,33,26,.16);border-radius:28px;padding:clamp(22px,3vw,38px)}
+.quiz-q + .quiz-q{margin-top:22px;padding-top:22px;border-top:1px solid var(--line)}
+.quiz-q h3{font-size:15px;line-height:1.35;letter-spacing:-.01em;margin-bottom:12px}
+.quiz-q h3 span{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:transparent;font-size:13px;line-height:1.2;transition:background-color .2s,color .2s,border-color .2s}
+.chip:hover{border-color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.quiz-result{margin-top:26px;padding-top:24px;border-top:1px solid var(--line);min-height:88px}
+.result-empty{font-size:13.5px;line-height:1.5;color:var(--muted);max-width:42ch}
+.result-kicker{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.result-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px}
+.result-row h3{font-size:27px;line-height:1.05;letter-spacing:-.03em}
+.result-price{margin-top:4px;font-size:14px;font-weight:650}
+.result-note{margin-top:12px;font-size:13px;line-height:1.5;color:var(--muted);max-width:46ch}
+.result-row .btn{padding:12px 18px;font-size:13px}
+.quiz-reset{margin-top:16px;padding:0;border:0;background:transparent;font-size:12px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.quiz-reset:hover{color:var(--ink)}
+
+.rating{display:flex;align-items:center;gap:14px;padding-bottom:6px}
+.rating strong{font-size:44px;line-height:.9;letter-spacing:-.04em}
+.stars{color:#9a5f06;font-size:15px;letter-spacing:2px;line-height:1}
+.rating p{margin-top:5px;font-size:12px;color:var(--muted)}
+.review-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.review-card{display:flex;flex-direction:column;gap:18px;padding:28px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card)}
+.review-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.verified{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:#39703f}
+.verified svg{width:13px;height:13px}
+.review-card blockquote{margin:0;font-size:16.5px;line-height:1.55;letter-spacing:-.005em}
+.review-author{display:flex;align-items:center;gap:12px;margin-top:auto;padding-top:18px;border-top:1px solid var(--line)}
+.avatar{width:42px;height:42px;display:grid;place-items:center;flex:none;border-radius:50%;background:var(--lime);font-size:13px;font-weight:800;letter-spacing:.02em}
+.avatar--dark{background:var(--ink);color:var(--lime)}
+.review-author b{display:block;font-size:14px;font-weight:700}
+.review-author span{display:block;font-size:12px;color:var(--muted)}
+
+.section--lead{background:linear-gradient(180deg,var(--paper) 0%,#ece7da 100%)}
+.lead-grid{display:grid;grid-template-columns:.9fr 1.1fr;border:1px solid var(--line);border-radius:32px;overflow:hidden;box-shadow:0 30px 60px -50px rgba(18,33,26,.6)}
+.lead-copy{position:relative;overflow:hidden;padding:clamp(28px,4vw,52px);background:var(--ink);color:var(--paper)}
+.lead-copy::after{content:"";position:absolute;width:300px;height:300px;right:-150px;bottom:-160px;border-radius:50%;border:1px solid rgba(216,242,106,.35);background:radial-gradient(circle at 35% 35%,rgba(216,242,106,.16),transparent 68%)}
+.lead-copy .label{color:var(--lime)}
+.lead-copy h2{font-size:clamp(32px,3.6vw,46px);max-width:12ch}
+.lead-copy h2 em{color:var(--lime)}
+.lead-copy > p{position:relative;z-index:1;max-width:360px;margin-top:20px;font-size:15px;line-height:1.6;color:#b8c4bb}
+.contact-list{position:relative;z-index:1;display:grid;gap:14px;margin-top:34px}
+.contact-list a,.contact-list address{display:grid;gap:2px;font-style:normal;font-size:16px;font-weight:600}
+.contact-list span{font-family:var(--mono);font-size:9.5px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;color:#96a49a}
+.contact-list a:hover{color:var(--lime)}
+.lead-form-wrap{padding:clamp(24px,4vw,48px);background:var(--card)}
+.lead-form-wrap h3{font-size:22px;letter-spacing:-.02em;margin-bottom:6px}
+.form-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+.field{display:grid;gap:7px;margin-bottom:15px}
+.field label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field input,.field select,.field textarea{width:100%;min-height:50px;padding:13px 15px;border:1px solid var(--line);border-radius:12px;background:#fffdf8;font-size:15px;transition:border-color .2s,box-shadow .2s}
+.field textarea{min-height:88px;resize:vertical}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(216,242,106,.65)}
+.consent{display:flex;align-items:flex-start;gap:9px;margin:4px 0 18px;font-size:12px;line-height:1.45;color:var(--muted)}
+.consent input{width:17px;height:17px;margin:1px 0 0;flex:none;accent-color:var(--ink)}
+.consent a{text-decoration:underline;text-underline-offset:2px}
+.form-note{margin-top:12px;font-size:11.5px;line-height:1.45;color:var(--muted)}
+.form-success{padding:32px 6px;text-align:center}
+.success-icon{width:64px;height:64px;display:grid;place-items:center;margin:0 auto 18px;border-radius:50%;background:var(--lime)}
+.success-icon svg{width:28px;height:28px}
+.form-success h3{font-size:25px;margin-bottom:8px}
+.form-success p{max-width:36ch;margin:0 auto;font-size:14px;line-height:1.55;color:var(--muted)}
+.form-success .btn{margin-top:22px}
+
+.site-footer{background:var(--ink);color:var(--paper);padding-block:clamp(46px,6vw,76px) 26px}
+.footer-top{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:clamp(28px,4vw,52px);padding-bottom:44px;border-bottom:1px solid rgba(255,255,255,.16)}
+.footer-brand .logo-text{font-size:23px}
+.footer-brand .logo-text small{color:#8f9c93}
+.footer-brand p{max-width:290px;margin-top:18px;font-size:13.5px;line-height:1.6;color:#a7b3aa}
+.footer-col h3{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--lime);margin-bottom:14px;font-weight:500}
+.footer-col a,.footer-col address{display:block;padding:5px 0;font-style:normal;font-size:13.5px;color:#c4cec6}
+.footer-col a:hover{color:var(--lime)}
+.footer-col address{line-height:1.65}
+.footer-bottom{display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px 30px;padding-top:24px;font-size:11.5px;line-height:1.55;color:#8e9b92}
+.footer-legal{max-width:760px}
+.footer-legal a{text-decoration:underline;text-underline-offset:2px}
+.footer-legal a:hover{color:var(--paper)}
+.footer-bottom p:last-child{white-space:nowrap}
+
+.cart-layer{position:fixed;inset:0;z-index:100}
+.cart-backdrop{position:absolute;inset:0;background:rgba(8,18,13,.58);backdrop-filter:blur(3px)}
+.cart-drawer{position:absolute;top:0;right:0;height:100%;width:min(430px,100%);display:flex;flex-direction:column;background:var(--paper);box-shadow:-20px 0 50px rgba(8,18,13,.25);animation:drawer-in .28s ease-out}
+@keyframes drawer-in{from{transform:translateX(36px);opacity:.4}to{transform:none;opacity:1}}
+.cart-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 24px;border-bottom:1px solid var(--line)}
+.cart-head h2{font-size:24px;letter-spacing:-.03em;max-width:none}
+.icon-btn{width:40px;height:40px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:transparent;font-size:23px;line-height:1;transition:background-color .2s,color .2s}
+.icon-btn:hover{background:var(--ink);color:var(--paper)}
+.cart-body{flex:1;overflow-y:auto;padding:22px 24px}
+.cart-empty{font-size:14px;line-height:1.55;color:var(--muted);max-width:30ch}
+.cart-list{display:grid;gap:14px}
+.cart-item{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.cart-item-name{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.cart-item-price{margin-top:4px;font-size:12.5px;color:var(--muted)}
+.cart-item-controls{display:flex;align-items:center;gap:5px;flex:none}
+.qty-btn{width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px;background:transparent;font-size:15px;line-height:1}
+.qty-btn:hover{border-color:var(--ink)}
+.qty-value{min-width:18px;text-align:center;font-size:12px;font-weight:700}
+.remove-btn{padding:0 3px;border:0;background:transparent;font-size:18px;line-height:1;color:var(--muted)}
+.remove-btn:hover{color:#a8360c}
+.cart-foot{padding:20px 24px 24px;border-top:1px solid var(--line);background:var(--card)}
+.cart-total{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:14px;font-size:14px}
+.cart-total strong{font-size:24px;letter-spacing:-.03em}
+.cart-note{margin-top:10px;font-size:11px;line-height:1.45;color:var(--muted)}
+body.is-locked{overflow:hidden}
+
+@media (max-width:1080px){
+  .adv-grid,.picker-grid{grid-template-columns:1fr}
+  .adv-intro p,.picker-intro p{max-width:620px}
+  .model-grid{grid-template-columns:repeat(2,1fr)}
+  .cat-grid{grid-template-columns:repeat(2,1fr)}
+  .footer-top{grid-template-columns:1.3fr repeat(3,1fr)}
+}
+@media (max-width:980px){
+  .header-inner{min-height:66px;gap:12px}
+  .nav{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:flex-start;gap:0;margin:0;padding:8px var(--pad) 22px;background:var(--paper);border-bottom:1px solid var(--line);box-shadow:0 18px 30px -24px rgba(18,33,26,.5)}
+  .nav.is-open{display:flex}
+  .nav a{width:100%;padding:13px 0;border-bottom:1px solid var(--line);font-size:16px}
+  .nav a::after{display:none}
+  .menu-btn{display:flex}
+  .header-phone{margin-left:auto}
+  .header-actions{margin-left:auto}
+  .lead-grid{grid-template-columns:1fr}
+  .review-grid{grid-template-columns:1fr}
+  .review-card{max-width:none}
+}
+@media (max-width:860px){
+  .hero{min-height:clamp(590px,92svh,760px)}
+  .hero-bg{object-position:63% 50%}
+  .hero-shade{background:linear-gradient(180deg,rgba(8,18,13,.52) 0%,rgba(8,18,13,.76) 42%,rgba(8,18,13,.95) 100%),linear-gradient(90deg,rgba(8,18,13,.45) 0%,rgba(8,18,13,0) 75%)}
+  .hero-inner{justify-content:flex-end;padding-bottom:44px;padding-top:80px}
+  .hero h1{max-width:15ch}
+  .hero-offer{display:none}
+  .hero-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:18px 24px;max-width:none}
+  .hero-stats div:last-child{grid-column:1/-1}
+  .footer-top{grid-template-columns:1fr 1fr}
+  .footer-brand{grid-column:1/-1}
+}
+@media (max-width:720px){
+  .topbar{display:none}
+  .header-phone{display:none}
+  .section-head{align-items:flex-start}
+  .section-head .text-link{margin-top:2px}
+  .lead-copy h2{max-width:16ch}
+}
+@media (max-width:620px){
+  .model-grid{grid-template-columns:1fr}
+  .cat-grid{grid-template-columns:1fr}
+  .cat-card{min-height:0}
+  .cat-card h3{margin-top:24px}
+  .hero h1{font-size:clamp(40px,11.5vw,56px)}
+  .hero-lead{font-size:15.5px}
+  .hero-actions{flex-direction:column;align-items:stretch}
+  .hero-actions .btn{width:100%}
+  .model-cta{min-height:0}
+  .footer-top{grid-template-columns:1fr}
+  .footer-brand{grid-column:auto}
+  .footer-bottom{flex-direction:column}
+  .footer-bottom p:last-child{white-space:normal}
+}
+@media (max-width:420px){
+  .header-inner{gap:8px}
+  .logo-text{font-size:15px;letter-spacing:.1em}
+  .logo-text small{font-size:7px;letter-spacing:.16em}
+  .logo-mark{width:34px;height:34px}
+  .cart-btn,.menu-btn{width:40px;height:40px}
+  .review-card{padding:22px}
+  .lead-form-wrap{padding:22px 18px}
+  .quiz{padding:20px 16px}
+  .model-body{padding:18px}
+  .result-row .btn{width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  .ticker-track{animation:none}
+  .cart-drawer{animation:none}
+}
+</style>
+</head>
+<body>
+<a class="sr-only" href="#main">Перейти к основному содержанию</a>
+
+<div class="topbar">
+  <div class="wrap topbar-inner">
+    <p>Бесплатная доставка при заказе от 50 000 ₽</p>
+    <div class="topbar-right">
+      <a href="tel:+74951234567">+7 (495) 123-45-67</a>
+      <span>Москва, ежедневно 10:00–21:00</span>
+    </div>
+  </div>
+</div>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="logo" href="#top" aria-label="ВЕЛОТОК — на главную">
+      <svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="19" fill="#12211a"/>
+        <path d="M22.6 8.5 13 22.1h6.2l-1.8 9.4L27.2 17h-6.3l1.7-8.5Z" fill="#d8f26a"/>
+      </svg>
+      <span class="logo-text">ВЕЛОТОК<small>электровелосипеды</small></span>
+    </a>
+    <nav class="nav" id="main-nav" aria-label="Основная навигация">
+      <a href="#categories">Каталог</a>
+      <a href="#models">Модели</a>
+      <a href="#advantages">Сервис</a>
+      <a href="#picker">Как выбрать</a>
+      <a href="#reviews">Отзывы</a>
+      <a href="#lead">Контакты</a>
+    </nav>
+    <div class="header-actions">
+      <a class="header-phone" href="tel:+74951234567">+7 (495) 123-45-67</a>
+      <button class="cart-btn" id="cart-open" type="button" aria-haspopup="dialog" aria-controls="cart-drawer" aria-label="Корзина, товаров: 0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 4h2l2.2 10.3a2 2 0 0 0 2 1.7h7.7a2 2 0 0 0 2-1.6L20.5 8H6.1"/>
+          <circle cx="10" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/>
+        </svg>
+        <span class="cart-count" id="cart-count">0</span>
+      </button>
+      <button class="menu-btn" id="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="Открыть меню">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <img class="hero-bg" src="assets/hero-city-1-web.jpg" width="1536" height="864" alt="Городской электровелосипед кремово-оливкового цвета на мощёной улице на закате" fetchpriority="high" decoding="async">
+    <div class="hero-shade" aria-hidden="true"></div>
+    <div class="hero-inner">
+      <p class="eyebrow">Электровелосипеды с 2018 года</p>
+      <h1 id="hero-title">Едете вы.<br><em>Работает мотор.</em></h1>
+      <p class="hero-lead">Семь проверенных моделей для города, гор и дачи. Привозим собранными, настраиваем посадку и объясняем, как обращаться с батареей.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#models">
+          Выбрать велосипед
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="#lead">Записаться на тест-драйв</a>
+      </div>
+      <dl class="hero-stats">
+        <div><dt>Типы моделей</dt><dd>4</dd></div>
+        <div><dt>Запас хода</dt><dd>20–120 км</dd></div>
+        <div><dt>Гарантия</dt><dd>2 года</dd></div>
+      </dl>
+    </div>
+    <a class="hero-offer" href="#model-riviera" aria-label="Хит сезона — электровелосипед Ривьера, 62 900 рублей">
+      <span class="offer-label">Хит сезона</span>
+      <span class="offer-name">Ривьера</span>
+      <span class="offer-price">62 900 ₽ · до 90 км</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </section>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <div class="ticker-group">
+        <span>Бесплатный тест-драйв</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+        <span>Своя мастерская</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+        <span>Рассрочка 0%</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+        <span>Доставка в 340 городов</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+        <span>Гарантия 2 года</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+      </div>
+      <div class="ticker-group">
+        <span>Бесплатный тест-драйв</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+        <span>Своя мастерская</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+        <span>Рассрочка 0%</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+        <span>Доставка в 340 городов</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+        <span>Гарантия 2 года</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.7 2 5 14.2h5.6L9.2 22 18.8 9.4h-5.7L13.7 2Z"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" id="categories" aria-labelledby="cat-title">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="label">01 — Каталог</p>
+          <h2 id="cat-title">Один магазин — <em class="serif">четыре</em> сценария</h2>
+        </div>
+        <a class="text-link" href="#models">Все модели
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        </a>
+      </div>
+      <div class="cat-grid">
+        <a class="cat-card" href="#models">
+          <span class="cat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V8l4-3v16M8 21V5l6 4v12M14 21V11h6v10M2 21h20M11 10h1M11 13h1M17 14h1M17 17h1"/></svg>
+          </span>
+          <h3>Городские</h3>
+          <p>Для работы, магазина и вечерних поездок без пота на спине.</p>
+          <span class="cat-meta">14 моделей
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </span>
+        </a>
+        <a class="cat-card" href="#models">
+          <span class="cat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 19 5.5-9 3.5 5.5L15 10l6 9H3ZM14 6.5l1.6-2.5 1.6 2.5"/></svg>
+          </span>
+          <h3>Горные</h3>
+          <p>Грунт, лесные тропы и подъёмы, где обычный велосипед сдаётся.</p>
+          <span class="cat-meta">9 моделей
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </span>
+        </a>
+        <a class="cat-card" href="#models">
+          <span class="cat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10v10H3zM13 12h5l3 3v3h-8M6 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM18 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM8 8V5h5"/></svg>
+          </span>
+          <h3>Грузовые</h3>
+          <p>Дети, доставка, дачный урожай — до 120 кг на борту.</p>
+          <span class="cat-meta">7 моделей
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </span>
+        </a>
+        <a class="cat-card" href="#models">
+          <span class="cat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="3.2"/><circle cx="18" cy="17" r="3.2"/><path d="M6 17 9.5 9h4L12 13l6-1M15.5 9H18M12 9l-2.5 8M15.5 9 18 17M4 7h3"/></svg>
+          </span>
+          <h3>Складные</h3>
+          <p>В багажник, в лифт, в офис. Складываются за полминуты.</p>
+          <span class="cat-meta">12 моделей
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--models" id="models" aria-labelledby="models-title">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="label">02 — Популярное</p>
+          <h2 id="models-title">Модели, которые чаще всего уезжают из шоурума</h2>
+        </div>
+        <a class="text-link" href="#lead">Нужна консультация
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        </a>
+      </div>
+
+      <div class="model-grid">
+        <article class="model-card" id="model-riviera">
+          <div class="model-media">
+            <span class="badge badge--lime">Хит</span>
+            <img src="assets/model-city-classic-1-web.jpg" width="800" height="600" alt="Городской электровелосипед «Ривьера» кремово-оливкового цвета с низкой рамой и кожаным седлом" loading="lazy" decoding="async">
+          </div>
+          <div class="model-body">
+            <div class="model-top"><span>Городской</span><span>01</span></div>
+            <h3>Ривьера</h3>
+            <ul class="specs">
+              <li><span>Запас хода</span><strong>до 90 км</strong></li>
+              <li><span>Мотор</span><strong>250 Вт</strong></li>
+              <li><span>Колёса</span><strong>28″</strong></li>
+              <li><span>Вес</span><strong>23 кг</strong></li>
+            </ul>
+            <div class="model-foot">
+              <div class="price">62 900 ₽<small>в рассрочку 2 621 ₽/мес</small></div>
+              <button class="btn-add" type="button" data-name="Ривьера" data-price="62900">В корзину</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="model-card" id="model-street">
+          <div class="model-media">
+            <span class="badge">Новинка</span>
+            <img src="assets/model-city-sport-1-web.jpg" width="800" height="600" alt="Городской электровелосипед «Стрит 7» тёмно-бирюзового цвета с узкими шинами и багажником" loading="lazy" decoding="async">
+          </div>
+          <div class="model-body">
+            <div class="model-top"><span>Городской спорт</span><span>02</span></div>
+            <h3>Стрит 7</h3>
+            <ul class="specs">
+              <li><span>Запас хода</span><strong>до 110 км</strong></li>
+              <li><span>Мотор</span><strong>350 Вт</strong></li>
+              <li><span>Колёса</span><strong>700C</strong></li>
+              <li><span>Вес</span><strong>21 кг</strong></li>
+            </ul>
+            <div class="model-foot">
+              <div class="price">74 900 ₽<small>в рассрочку 3 121 ₽/мес</small></div>
+              <button class="btn-add" type="button" data-name="Стрит 7" data-price="74900">В корзину</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="model-card" id="model-hrebet-pro">
+          <div class="model-media">
+            <span class="badge">Для гор</span>
+            <img src="assets/model-mountain-pro-1-web.jpg" width="800" height="600" alt="Горный электровелосипед «Хребет Pro» с полной подвеской, чёрной рамой и оранжевыми акцентами" loading="lazy" decoding="async">
+          </div>
+          <div class="model-body">
+            <div class="model-top"><span>Горный</span><span>03</span></div>
+            <h3>Хребет Pro</h3>
+            <ul class="specs">
+              <li><span>Запас хода</span><strong>до 120 км</strong></li>
+              <li><span>Мотор</span><strong>750 Вт</strong></li>
+              <li><span>Ход вилки</span><strong>150 мм</strong></li>
+              <li><span>Колёса</span><strong>29″</strong></li>
+            </ul>
+            <div class="model-foot">
+              <div class="price">149 900 ₽<small>в рассрочку 6 246 ₽/мес</small></div>
+              <button class="btn-add" type="button" data-name="Хребет Pro" data-price="149900">В корзину</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="model-card" id="model-hrebet-trail">
+          <div class="model-media">
+            <span class="badge badge--lime">Выбор механиков</span>
+            <img src="assets/model-mountain-hardtail-1-web.jpg" width="800" height="600" alt="Горный электровелосипед «Хребет Trail» с зелёной рамой и широкими грунтовыми шинами" loading="lazy" decoding="async">
+          </div>
+          <div class="model-body">
+            <div class="model-top"><span>Горный</span><span>04</span></div>
+            <h3>Хребет Trail</h3>
+            <ul class="specs">
+              <li><span>Запас хода</span><strong>до 95 км</strong></li>
+              <li><span>Мотор</span><strong>500 Вт</strong></li>
+              <li><span>Ход вилки</span><strong>120 мм</strong></li>
+              <li><span>Колёса</span><strong>27,5″</strong></li>
+            </ul>
+            <div class="model-foot">
+              <div class="price">98 900 ₽<small>в рассрочку 4 121 ₽/мес</small></div>
+              <button class="btn-add" type="button" data-name="Хребет Trail" data-price="98900">В корзину</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="model-card" id="model-family">
+          <div class="model-media">
+            <span class="badge">Для семьи</span>
+            <img src="assets/model-cargo-family-1-web.jpg" width="800" height="600" alt="Грузовой электровелосипед «Семейный» с деревянным боксом на удлинённой задней раме" loading="lazy" decoding="async">
+          </div>
+          <div class="model-body">
+            <div class="model-top"><span>Грузовой</span><span>05</span></div>
+            <h3>Семейный</h3>
+            <ul class="specs">
+              <li><span>Запас хода</span><strong>до 80 км</strong></li>
+              <li><span>Мотор</span><strong>750 Вт</strong></li>
+              <li><span>Груз</span><strong>до 80 кг</strong></li>
+              <li><span>Колёса</span><strong>20″ / 26″</strong></li>
+            </ul>
+            <div class="model-foot">
+              <div class="price">132 900 ₽<small>в рассрочку 5 538 ₽/мес</small></div>
+              <button class="btn-add" type="button" data-name="Семейный" data-price="132900">В корзину</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="model-card" id="model-courier">
+          <div class="model-media">
+            <span class="badge">Для работы</span>
+            <img src="assets/model-cargo-courier-1-web.jpg" width="800" height="600" alt="Грузовой электровелосипед «Курьер» с передним багажником и широкими шинами" loading="lazy" decoding="async">
+          </div>
+          <div class="model-body">
+            <div class="model-top"><span>Грузовой</span><span>06</span></div>
+            <h3>Курьер</h3>
+            <ul class="specs">
+              <li><span>Запас хода</span><strong>до 100 км</strong></li>
+              <li><span>Мотор</span><strong>500 Вт</strong></li>
+              <li><span>Груз</span><strong>до 120 кг</strong></li>
+              <li><span>Колёса</span><strong>20″</strong></li>
+            </ul>
+            <div class="model-foot">
+              <div class="price">119 900 ₽<small>в рассрочку 4 996 ₽/мес</small></div>
+              <button class="btn-add" type="button" data-name="Курьер" data-price="119900">В корзину</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="model-card" id="model-sklad">
+          <div class="model-media">
+            <span class="badge">В багажник</span>
+            <img src="assets/model-folding-compact-1-web.jpg" width="800" height="600" alt="Складной электровелосипед «Складень 20» с маленькими колёсами и графитовой рамой" loading="lazy" decoding="async">
+          </div>
+          <div class="model-body">
+            <div class="model-top"><span>Складной</span><span>07</span></div>
+            <h3>Складень 20</h3>
+            <ul class="specs">
+              <li><span>Запас хода</span><strong>до 65 км</strong></li>
+              <li><span>Мотор</span><strong>250 Вт</strong></li>
+              <li><span>Колёса</span><strong>20″</strong></li>
+              <li><span>Вес</span><strong>18 кг</strong></li>
+            </ul>
+            <div class="model-foot">
+              <div class="price">68 900 ₽<small>в рассрочку 2 871 ₽/мес</small></div>
+              <button class="btn-add" type="button" data-name="Складень 20" data-price="68900">В корзину</button>
+            </div>
+          </div>
+        </article>
+
+        <div class="model-cta">
+          <p class="label">Не определились?</p>
+          <h3>Три вопроса — и мы покажем вашу модель</h3>
+          <p>Ответьте, где и как часто будете ездить. Подборщик учтёт бюджет и тип маршрута.</p>
+          <a class="btn btn-primary" href="#picker">
+            Подобрать модель
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--dark" id="advantages" aria-labelledby="adv-title">
+    <div class="wrap adv-grid">
+      <div class="adv-intro">
+        <p class="label">03 — Почему мы</p>
+        <h2 id="adv-title">Велосипед — это <em class="serif">не только</em> рама и мотор</h2>
+        <p>Сервис, сборка и честный разговор о том, что подойдёт именно вам. Без «лучшего предложения на рынке» и мелкого шрифта.</p>
+        <a class="btn btn-primary" href="#lead">Записаться в шоурум
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+      <div class="adv-list">
+        <div class="adv-item">
+          <span class="adv-num">01</span>
+          <div>
+            <h3>Собираем и проверяем каждую модель</h3>
+            <p>Протягиваем крепёж, настраиваем тормоза и трансмиссию, делаем пробег 3 км до отправки.</p>
+          </div>
+        </div>
+        <div class="adv-item">
+          <span class="adv-num">02</span>
+          <div>
+            <h3>Тест-драйв по вашему маршруту</h3>
+            <p>30 минут по знакомым улицам или ближайшему парку. Понравится — оформим на месте.</p>
+          </div>
+        </div>
+        <div class="adv-item">
+          <span class="adv-num">03</span>
+          <div>
+            <h3>Своя мастерская, а не «партнёры»</h3>
+            <p>Диагностика батареи, ремонт и апгрейд — у нас, по записи, обычно со сроком от одного дня.</p>
+          </div>
+        </div>
+        <div class="adv-item">
+          <span class="adv-num">04</span>
+          <div>
+            <h3>Доставка в 340 городов</h3>
+            <p>Собранный велосипед едет в жёсткой коробке. В Москве и Петербурге — на следующий день.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--picker" id="picker" aria-labelledby="picker-title">
+    <div class="wrap picker-grid">
+      <div class="picker-intro">
+        <p class="label">04 — Подбор</p>
+        <h2 id="picker-title">Как выбрать <em class="serif">электровелосипед</em></h2>
+        <p>Начните не с мощности мотора, а с маршрута. Три коротких вопроса помогут сузить выбор до одной модели — дальше можно приехать и прокатиться.</p>
+        <p class="picker-note">Если сомневаетесь между двумя вариантами, напишите нам. Сравним батареи, вес и стоимость обслуживания без давления на выбор.</p>
+      </div>
+
+      <div class="quiz">
+        <div class="quiz-q">
+          <h3><span>01</span>Где чаще будете ездить?</h3>
+          <div class="chips">
+            <button class="chip" type="button" data-q="place" data-v="city" aria-pressed="false">Город</button>
+            <button class="chip" type="button" data-q="place" data-v="mountain" aria-pressed="false">Горы и лес</button>
+            <button class="chip" type="button" data-q="place" data-v="family" aria-pressed="false">Дача с детьми</button>
+            <button class="chip" type="button" data-q="place" data-v="commute" aria-pressed="false">Дорога на работу</button>
+          </div>
+        </div>
+        <div class="quiz-q">
+          <h3><span>02</span>Что важнее всего?</h3>
+          <div class="chips">
+            <button class="chip" type="button" data-q="need" data-v="range" aria-pressed="false">Запас хода</button>
+            <button class="chip" type="button" data-q="need" data-v="cargo" aria-pressed="false">Перевозить груз</button>
+            <button class="chip" type="button" data-q="need" data-v="compact" aria-pressed="false">Компактность</button>
+            <button class="chip" type="button" data-q="need" data-v="speed" aria-pressed="false">Скорость</button>
+          </div>
+        </div>
+        <div class="quiz-q">
+          <h3><span>03</span>Какой бюджет комфортен?</h3>
+          <div class="chips">
+            <button class="chip" type="button" data-q="budget" data-v="low" aria-pressed="false">до 80 000 ₽</button>
+            <button class="chip" type="button" data-q="budget" data-v="mid" aria-pressed="false">80–120 000 ₽</button>
+            <button class="chip" type="button" data-q="budget" data-v="high" aria-pressed="false">от 120 000 ₽</button>
+          </div>
+        </div>
+        <div class="quiz-result" id="quiz-result" aria-live="polite" aria-atomic="true">
+          <p class="result-empty">Ответьте на три вопроса — покажем модель, которая подходит под ваш маршрут и бюджет.</p>
+        </div>
+        <button class="quiz-reset" type="button" id="quiz-reset" hidden>Сбросить ответы</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="reviews" aria-labelledby="reviews-title">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="label">05 — Отзывы</p>
+          <h2 id="reviews-title">Что говорят после <em class="serif">первой тысячи</em> километров</h2>
+        </div>
+        <div class="rating">
+          <strong>4,9</strong>
+          <div>
+            <span class="stars" aria-hidden="true">★★★★★</span>
+            <p>218 отзывов на картах</p>
+          </div>
+        </div>
+      </div>
+      <div class="review-grid">
+        <article class="review-card">
+          <div class="review-top">
+            <span class="stars" aria-label="Оценка 5 из 5">★★★★★</span>
+            <span class="verified">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12 5 5L20 6"/></svg>
+              Проверен
+            </span>
+          </div>
+          <blockquote>«Брала Ривьеру, чтобы ездить на работу вместо метро. Дорога занимает те же 25 минут, но я приезжаю без толпы и с ровным дыханием. Батареи хватает на три дня с запасом».</blockquote>
+          <div class="review-author">
+            <span class="avatar" aria-hidden="true">АК</span>
+            <div><b>Анна К.</b><span>Москва · Ривьера</span></div>
+          </div>
+        </article>
+
+        <article class="review-card">
+          <div class="review-top">
+            <span class="stars" aria-label="Оценка 5 из 5">★★★★★</span>
+            <span class="verified">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12 5 5L20 6"/></svg>
+              Проверен
+            </span>
+          </div>
+          <blockquote>«Взял Хребет Trail для леса за городом. На подъёмах мотор работает плавно, без рывка, а по грунту велосипед ведёт себя предсказуемо. На первой неделе приехал на настройку подвески — сделали за час».</blockquote>
+          <div class="review-author">
+            <span class="avatar avatar--dark" aria-hidden="true">ДС</span>
+            <div><b>Дмитрий С.</b><span>Казань · Хребет Trail</span></div>
+          </div>
+        </article>
+
+        <article class="review-card">
+          <div class="review-top">
+            <span class="stars" aria-label="Оценка 5 из 5">★★★★★</span>
+            <span class="verified">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12 5 5L20 6"/></svg>
+              Проверен
+            </span>
+          </div>
+          <blockquote>«Семейный заменил нам вторую машину для поездок в садик и магазин. Двое детей сзади, рюкзаки в боксе, до горки доезжаем быстрее, чем на автобусе. Главное — поставили удобное детское кресло».</blockquote>
+          <div class="review-author">
+            <span class="avatar" aria-hidden="true">МП</span>
+            <div><b>Марина и Павел</b><span>Санкт-Петербург · Семейный</span></div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--lead" id="lead" aria-labelledby="lead-title">
+    <div class="wrap">
+      <div class="lead-grid">
+        <div class="lead-copy">
+          <p class="label">06 — Заявка</p>
+          <h2 id="lead-title">Приезжайте <em class="serif">прокатиться</em></h2>
+          <p>Покажем модели вживую, подберём раму по росту и дадим проехать по району. Запись занимает пару минут.</p>
+          <div class="contact-list">
+            <a href="tel:+74951234567"><span>Телефон</span>+7 (495) 123-45-67</a>
+            <a href="mailto:hello@velotok.ru"><span>Почта</span>hello@velotok.ru</a>
+            <address><span>Шоурум</span>Москва, Нижняя Сыромятническая, 10, стр. 2</address>
+            <address><span>Часы работы</span>Ежедневно, 10:00–21:00</address>
+          </div>
+        </div>
+        <div class="lead-form-wrap">
+          <h3>Оставьте заявку на тест-драйв</h3>
+          <p class="form-sub">Перезвоним в течение рабочего дня и согласуем удобное время.</p>
+          <form id="lead-form" novalidate>
+            <div class="field">
+              <label for="name">Как к вам обращаться</label>
+              <input id="name" name="name" type="text" autocomplete="name" placeholder="Имя" required>
+            </div>
+            <div class="field">
+              <label for="phone">Телефон</label>
+              <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+7 (___) ___-__-__" required>
+            </div>
+            <div class="field">
+              <label for="model">Интересующая модель</label>
+              <select id="model" name="model">
+                <option value="">Помогите выбрать</option>
+                <option>Ривьера</option>
+                <option>Стрит 7</option>
+                <option>Хребет Pro</option>
+                <option>Хребет Trail</option>
+                <option>Семейный</option>
+                <option>Курьер</option>
+                <option>Складень 20</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="comment">Комментарий</label>
+              <textarea id="comment" name="comment" rows="3" placeholder="Например: хочу проехать 30 км до дачи"></textarea>
+            </div>
+            <label class="consent" for="consent">
+              <input id="consent" name="consent" type="checkbox" required>
+              <span>Согласен на обработку персональных данных и принимаю <a href="#privacy">политику конфиденциальности</a></span>
+            </label>
+            <button class="btn btn-dark btn-block" type="submit">Отправить заявку</button>
+            <p class="form-note">Это демонстрационная форма: данные никуда не отправляются.</p>
+          </form>
+          <div class="form-success" id="form-success" hidden tabindex="-1">
+            <span class="success-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12 5 5L20 6"/></svg>
+            </span>
+            <h3>Заявка принята</h3>
+            <p>Спасибо! В реальном магазине здесь бы появилось подтверждение, а менеджер перезвонил бы в течение рабочего дня.</p>
+            <button class="btn btn-dark" type="button" id="form-again">Отправить ещё одну</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer" id="contacts">
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="logo" href="#top" aria-label="ВЕЛОТОК — на главную">
+          <svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true">
+            <circle cx="20" cy="20" r="19" fill="#d8f26a"/>
+            <path d="M22.6 8.5 13 22.1h6.2l-1.8 9.4L27.2 17h-6.3l1.7-8.5Z" fill="#12211a"/>
+          </svg>
+          <span class="logo-text">ВЕЛОТОК<small>электровелосипеды</small></span>
+        </a>
+        <p>Магазин и мастерская электровелосипедов. Помогаем выбрать технику под маршрут, а не под красивую цифру в характеристиках.</p>
+      </div>
+      <div class="footer-col">
+        <h3>Каталог</h3>
+        <a href="#models">Городские</a>
+        <a href="#models">Горные</a>
+        <a href="#models">Грузовые</a>
+        <a href="#models">Складные</a>
+        <a href="#models">Аксессуары</a>
+      </div>
+      <div class="footer-col">
+        <h3>Покупателям</h3>
+        <a href="#lead">Доставка и оплата</a>
+        <a href="#advantages">Гарантия и сервис</a>
+        <a href="#lead">Тест-драйв</a>
+        <a href="#reviews">Отзывы</a>
+        <a href="#privacy" id="privacy">Политика конфиденциальности</a>
+      </div>
+      <div class="footer-col">
+        <h3>Контакты</h3>
+        <a href="tel:+74951234567">+7 (495) 123-45-67</a>
+        <a href="mailto:hello@velotok.ru">hello@velotok.ru</a>
+        <address>Москва, Нижняя Сыромятническая, 10, стр. 2</address>
+        <address>Ежедневно, 10:00–21:00</address>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-legal">© 2026 «ВЕЛОТОК». ИП Соколов А. В., ИНН 770123456789, ОГРНИП 320770000123456. Цены на сайте не являются публичной офертой. <a href="#privacy">Политика конфиденциальности</a> · <a href="#lead">Публичная оферта</a></p>
+      <p>Сделано для тех, кто ездит</p>
+    </div>
+  </div>
+</footer>
+
+<div class="cart-layer" id="cart-layer" hidden>
+  <div class="cart-backdrop" data-close-cart></div>
+  <aside class="cart-drawer" id="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" tabindex="-1">
+    <div class="cart-head">
+      <h2 id="cart-title">Корзина</h2>
+      <button class="icon-btn" type="button" id="cart-close" aria-label="Закрыть корзину">×</button>
+    </div>
+    <div class="cart-body">
+      <p class="cart-empty" id="cart-empty">Пока пусто. Добавьте модель — и она появится здесь.</p>
+      <ul class="cart-list" id="cart-list"></ul>
+    </div>
+    <div class="cart-foot" id="cart-foot" hidden>
+      <div class="cart-total"><span>Итого</span><strong id="cart-total">0 ₽</strong></div>
+      <a class="btn btn-dark btn-block" href="#lead" id="cart-checkout">Оформить заявку</a>
+      <p class="cart-note">Оплата и доставка — после подтверждения менеджером.</p>
+    </div>
+  </aside>
+</div>
+
+<p class="sr-only" role="status" aria-live="polite" id="live"></p>
+
+<script>
+(function(){
+  "use strict";
+  var fmt = new Intl.NumberFormat("ru-RU");
+  var money = function(value){ return fmt.format(value) + " ₽"; };
+  var live = document.getElementById("live");
+  var announce = function(text){ if(live){ live.textContent = ""; window.setTimeout(function(){ live.textContent = text; }, 40); } };
+
+  var menuBtn = document.getElementById("menu-toggle");
+  var nav = document.getElementById("main-nav");
+  if(menuBtn && nav){
+    menuBtn.addEventListener("click", function(){
+      var open = menuBtn.getAttribute("aria-expanded") === "true";
+      menuBtn.setAttribute("aria-expanded", String(!open));
+      menuBtn.setAttribute("aria-label", open ? "Открыть меню" : "Закрыть меню");
+      nav.classList.toggle("is-open", !open);
+    });
+    nav.querySelectorAll("a").forEach(function(link){
+      link.addEventListener("click", function(){
+        menuBtn.setAttribute("aria-expanded", "false");
+        menuBtn.setAttribute("aria-label", "Открыть меню");
+        nav.classList.remove("is-open");
+      });
+    });
+    window.addEventListener("resize", function(){
+      if(window.innerWidth > 980){
+        menuBtn.setAttribute("aria-expanded", "false");
+        nav.classList.remove("is-open");
+      }
+    });
+  }
+
+  var cart = new Map();
+  var layer = document.getElementById("cart-layer");
+  var drawer = document.getElementById("cart-drawer");
+  var openBtn = document.getElementById("cart-open");
+  var closeBtn = document.getElementById("cart-close");
+  var cartList = document.getElementById("cart-list");
+  var emptyEl = document.getElementById("cart-empty");
+  var footEl = document.getElementById("cart-foot");
+  var totalEl = document.getElementById("cart-total");
+  var countEl = document.getElementById("cart-count");
+  var lastFocus = null;
+
+  function cartQty(){
+    var total = 0;
+    cart.forEach(function(item){ total += item.qty; });
+    return total;
+  }
+  function renderCart(){
+    var qty = cartQty();
+    countEl.textContent = String(qty);
+    openBtn.setAttribute("aria-label", "Корзина, товаров: " + qty);
+    cartList.textContent = "";
+    if(cart.size === 0){
+      emptyEl.hidden = false;
+      footEl.hidden = true;
+      totalEl.textContent = "0 ₽";
+      return;
+    }
+    emptyEl.hidden = true;
+    footEl.hidden = false;
+    var sum = 0;
+    cart.forEach(function(item){
+      sum += item.price * item.qty;
+      var li = document.createElement("li");
+      li.className = "cart-item";
+      var info = document.createElement("div");
+      var name = document.createElement("p");
+      name.className = "cart-item-name";
+      name.textContent = item.name;
+      var price = document.createElement("p");
+      price.className = "cart-item-price";
+      price.textContent = money(item.price) + " × " + item.qty;
+      info.appendChild(name);
+      info.appendChild(price);
+      var controls = document.createElement("div");
+      controls.className = "cart-item-controls";
+      var minus = document.createElement("button");
+      minus.type = "button";
+      minus.className = "qty-btn";
+      minus.dataset.act = "minus";
+      minus.dataset.name = item.name;
+      minus.setAttribute("aria-label", "Уменьшить количество: " + item.name);
+      minus.textContent = "−";
+      var qtyEl = document.createElement("span");
+      qtyEl.className = "qty-value";
+      qtyEl.textContent = String(item.qty);
+      var plus = document.createElement("button");
+      plus.type = "button";
+      plus.className = "qty-btn";
+      plus.dataset.act = "plus";
+      plus.dataset.name = item.name;
+      plus.setAttribute("aria-label", "Увеличить количество: " + item.name);
+      plus.textContent = "+";
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "remove-btn";
+      remove.dataset.act = "remove";
+      remove.dataset.name = item.name;
+      remove.setAttribute("aria-label", "Удалить из корзины: " + item.name);
+      remove.textContent = "×";
+      controls.appendChild(minus);
+      controls.appendChild(qtyEl);
+      controls.appendChild(plus);
+      controls.appendChild(remove);
+      li.appendChild(info);
+      li.appendChild(controls);
+      cartList.appendChild(li);
+    });
+    totalEl.textContent = money(sum);
+  }
+  function openCart(){
+    lastFocus = document.activeElement;
+    layer.hidden = false;
+    document.body.classList.add("is-locked");
+    renderCart();
+    window.setTimeout(function(){ closeBtn.focus(); }, 20);
+  }
+  function closeCart(){
+    layer.hidden = true;
+    document.body.classList.remove("is-locked");
+    if(lastFocus && document.contains(lastFocus)){
+      lastFocus.focus();
+    }
+  }
+  openBtn.addEventListener("click", openCart);
+  closeBtn.addEventListener("click", closeCart);
+  layer.querySelector("[data-close-cart]").addEventListener("click", closeCart);
+  var checkout = document.getElementById("cart-checkout");
+  if(checkout){ checkout.addEventListener("click", closeCart); }
+
+  document.addEventListener("keydown", function(event){
+    if(event.key === "Escape" && !layer.hidden){ closeCart(); }
+  });
+
+  document.querySelectorAll(".btn-add").forEach(function(button){
+    button.addEventListener("click", function(){
+      var name = button.dataset.name;
+      var price = Number(button.dataset.price);
+      if(cart.has(name)){
+        cart.get(name).qty += 1;
+      }else{
+        cart.set(name, { name: name, price: price, qty: 1 });
+      }
+      renderCart();
+      openCart();
+      announce(name + " добавлен в корзину");
+    });
+  });
+
+  cartList.addEventListener("click", function(event){
+    var control = event.target.closest("[data-act]");
+    if(!control){ return; }
+    var item = cart.get(control.dataset.name);
+    if(!item){ return; }
+    var act = control.dataset.act;
+    if(act === "plus"){
+      item.qty += 1;
+    }else if(act === "minus"){
+      item.qty -= 1;
+      if(item.qty <= 0){ cart.delete(item.name); }
+    }else if(act === "remove"){
+      cart.delete(item.name);
+    }
+    renderCart();
+  });
+
+  var models = {
+    riviera: { name: "Ривьера", price: "62 900 ₽", href: "#model-riviera", note: "Лёгкая низкая рама, 90 км запаса хода и спокойный характер — для ежедневных поездок по городу." },
+    street: { name: "Стрит 7", price: "74 900 ₽", href: "#model-street", note: "Более быстрый и жёсткий вариант для асфальта: 110 км хода и посадка для активной езды." },
+    "hrebet-pro": { name: "Хребет Pro", price: "149 900 ₽", href: "#model-hrebet-pro", note: "Полная подвеска и мотор 750 Вт — если в маршруте есть серьёзные подъёмы и спуски." },
+    "hrebet-trail": { name: "Хребет Trail", price: "98 900 ₽", href: "#model-hrebet-trail", note: "Хардтейл для леса и грунта: меньше веса, простая обслуживаемость и уверенный ход." },
+    family: { name: "Семейный", price: "132 900 ₽", href: "#model-family", note: "Удлинённая рама и бокс на 80 кг: дети, продукты и всё, что нужно на даче." },
+    courier: { name: "Курьер", price: "119 900 ₽", href: "#model-courier", note: "Рама под ежедневные нагрузки: передний и задний багажник, груз до 120 кг." },
+    sklad: { name: "Складень 20", price: "68 900 ₽", href: "#model-sklad", note: "Складывается за полминуты и помещается в багажник — для поездов, офиса и лифта." }
+  };
+  var answers = {};
+  var resultEl = document.getElementById("quiz-result");
+  var resetBtn = document.getElementById("quiz-reset");
+  var arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+  function pickModel(){
+    var place = answers.place;
+    var need = answers.need;
+    var budget = answers.budget;
+    if(place === "mountain"){
+      return budget === "high" ? "hrebet-pro" : "hrebet-trail";
+    }
+    if(place === "family"){
+      return budget === "low" ? "sklad" : "family";
+    }
+    if(need === "cargo"){ return "courier"; }
+    if(need === "compact"){ return "sklad"; }
+    if(place === "commute"){
+      return budget === "low" ? "riviera" : "street";
+    }
+    if(budget === "high" || need === "speed"){ return "street"; }
+    return "riviera";
+  }
+  function renderResult(){
+    if(!answers.place || !answers.need || !answers.budget){
+      resultEl.innerHTML = '<p class="result-empty">Ответьте на три вопроса — покажем модель, которая подходит под ваш маршрут и бюджет.</p>';
+      resetBtn.hidden = true;
+      return;
+    }
+    var model = models[pickModel()];
+    resultEl.innerHTML = '<p class="result-kicker">Ваш вариант</p><div class="result-row"><div><h3>' + model.name + '</h3><p class="result-price">' + model.price + '</p></div><a class="btn btn-dark" href="' + model.href + '">Смотреть модель ' + arrow + '</a></div><p class="result-note">' + model.note + '</p>';
+    resetBtn.hidden = false;
+  }
+  document.querySelectorAll(".chip").forEach(function(chip){
+    chip.addEventListener("click", function(){
+      var q = chip.dataset.q;
+      answers[q] = chip.dataset.v;
+      document.querySelectorAll('.chip[data-q="' + q + '"]').forEach(function(other){
+        other.setAttribute("aria-pressed", String(other === chip));
+      });
+      renderResult();
+    });
+  });
+  resetBtn.addEventListener("click", function(){
+    answers = {};
+    document.querySelectorAll(".chip").forEach(function(chip){ chip.setAttribute("aria-pressed", "false"); });
+    renderResult();
+  });
+
+  var form = document.getElementById("lead-form");
+  var success = document.getElementById("form-success");
+  var again = document.getElementById("form-again");
+  form.addEventListener("submit", function(event){
+    event.preventDefault();
+    if(!form.checkValidity()){
+      form.reportValidity();
+      return;
+    }
+    form.hidden = true;
+    success.hidden = false;
+    success.focus();
+    announce("Заявка отправлена");
+  });
+  again.addEventListener("click", function(){
+    form.reset();
+    form.hidden = false;
+    success.hidden = true;
+    var first = form.querySelector("input");
+    if(first){ first.focus(); }
+  });
+
+  renderCart();
+})();
+</script>
+</body>
+</html>
