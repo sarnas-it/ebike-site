@@ -30,9 +30,10 @@ GitHub не запускает workflow задним числом: появле�
 
 Предварительная проверка целевого коммита: клон ветки
 `feat/ebike-site-testeb-2` на `19c4f0db` прогнан через
-`bash scripts/ci/run-checks.sh <checkout>`; `php-lint`, `php-tests` и
-`plugin-tests` завершились успешно. Значит, после публикации этих же проверок
-recovery-workflow сможет завершить отложенный мерж без ручного вмешательства.
+`bash scripts/ci/run-checks.sh <checkout>`; `php-lint`, `php-tests`,
+`plugin-tests` и `php-plugin-tests` завершились успешно. Значит, после
+публикации этих же проверок recovery-workflow сможет завершить отложенный мерж
+без ручного вмешательства.
 
 Остальные возможные причины исключены:
 
@@ -55,10 +56,14 @@ recovery-workflow сможет завершить отложенный мерж 
 * на `push` в `main`;
 * вручную через `workflow_dispatch`.
 
-Проверки: `php-lint`, `php-tests`, `plugin-tests`, `ci-repair-tests`. Набор
-проверок только расширен, ни одна проверка не отключена. `ci-repair-tests`
-запускает все `scripts/ci/tests/*.test.mjs`, поэтому новые red-green тесты не
-могут быть пропущены.
+Проверки: `php-lint`, `php-tests`, `php-plugin-tests`, `plugin-tests`,
+`ci-repair-tests`. Набор проверок только расширен, ни одна проверка не
+отключена. `php-plugin-tests` действительно исполняет все
+`wp/plugins/velotok-core/tests/*-test.php` через `php`, включая приёмочную
+команду `php wp/plugins/velotok-core/tests/accounts-contract-test.php`, а не
+только проверяет синтаксис через `php -l`. `ci-repair-tests` запускает все
+`scripts/ci/tests/*.test.mjs`, поэтому новые red-green тесты не могут быть
+пропущены.
 
 После мержа этой починки в `main` файл `.github/workflows/ci.yml` окажется в
 базовой ветке, и новые PR будут получать реальные прогоны.
@@ -74,25 +79,31 @@ recovery-workflow сможет завершить отложенный мерж 
    `INCIDENT_SHA` для аудита: recovery не привязан к нему и не пропускает
    мерж, если head уехал;
 2. прогоняет на разрешённом коммите те же проверки через общий
-   `scripts/ci/run-checks.sh` (`php-lint`, `php-tests`, `plugin-tests`);
+   `scripts/ci/run-checks.sh` (`php-lint`, `php-tests`, `php-plugin-tests`,
+   `plugin-tests`);
 3. публикует результаты как check runs с именами `php-lint`, `php-tests`,
-   `plugin-tests` и commit status `ci/recover` **на этот же SHA**;
+   `php-plugin-tests`, `plugin-tests` и commit status `ci/recover` **на этот
+   же SHA**;
 4. завершает отложенный мерж PR #71 (если он ещё открыт и head всё ещё равен
    проверенному коммиту). Если head уехал между проверкой и мержем, мерж
    безопасно пропускается; следующий push в PR-ветку запускает recovery уже
    по новому head;
-5. в конце запускает `scripts/ci/request-evidence-finalize.mjs`, который
-   диспатчит отдельный workflow `Finalize PR #71 evidence`
-   (`.github/workflows/finalize-pr71-evidence.yml`). Тот ждёт завершения
-   именно этого recovery-прогона и только потом вызывает
-   `scripts/ci/publish-evidence.mjs`: проверяет реальный успешный workflow
-   run, зелёные проверки на проверенном SHA и наличие merge commit, после чего
-   создаёт **или обновляет** один идемпотентный комментарий к PR #71 с
-   фактическими ссылками на run, проверки и merge commit. Поэтому в
-   комментарий никогда не попадает `in_progress` как итоговый результат.
-   Черновик не публикуется «как есть»: блок доказательств между маркерами
-   `<!-- testeb-66-evidence:start/end -->` заменяется данными из API, поэтому
-   старые in-progress доказательства не остаются и не дублируются.
+5. публикует доказательства через отдельный workflow `Finalize PR #71
+   evidence` (`.github/workflows/finalize-pr71-evidence.yml`), который
+   запускается тем же `push`, а не диспатчится из recovery. GitHub разрешает
+   `workflow_dispatch` только для workflow, уже существующего в базовой ветке;
+   именно на этом падал первый recovery-прогон после того, как проверки уже
+   были зелёными и PR уже был смержен. Теперь финализатор сам находит
+   recovery-прогон по точному SHA триггера (`--trigger-sha`), ждёт его
+   завершения и только потом вызывает `scripts/ci/publish-evidence.mjs`:
+   проверяет реальный успешный workflow run, зелёные проверки на проверенном
+   SHA и наличие merge commit, после чего создаёт **или обновляет** один
+   идемпотентный комментарий к PR #71 с фактическими ссылками на run, проверки
+   и merge commit. Поэтому в комментарий никогда не попадает `in_progress` как
+   итоговый результат. Черновик не публикуется «как есть»: блок доказательств
+   между маркерами `<!-- testeb-66-evidence:start/end -->` заменяется данными
+   из API, поэтому старые in-progress доказательства не остаются и не
+   дублируются.
 
 `name` и `run-name` workflow взяты в кавычки: без них `#71` в YAML считается
 началом комментария, и GitHub показывал бы прогон как «Recover PR». Теперь имя
@@ -105,12 +116,21 @@ recovery-workflow сможет завершить отложенный мерж 
 
 ### Фактический результат recovery
 
-Итог recovery появится в комментарии к PR #71 после первого запуска
-workflow. Финальный комментарий публикует только `Finalize PR #71 evidence`,
-когда recovery-прогон завершился успешно, проверки на проверенном SHA зелёные,
-а PR смержен. Ссылка на run, список проверок и merge commit подставляются из
-GitHub API, поэтому в `docs/testeb-66-comment.md` заранее не записываются
-вымышленные run id и merge commit.
+По PR #71 (`head = 19c4f0dbfb0b14eb7b9ef5fc6ecd6207769e5008`) recovery-прогон
+[#42487589325](https://github.com/sarnas-it/ebike-site/actions/runs/42487589325)
+опубликовал зелёные проверки `php-lint`, `php-tests`, `plugin-tests` на этом
+SHA и смержил PR: merge commit
+`99f296a30502af717ac31af5794928e5e540b136`, `merged=true`. Прогон при этом
+завершился `failure`, потому что последний шаг пытался диспатчить отдельный
+финализатор через `workflow_dispatch`, а того ещё не было в базовой ветке.
+Поэтому комментарий к PR не появился, хотя мерж и проверки уже были успешны.
+
+После перевода финализатора на триггер `push` тот же push запускает оба
+workflow: recovery проверяет актуальный head, публикует check runs и при
+необходимости мержит, а финализатор находит этот recovery-прогон по SHA
+триггера, дожидается его `completed/success` и обновляет комментарий
+фактическими данными из API. Ни `workflow_dispatch`, ни заглушки в комментарии
+для этого больше не нужны.
 
 ## Как проверить
 
@@ -179,18 +199,21 @@ bash scripts/ci/run-checks.sh .
   берёт актуальный head PR, даже если SHA из инцидента уже уехал, и помечает
   дрейф; PR без head SHA отклоняется.
 * `scripts/ci/tests/finalize-evidence.test.mjs` — finalizer ждёт
-  `completed`-прогон, не публикует упавший/незавершённый прогон и заменяет
+  `completed`-прогон, не публикует упавший/незавершённый прогон, находит
+  recovery-прогон по SHA триггера и не путает его с собственным прогоном
+  финализатора, а при отсутствии recovery-прогона остаётся red; заменяет
   старый in-progress блок доказательств финальным `completed/success` с
   ссылкой на run и merge commit.
 * `scripts/ci/tests/workflow-triggers.test.mjs` — фикстура без
   `pull_request` детектируется как сломанная; фикстура recovery без `push`,
-  нужных write-прав, checkout актуального head, `run-name` с целевым PR и
-  вызова финализатора доказательств детектируется как сломанная; реальные
-  `ci.yml`, `recover-pr71.yml` и `finalize-pr71-evidence.yml` проходят.
-  Дополнительно проверяется отсутствие `paths`-фильтра, динамическое
-  разрешение head вместо зашитого SHA, отказ recovery публиковать
-  `in_progress`, кавычки вокруг `name`/`run-name` с `#71` и полный набор
-  проверок в `run-checks.sh`.
+  нужных write-прав, checkout актуального head и `run-name` с целевым PR
+  детектируется как сломанная; реальные `ci.yml`, `recover-pr71.yml` и
+  `finalize-pr71-evidence.yml` проходят. Дополнительно проверяется отсутствие
+  `paths`-фильтра, динамическое разрешение head вместо зашитого SHA, отказ
+  recovery от хрупкого `workflow_dispatch` финализатора, отказ публиковать
+  `in_progress`, кавычки вокруг `name`/`run-name` с `#71`, push-триггер и
+  поиск recovery-прогона по SHA в финализаторе, исполнение PHP-контрактов
+  плагина в CI и полный набор проверок в `run-checks.sh`.
 * `scripts/ci/tests/recover-pr.test.mjs` — пустой/упавший набор проверок не
   даёт мержа, успешный даёт; проверяется, что check runs публикуются именно на
   целевой SHA, что recovery мержит разрешённый актуальный head после дрейфа,
@@ -199,6 +222,10 @@ bash scripts/ci/run-checks.sh .
   дублируется.
 * `scripts/ci/tests/run-checks.test.mjs` — здоровый checkout даёт зелёный
   результат, а падающий тест и битый PHP-синтаксис дают красный, то есть
-  recovery не может «позеленить» сломанный коммит.
+  recovery не может «позеленить» сломанный коммит. Отдельный red-green тест
+  кладёт синтаксически валидный, но падающий при исполнении
+  `accounts-contract-test.php`: без группы `php-plugin-tests` он проходил бы
+  только через `php -l`, а с ней прогон становится красным, то есть
+  приёмочная PHP-команда действительно исполняется.
 * `scripts/ci/tests/repair-pr-checks.test.mjs` — починка целится в head PR, а
   не в отдельную задачную ветку.

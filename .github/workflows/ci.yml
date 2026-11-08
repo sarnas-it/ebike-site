@@ -41,6 +41,25 @@ jobs:
             php "${test}"
           done
 
+  php-plugin-tests:
+    name: php-plugin-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Run accounts acceptance test
+        run: php wp/plugins/velotok-core/tests/accounts-contract-test.php
+      - name: Run plugin PHP contract tests
+        run: |
+          set -e
+          for test in wp/plugins/velotok-core/tests/*-test.php; do
+            echo "== ${test}"
+            php "${test}"
+          done
+
   plugin-tests:
     name: plugin-tests
     runs-on: ubuntu-latest

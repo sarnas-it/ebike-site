@@ -4,6 +4,7 @@ import process from 'node:process';
 import { EVIDENCE_START } from '../evidence.mjs';
 import {
   finalizeRecoveryEvidence,
+  findRecoveryRunForTrigger,
   isSuccessfulRecoveryRun,
   waitForRunCompletion,
 } from '../wait-and-publish-evidence.mjs';
@@ -203,11 +204,83 @@ async function testCompletedRunPublishesFinalEvidence() {
   console.log('PASS: completed run evidence replaces the stale in-progress block');
 }
 
+async function testDiscoversRecoveryRunForTriggerSha() {
+  const finalizerRun = {
+    id: 777,
+    path: '.github/workflows/finalize-pr71-evidence.yml',
+    status: 'in_progress',
+    conclusion: null,
+    created_at: '2026-11-08T00:00:01Z',
+  };
+  const recoveryRun = {
+    id: 778,
+    path: '.github/workflows/recover-pr71.yml',
+    status: 'in_progress',
+    conclusion: null,
+    created_at: '2026-11-08T00:00:00Z',
+  };
+  const { fetchImpl } = makeFetch((call) => {
+    if (call.url.includes('/actions/runs?') && call.method === 'GET') {
+      return response(200, { workflow_runs: [finalizerRun, recoveryRun] });
+    }
+    throw new Error(`unexpected request: ${call.method} ${call.url}`);
+  });
+
+  const run = await findRecoveryRunForTrigger({
+    owner: OWNER,
+    repo: REPO,
+    triggerSha: TARGET_SHA,
+    token: 'test-token',
+    fetchImpl,
+    timeoutMs: 0,
+  });
+
+  assert.strictEqual(run.id, recoveryRun.id);
+  assert.strictEqual(
+    run.path,
+    '.github/workflows/recover-pr71.yml',
+    'the finalizer must never mistake its own run for the recovery run',
+  );
+  console.log('PASS: the finalizer discovers the matching recovery run by trigger sha');
+}
+
+async function testMissingRecoveryRunIsNotInvented() {
+  const { fetchImpl } = makeFetch((call) => {
+    if (call.url.includes('/actions/runs?') && call.method === 'GET') {
+      return response(200, {
+        workflow_runs: [
+          {
+            id: 779,
+            path: '.github/workflows/finalize-pr71-evidence.yml',
+            status: 'completed',
+            conclusion: 'success',
+          },
+        ],
+      });
+    }
+    throw new Error(`unexpected request: ${call.method} ${call.url}`);
+  });
+
+  const run = await findRecoveryRunForTrigger({
+    owner: OWNER,
+    repo: REPO,
+    triggerSha: TARGET_SHA,
+    token: 'test-token',
+    fetchImpl,
+    timeoutMs: 0,
+  });
+
+  assert.strictEqual(run, null);
+  console.log('PASS: a finalizer run without a recovery run is red, not invented');
+}
+
 async function main() {
   await testWaitPollsUntilCompleted();
   await testWaitTimesOutWithoutFinishedRun();
   await testFailedRunIsNotPublished();
   await testCompletedRunPublishesFinalEvidence();
+  await testDiscoversRecoveryRunForTriggerSha();
+  await testMissingRecoveryRunIsNotInvented();
 }
 
 main().catch((error) => {
