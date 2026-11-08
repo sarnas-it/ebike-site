@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -63,6 +63,14 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'free_shipping'           => array(
 				'threshold_key' => 'free_from',
 				'rule'          => 'subtotal >= free_from',
+			),
+			'cost'                    => array(
+				'requirement'            => 'TESTEB-29',
+				'tariff'                 => 'base + per_kg * ceil(weight)',
+				'provider_tariff'        => 'provider',
+				'threshold_applies_to'   => 'subtotal',
+				'threshold_applies_to_provider' => true,
+				'fallback_tariff'        => false,
 			),
 			'pickup'                  => array(
 				'enabled'             => true,
@@ -852,9 +860,40 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_zones_free_shipping_threshold' ) ) {
+	/**
+	 * Resolve the configured free-shipping threshold for a method.
+	 *
+	 * @param mixed $method Method data.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_zones_free_shipping_threshold( $method ) {
+		$settings = velotok_core_delivery_zones_settings( $method );
+		$keys     = array( 'free_from', 'free_shipping_threshold', 'min_amount', 'minimum_amount' );
+		$value    = velotok_core_delivery_zones_value( $method, $keys, null );
+
+		if ( ! is_numeric( $value ) ) {
+			$value = null;
+
+			foreach ( $keys as $key ) {
+				if ( isset( $settings[ $key ] ) && is_numeric( $settings[ $key ] ) ) {
+					$value = $settings[ $key ];
+					break;
+				}
+			}
+		}
+
+		return is_numeric( $value ) ? (float) $value : null;
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 	/**
 	 * Calculate a method cost from the provider or the configured tariff.
+	 *
+	 * The configured free-shipping threshold applies to both the provider
+	 * tariff and the fallback tariff, so the customer is never charged above
+	 * the store's free-delivery threshold.
 	 *
 	 * @param mixed $method  Method data.
 	 * @param mixed $order   Order data.
@@ -875,54 +914,73 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 			);
 		}
 
-		if ( 'free_shipping' === velotok_core_delivery_zones_method_id( $method ) ) {
-			return array(
-				'ok'         => true,
-				'amount'     => 0.0,
-				'cost'       => 0.0,
-				'currency'   => 'RUB',
-				'free'       => true,
-				'weight'     => $weight['weight'],
-				'weight_kg'  => $weight['weight'],
-				'source'     => 'free_shipping',
-				'calculated' => true,
-			);
-		}
-
-		$provider = velotok_core_delivery_zones_provider_rate( $method, $order, $context );
-
-		if ( ! empty( $provider['ok'] ) ) {
-			return array(
-				'ok'         => true,
-				'amount'     => $provider['amount'],
-				'cost'       => $provider['amount'],
-				'currency'   => $provider['currency'],
-				'free'       => 0.0 === (float) $provider['amount'],
-				'weight'     => $weight['weight'],
-				'weight_kg'  => $weight['weight'],
-				'source'     => 'provider',
-				'calculated' => true,
-			);
-		}
-
-		if ( true === $provider['configured'] && empty( $provider['ok'] ) ) {
-			return array(
-				'ok'         => false,
-				'code'       => $provider['code'],
-				'error'      => $provider['error'],
-				'amount'     => null,
-				'weight'     => $weight['weight'],
-				'visible'    => true,
-				'calculated' => false,
-			);
-		}
-
 		$subtotal = velotok_core_delivery_zones_number(
 			velotok_core_delivery_zones_value( $order, array( 'subtotal', 'cart_subtotal' ), 0 )
 		);
 		$total    = velotok_core_delivery_zones_number(
 			velotok_core_delivery_zones_value( $order, array( 'total', 'cart_total' ), $subtotal )
 		);
+		$base_total = $subtotal > 0 ? $subtotal : $total;
+		$free_from  = velotok_core_delivery_zones_free_shipping_threshold( $method );
+		$free       = null !== $free_from && $base_total >= $free_from;
+		$weight_info = array(
+			'weight'                  => $weight['weight'],
+			'weight_kg'               => $weight['weight'],
+			'subtotal'                => $base_total,
+			'free_from'               => $free_from,
+			'free_shipping_threshold' => $free_from,
+		);
+
+		if ( 'free_shipping' === velotok_core_delivery_zones_method_id( $method ) ) {
+			return array_merge(
+				array(
+					'ok'         => true,
+					'amount'     => 0.0,
+					'cost'       => 0.0,
+					'currency'   => 'RUB',
+					'free'       => true,
+					'source'     => 'free_shipping',
+					'calculated' => true,
+				),
+				$weight_info
+			);
+		}
+
+		$provider = velotok_core_delivery_zones_provider_rate( $method, $order, $context );
+
+		if ( ! empty( $provider['ok'] ) ) {
+			$provider_amount = (float) $provider['amount'];
+			$amount          = $free ? 0.0 : $provider_amount;
+
+			return array_merge(
+				array(
+					'ok'              => true,
+					'amount'          => $amount,
+					'cost'            => $amount,
+					'currency'        => $provider['currency'],
+					'free'            => $free || 0.0 === $provider_amount,
+					'provider_amount' => $provider_amount,
+					'source'          => 'provider',
+					'calculated'      => true,
+				),
+				$weight_info
+			);
+		}
+
+		if ( true === $provider['configured'] && empty( $provider['ok'] ) ) {
+			return array_merge(
+				array(
+					'ok'         => false,
+					'code'       => $provider['code'],
+					'error'      => $provider['error'],
+					'amount'     => null,
+					'visible'    => true,
+					'calculated' => false,
+				),
+				$weight_info
+			);
+		}
+
 		$base = velotok_core_delivery_zones_number(
 			velotok_core_delivery_zones_value(
 				$method,
@@ -937,40 +995,27 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 				isset( $settings['per_kg'] ) ? $settings['per_kg'] : 0
 			)
 		);
-		$free_from = velotok_core_delivery_zones_value(
-			$method,
-			array( 'free_from', 'free_shipping_threshold', 'min_amount', 'minimum_amount' ),
-			isset( $settings['free_from'] )
-				? $settings['free_from']
-				: ( isset( $settings['min_amount'] )
-					? $settings['min_amount']
-					: ( isset( $settings['minimum_amount'] ) ? $settings['minimum_amount'] : null ) )
-		);
-		$free_from = is_numeric( $free_from ) ? (float) $free_from : null;
-		$base_total = $subtotal > 0 ? $subtotal : $total;
 		$round_weight = 'ceil' === $contract['weight']['rounding'] ? ceil( $weight['weight'] ) : $weight['weight'];
 		$amount = $base + $per_kg * $round_weight;
-		$free   = null !== $free_from && $base_total >= $free_from;
 
 		if ( $free ) {
 			$amount = 0.0;
 		}
 
-		return array(
-			'ok'                   => true,
-			'amount'               => round( $amount, 2 ),
-			'cost'                 => round( $amount, 2 ),
-			'currency'             => 'RUB',
-			'free'                 => $free,
-			'weight'               => $weight['weight'],
-			'weight_kg'            => $weight['weight'],
-			'billable_weight'      => $round_weight,
-			'base'                 => $base,
-			'per_kg'               => $per_kg,
-			'free_from'            => $free_from,
-			'free_shipping_threshold' => $free_from,
-			'source'               => 'tariff',
-			'calculated'           => true,
+		return array_merge(
+			array(
+				'ok'         => true,
+				'amount'     => round( $amount, 2 ),
+				'cost'       => round( $amount, 2 ),
+				'currency'   => 'RUB',
+				'free'       => $free,
+				'billable_weight' => $round_weight,
+				'base'       => $base,
+				'per_kg'     => $per_kg,
+				'source'     => 'tariff',
+				'calculated' => true,
+			),
+			$weight_info
 		);
 	}
 }
