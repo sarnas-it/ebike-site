@@ -527,11 +527,31 @@ function testRolloutVerificationWorkflowIsWired() {
   );
   assert.ok(
     /github\.event\.pull_request\.number\s*==\s*65/.test(text),
-    'the pull_request run must target PR #65 so it attaches a normal check run to the real head',
+    'a pull_request for PR #65 must pin the verified commit to its own head',
+  );
+  assert.ok(
+    !/^\s{4}if:\s*\$\{\{\s*github\.event_name != 'pull_request'/m.test(text),
+    'the rollout gate must not be skipped for a re-submission in another pull request',
+  );
+  assert.ok(
+    /verify-submitted-ci:/.test(text),
+    'a re-submission must get its own check that ci ran on the submitted head',
+  );
+  assert.ok(
+    /github\.event\.pull_request\.number\s*!=\s*65/.test(text),
+    'the submitted-head job must run for pull requests other than #65',
+  );
+  assert.ok(
+    /--pr "\$SUBMITTED_PR"[\s\S]*?--sha "\$SUBMITTED_SHA"/.test(text),
+    'the submitted-head check must verify the exact pull request and commit being submitted',
   );
   assert.ok(
     text.includes('scripts/ci/verify-rollout.mjs'),
     'rollout verification must call the red-green gate',
+  );
+  assert.ok(
+    text.includes('scripts/ci/verify-mergeable.mjs'),
+    'criterion 3 must be checked independently of CI on PR #65',
   );
   assert.ok(
     text.includes('scripts/ci/publish-rollout-evidence.mjs'),
@@ -542,10 +562,10 @@ function testRolloutVerificationWorkflowIsWired() {
     'publishing the evidence comment requires pull-requests: write',
   );
   assert.ok(
-    /TARGET_SHA:\s*\$\{\{\s*github\.event_name == 'pull_request'\s*&&\s*github\.event\.pull_request\.head\.sha\s*\|\|\s*''\s*\}\}/.test(
+    /TARGET_SHA:\s*\$\{\{\s*github\.event_name == 'pull_request'\s*&&\s*github\.event\.pull_request\.number == 65\s*&&\s*github\.event\.pull_request\.head\.sha\s*\|\|\s*''\s*\}\}/.test(
       text,
     ),
-    'a pull_request run must pin the verified commit to the actual PR head',
+    'a pull_request run for PR #65 must pin the verified commit to that PR head, not to another submission head',
   );
   assert.ok(
     /if \[ -n "\$TARGET_SHA" \]; then[\s\S]*?target_args=\(--sha "\$TARGET_SHA"\)/.test(

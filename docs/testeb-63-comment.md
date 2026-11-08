@@ -134,3 +134,34 @@ Recovery-workflow `Recover PR #62 checks`
 recovery-прогон не завершился успешно или проверки не зелёные, скрипт
 `scripts/ci/publish-evidence.mjs` не публикует подтверждение, а завершает job
 ошибкой.
+
+### Повторная сдача в отдельном PR: доказательства не смешиваются
+
+Критерии приёмки проверяются двумя независимыми гейтами на коммите сдачи:
+
+1. **Критерий 2 — CI на коммите сдачи.** Job `verify-submitted-ci` в
+   `.github/workflows/verify-ci-rollout.yml` запускается на pull request, отличном
+   от #65, и вызывает
+   `node scripts/ci/verify-rollout.mjs --pr <номер PR сдачи> --sha <head PR сдачи>`.
+   Гейт требует `ci`-прогон `completed/success` именно на этом SHA, полный набор
+   job и штатные check runs, привязанные к этому же коммиту. Ссылку на прогон
+   исполнитель указывает в результате сдачи (result), а не файлом в репозитории.
+2. **Критерий 3 — PR #65 mergeable.** `scripts/ci/verify-mergeable.mjs` проверяет,
+   что PR #65 нацелен в `main`, открыт (или смержен) и имеет `mergeable=true` без
+   конфликтов. Этот гейт не требует прогона `ci` на PR #65, поэтому сдача в
+   другом PR не может ни подменить, ни заблокировать его искусственным
+   требованием чужого зелёного прогона. Red-green тест:
+   `scripts/ci/tests/mergeability.test.mjs`.
+
+Отдельный job `verify-fix-pr` по-прежнему проверяет сам PR #65 (или его merge
+commit) и обновляет комментарий `<!-- testeb-63-rollout -->`. Номера прогонов и
+SHA в репозиторий не коммитятся: доказательство всегда относится к коммиту
+текущей сдачи и указывается в её результате.
+
+`recover-pr.yml` теперь выполняет решение recovery изнутри checkout-каталога
+`tooling` (`working-directory: tooling`, `node scripts/ci/should-recover.mjs`),
+то есть ровно тот файл `scripts/ci/should-recover.mjs`, который импортируют
+тесты и который разбирает `--require-missing-ci-run`. Тест
+`scripts/ci/tests/no-checks-recovery.test.mjs` проверяет это и запускает
+`--help` реального файла, поэтому зелёные тесты доказывают, что джоба применит
+новый флаг, а не префиксную копию.

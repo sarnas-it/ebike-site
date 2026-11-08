@@ -53,6 +53,12 @@ jobs:
 
       - name: Decide whether recovery is needed
         id: need
+        # Run the decision script from inside the tooling checkout. The script
+        # lives at scripts/ci/should-recover.mjs in the repository; invoking it
+        # through this relative path guarantees the workflow executes exactly
+        # the flags/behaviour that the tests exercise, instead of a separately
+        # prefixed location that could drift from the source.
+        working-directory: tooling
         env:
           GITHUB_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
@@ -82,7 +88,7 @@ jobs:
             # Only take over when GitHub never started ci for this commit.
             args+=(--require-missing-ci-run --workflow .github/workflows/ci.yml)
           fi
-          node tooling/scripts/ci/should-recover.mjs "${args[@]}"
+          node scripts/ci/should-recover.mjs "${args[@]}"
 
       - name: Check out resolved pull request head
         if: steps.need.outputs.needed == 'true'

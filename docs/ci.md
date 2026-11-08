@@ -700,3 +700,27 @@ Red-green проверка критериев приёмки:
 post-fix снимок (run #42505520113, merge `330a631...`) зелёным.
 
 Проверка: `for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done`.
+
+## Повторная сдача TESTEB-63 в отдельном PR: два независимых доказательства
+
+Критерии 2 и 3 проверяются раздельно, чтобы сдача в новом pull request не
+подменяла доказательство для PR #65 и наоборот.
+
+* `verify-submitted-ci` (job в `.github/workflows/verify-ci-rollout.yml`)
+  запускается на любом `pull_request`, кроме #65, и вызывает
+  `scripts/ci/verify-rollout.mjs --pr <номер сдаваемого PR> --sha <head этого
+  PR>`. Так проверяется именно прогон `ci` на коммите из сдачи: он должен быть
+  `completed/success` со всеми job и штатными check runs, привязанными к этому
+  же SHA. Ссылку на этот прогон исполнитель указывает в результате сдачи.
+* `verify-fix-pr` продолжает проверять сам PR #65 (или merge commit после
+  мержа) и публикует комментарий `<!-- testeb-63-rollout -->`.
+* `scripts/ci/verify-mergeable.mjs` проверяет ровно критерий 3: PR #65 нацелен
+  в `main`, открыт (или уже смержен) и имеет `mergeable=true` без конфликтов
+  (`mergeable_state != dirty`). Этот гейт намеренно не требует прогона `ci` на
+  PR #65: зелёный прогон должен относиться к коммиту текущей сдачи, а не к
+  чужому PR. Red-green тест — `scripts/ci/tests/mergeability.test.mjs`.
+
+Таким образом, новый PR получает собственный check run на своём head
+(`verify-submitted-ci`), а готовность PR #65 к автомержу подтверждается
+отдельным check run. Файлы-доказательства с номерами прогонов в репозиторий не
+коммитятся: коммит с такой ссылкой сам меняет сдаваемый SHA.
