@@ -1,0 +1,120 @@
+name: "Recover PR #71 checks"
+run-name: "Recover PR #71 checks from ${{ github.sha }}"
+
+# The pull request #71 head predates any workflow file, so GitHub never created
+# a run for it and will not do so retroactively. This workflow runs the regular
+# checks against the pull request's *current* head (which may have moved since
+# the incident), publishes the results as check runs/status on that exact
+# commit, and completes the deferred merge when it is still open.
+#
+# The SHA from the incident report is only used for auditing. Pinning recovery to
+# it would skip the merge whenever the head moved, which is exactly what must not
+# happen.
+#
+# Evidence publication is handled by the separate finalizer workflow, which is
+# triggered by the same push instead of being dispatched from this job. A
+# workflow_dispatch call from here failed because the finalizer did not exist on
+# the default branch yet, even though the checks had already passed and the PR
+# had already been merged.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  checks: write
+  statuses: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: recover-pr-71
+  cancel-in-progress: false
+
+env:
+  TARGET_PR: '71'
+  INCIDENT_SHA: '19c4f0dbfb0b14eb7b9ef5fc6ecd6207769e5008'
+  CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  recover:
+    name: Recover PR #71 checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out CI tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+          persist-credentials: false
+
+      - name: Resolve the current pull request head
+        id: target
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tooling/scripts/ci/resolve-pr-target.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$TARGET_PR" \
+            --expected-sha "$INCIDENT_SHA" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Check out resolved head commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Record checked commit
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+          HEAD_REF: ${{ steps.target.outputs.head_ref }}
+          DRIFTED: ${{ steps.target.outputs.drifted }}
+        run: |
+          set -euo pipefail
+          checked="$(git -C target rev-parse HEAD)"
+          test "$checked" = "$TARGET_SHA"
+          {
+            echo "Checked commit: $checked"
+            echo "Head branch: $HEAD_REF"
+            echo "Incident commit: $INCIDENT_SHA"
+            echo "Incident commit drifted: $DRIFTED"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Run repository checks against resolved head
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          set -euo pipefail
+          bash tooling/scripts/ci/run-checks.sh target "$RUNNER_TEMP/checks.json" || true
+          cat "$RUNNER_TEMP/checks.json"
+
+      - name: Publish checks and complete deferred merge
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          set -euo pipefail
+          node tooling/scripts/ci/recover-pr.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$TARGET_PR" \
+            --sha "$TARGET_SHA" \
+            --results "$RUNNER_TEMP/checks.json" \
+            --details-url "$CI_RUN_URL" \
+            --summary "Recovered checks for PR #${TARGET_PR} at ${TARGET_SHA}"
+
