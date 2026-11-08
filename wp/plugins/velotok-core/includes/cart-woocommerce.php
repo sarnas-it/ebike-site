@@ -2029,14 +2029,22 @@ function velotok_core_wc_cart_validate_checkout_auth() {
 /**
  * Clamp a quantity before WooCommerce adds a product to the cart.
  *
- * @param mixed $quantity   Quantity.
- * @param int   $product_id Product id.
+ * @param mixed $quantity     Quantity.
+ * @param int   $product_id   Product id.
+ * @param int   $variation_id Variation id.
  * @return int
  */
-function velotok_core_wc_cart_filter_add_quantity( $quantity, $product_id = 0 ) {
-	$quantity = is_numeric( $quantity ) ? (int) $quantity : 1;
+function velotok_core_wc_cart_filter_add_quantity( $quantity, $product_id = 0, $variation_id = 0 ) {
+	$quantity  = is_numeric( $quantity ) ? (int) $quantity : 1;
+	$max       = velotok_core_wc_cart_max_quantity( (int) $product_id );
+	$existing  = velotok_core_wc_cart_quantity_for_product( (int) $product_id, (int) $variation_id );
+	$remaining = $max - $existing;
 
-	return min( $quantity, velotok_core_wc_cart_max_quantity( (int) $product_id ) );
+	if ( $remaining < 1 ) {
+		return 0;
+	}
+
+	return min( $quantity, $remaining );
 }
 
 /**
@@ -2050,7 +2058,7 @@ function velotok_core_wc_cart_filter_add_quantity( $quantity, $product_id = 0 ) 
  * @return bool
  */
 function velotok_core_wc_cart_validate_add_quantity( $passed, $product_id, $quantity, $variation_id = 0, $variations = array() ) {
-	unset( $variation_id, $variations );
+	unset( $variations );
 
 	if ( ! is_numeric( $quantity ) || (int) $quantity < 1 ) {
 		if ( function_exists( 'wc_add_notice' ) ) {
@@ -2060,7 +2068,11 @@ function velotok_core_wc_cart_validate_add_quantity( $passed, $product_id, $quan
 		return false;
 	}
 
-	if ( (int) $quantity > velotok_core_wc_cart_max_quantity( (int) $product_id ) ) {
+	$max       = velotok_core_wc_cart_max_quantity( (int) $product_id );
+	$existing  = velotok_core_wc_cart_quantity_for_product( (int) $product_id, (int) $variation_id );
+	$requested = $existing + (int) $quantity;
+
+	if ( (int) $quantity > $max || $requested > $max ) {
 		if ( function_exists( 'wc_add_notice' ) ) {
 			wc_add_notice( 'Превышено максимальное количество товара в корзине.', 'error' );
 		}
@@ -2287,5 +2299,5 @@ if ( function_exists( 'add_action' ) ) {
 }
 
 if ( function_exists( 'add_filter' ) ) {
-	add_filter( 'woocommerce_add_to_cart_quantity', 'velotok_core_wc_cart_filter_add_quantity', 10, 2 );
+	add_filter( 'woocommerce_add_to_cart_quantity', 'velotok_core_wc_cart_filter_add_quantity', 10, 3 );
 }
