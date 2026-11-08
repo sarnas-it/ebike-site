@@ -130,11 +130,11 @@ $meta_query_block = "\t\t\t\$meta_query = array(\n"
 $mutations = array(
 	'marking TESTEB-26' => str_replace(
 		array(
-			"array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-26' )",
+			"array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-26', 'TESTEB-27' )",
 			"'requirement'       => 'TESTEB-26',",
 		),
 		array(
-			"array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25' )",
+			"array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-27' )",
 			"'requirement'       => 'TESTEB-23',",
 		),
 		$source

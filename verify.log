@@ -1,5 +1,5 @@
 TESTEB-63: CI не дал результат (no_checks): TESTEB-1 — sarnas-it/ebike-site#62
-================================================================
+----------------------------------------------------------------
 
 Причина no_checks
 -----------------
@@ -85,9 +85,10 @@ scripts/ci/tests/submitted-sha-evidence.test.mjs)
 $ node scripts/ci/tests/submitted-sha-evidence.test.mjs
 PASS: the submitted SHA has its own green ci run, standard check runs and a mergeable PR (criteria 2 and 3)
 PASS: evidence recorded on the submitted SHA is rejected for any later submission
+PASS: a run without commit provenance is rejected as evidence for the submitted SHA
 PASS: criterion 3 requires mergeable=true without conflicts
 PASS: the evidence comment always pins the submitted SHA to its own run
-PASS: the task comment cites the submitted SHA and its own run instead of a different commit
+PASS: documentation leaves the run link to the submission result instead of pinning a stale SHA
 exit code: 0
 
 PHP-файлы продуктовых пакетов в этой правке не менялись: изменены только
