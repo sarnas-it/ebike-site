@@ -112,8 +112,13 @@ export function selectLatestCiRun(runs, targetSha, expectedWorkflowPath = WORKFL
     if (!run) {
       return false;
     }
-    if (targetSha && run.head_sha && run.head_sha !== targetSha) {
-      return false;
+    if (targetSha) {
+      // A run that does not name the commit it ran for cannot be tied to the
+      // submitted SHA. Accepting it would let a run from another commit stand
+      // in for this submission, so it is not even a candidate.
+      if (!run.head_sha || String(run.head_sha) !== String(targetSha)) {
+        return false;
+      }
     }
     const runPath = run.path || run.workflow_path;
     if (runPath && expectedWorkflowPath && runPath !== expectedWorkflowPath) {

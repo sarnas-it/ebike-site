@@ -91,6 +91,22 @@ function testEvidenceFromSubmittedHeadCannotProveALaterHead() {
   );
 }
 
+function testRunWithoutCommitProvenanceIsNotACandidate() {
+  // Regression for the review finding: a run whose payload does not name the
+  // commit must not be selected for the submitted SHA. Before the fix such a
+  // run slipped through the candidate filter because the head_sha check was
+  // skipped when the field was missing.
+  const { head_sha: _headSha, ...anonymousRun } = fixture.run;
+  assert.strictEqual(
+    selectLatestCiRun([anonymousRun], SUBMITTED_SHA, '.github/workflows/ci.yml'),
+    null,
+    'a run without head_sha cannot be tied to the submitted SHA',
+  );
+  console.log(
+    'PASS: a run without commit provenance is rejected as evidence for the submitted SHA',
+  );
+}
+
 function testMergeableStateIsRequired() {
   const conflicting = evidenceFor({
     pr: { ...fixture.pullRequest, mergeable: false, mergeable_state: 'dirty' },
@@ -161,38 +177,56 @@ function testCommentPinsSubmittedShaAndItsOwnRun() {
   );
 }
 
-function testDocumentationRecordsSubmittedShaEvidence() {
+function testDocumentationDoesNotPinAStaleSubmission() {
+  // Regression for the review finding: the task comment used to cite a run on
+  // the previously rejected head as if it were evidence for the current
+  // submission. Committing any particular run/SHA is self-defeating because
+  // the evidence commit changes the submitted SHA. The documentation must
+  // describe the dynamic per-head workflow and leave the actual run link to
+  // the submission result instead of pinning a stale one.
   const comment = readFileSync(
     path.join(repoRoot, 'docs/testeb-63-comment.md'),
     'utf8',
   );
   assert.ok(
-    comment.includes(SUBMITTED_SHA),
-    'the task comment must name the submitted SHA whose run is being cited',
+    !comment.includes(SUBMITTED_SHA),
+    'the task comment must not pin the previously submitted SHA as current evidence',
   );
   assert.ok(
-    comment.includes(SUBMITTED_RUN_URL),
-    'the task comment must link the ci run on that exact SHA',
+    !comment.includes(SUBMITTED_RUN_URL),
+    'the task comment must not pin a run from an older submission as evidence',
   );
   assert.ok(
-    comment.includes(String(SUBMITTED_RUN_ID)),
-    'the task comment must name the run id so it can be cross-checked',
+    !comment.includes(String(SUBMITTED_RUN_ID)),
+    'the task comment must not cite a stale run id',
   );
   assert.ok(
-    comment.includes(`verify-ci-rollout`),
+    comment.includes(`verify-ci-rollout`) && comment.includes('TARGET_SHA'),
     'the task comment must mention the workflow that regenerates evidence per head',
   );
+  assert.ok(
+    comment.includes(MARKER),
+    'the task comment must point at the per-head evidence comment',
+  );
+  for (const relative of ['docs/ci.md', 'verify.log']) {
+    const text = readFileSync(path.join(repoRoot, relative), 'utf8');
+    assert.ok(
+      !text.includes(SUBMITTED_SHA) && !text.includes(SUBMITTED_RUN_URL),
+      `${relative} must not pin a run from a previous submission as evidence`,
+    );
+  }
   console.log(
-    'PASS: the task comment cites the submitted SHA and its own run instead of a different commit',
+    'PASS: documentation leaves the run link to the submission result instead of pinning a stale SHA',
   );
 }
 
 function main() {
   testRecordedSubmittedHeadIsGreen();
   testEvidenceFromSubmittedHeadCannotProveALaterHead();
+  testRunWithoutCommitProvenanceIsNotACandidate();
   testMergeableStateIsRequired();
   testCommentPinsSubmittedShaAndItsOwnRun();
-  testDocumentationRecordsSubmittedShaEvidence();
+  testDocumentationDoesNotPinAStaleSubmission();
 }
 
 try {
