@@ -130,6 +130,17 @@ async function main() {
         .join(', ') || 'none'
     }\n`,
   );
+  process.stdout.write(
+    `check runs:       ${
+      (evidence.checkRuns || [])
+        .map(
+          (check) =>
+            `${check.name}=${check.conclusion ?? check.status ?? 'unknown'}` +
+            `@${check.headSha ?? 'unknown'}/suite:${check.checkSuiteId ?? 'unknown'}`,
+        )
+        .join(', ') || 'none'
+    }\n`,
+  );
 
   if (!evidence.ready) {
     process.stdout.write(`problems:         ${evidence.problems.join('; ')}\n`);

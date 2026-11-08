@@ -427,6 +427,53 @@ function testSyntheticCheckRunsAreRejected() {
   console.log('PASS: synthetic green check runs are not accepted as CI evidence');
 }
 
+function testCheckRunsFromAnotherSuiteLinkToRunAreRejected() {
+  // A check run can point its details_url at the verified ci run while still
+  // belonging to a different check suite (for example one created manually via
+  // the Checks API). The check suite, not the link, proves provenance.
+  const foreign = STANDARD_CHECK_RUNS.map((check) => ({
+    ...check,
+    check_suite: { id: CHECK_SUITE_ID + 1 },
+  }));
+  const evidence = greenEvidence({ checkRuns: foreign });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some((problem) =>
+      problem.includes('synthetic Checks API evidence is not accepted'),
+    ),
+    'check runs from another check suite must not satisfy the gate even if they link to the run',
+  );
+  assert.strictEqual(
+    evidence.run.checkSuiteId,
+    CHECK_SUITE_ID,
+    'the verified run must expose its check suite id for provenance checks',
+  );
+  console.log(
+    'PASS: check runs from another check suite are rejected even when they link to the ci run',
+  );
+}
+
+function testCheckRunsForAnotherCommitAreRejected() {
+  // The reviewer saw a green run for 7052bf2 while the submission was
+  // b774c408. A check run attached to the older commit must never count for
+  // the submitted head, even if it belongs to the same ci run/suite.
+  const fromStaleCommit = STANDARD_CHECK_RUNS.map((check) => ({
+    ...check,
+    head_sha: STALE_SHA,
+  }));
+  const evidence = greenEvidence({ checkRuns: fromStaleCommit });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some(
+      (problem) =>
+        problem.includes(`is for ${STALE_SHA}`) &&
+        problem.includes(`expected ${HEAD_SHA}`),
+    ),
+    'check runs must be attached to the exact submitted commit, not an older one',
+  );
+  console.log('PASS: standard check runs from another commit are rejected');
+}
+
 function testFailedStandardCheckRunIsRed() {
   const failed = greenEvidence({
     checkRuns: STANDARD_CHECK_RUNS.map((check) =>
@@ -677,6 +724,8 @@ async function main() {
   testWrongWorkflowPathIsRed();
   testStandardCheckRunsFromTheCiRunAreRequired();
   testSyntheticCheckRunsAreRejected();
+  testCheckRunsFromAnotherSuiteLinkToRunAreRejected();
+  testCheckRunsForAnotherCommitAreRejected();
   testFailedStandardCheckRunIsRed();
   testLatestRunWins();
   await testCollectsFromApiByRunId();

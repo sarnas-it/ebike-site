@@ -33,6 +33,7 @@ function normalizeRun(run) {
     conclusion: run.conclusion ?? null,
     headSha: run.head_sha ?? null,
     headBranch: run.head_branch ?? null,
+    checkSuiteId: run.check_suite_id ?? run.check_suite?.id ?? null,
     createdAt: run.created_at ?? null,
     updatedAt: run.updated_at ?? null,
   };
@@ -69,12 +70,11 @@ function checkRunBelongsToRun(check, run) {
     return true;
   }
   const runSuiteId = run?.checkSuiteId ?? null;
-  if (
-    runSuiteId != null &&
-    check.checkSuiteId != null &&
-    String(check.checkSuiteId) === String(runSuiteId)
-  ) {
-    return true;
+  if (runSuiteId != null && check.checkSuiteId != null) {
+    // Both sides name a suite: they must be the same suite. Never fall back to
+    // the details URL here, otherwise a check run from another run/suite that
+    // merely links to the verified run could be accepted.
+    return String(check.checkSuiteId) === String(runSuiteId);
   }
   if (check.detailsUrl) {
     return check.detailsUrl.includes(`/actions/runs/${run.id}`);
@@ -84,6 +84,16 @@ function checkRunBelongsToRun(check, run) {
     return true;
   }
   return false;
+}
+
+// Even a check run that belongs to the verified ci run must be attached to the
+// exact commit this gate is certifying. A check run for an older head (for
+// example 7052bf2 when the submission is b774c408) must not count.
+function checkRunIsForCommit(check, targetSha) {
+  if (!targetSha || !check.headSha) {
+    return true;
+  }
+  return String(check.headSha) === String(targetSha);
 }
 
 function runTimestamp(run) {
@@ -272,7 +282,18 @@ export function summarizeRolloutEvidence({
         );
         continue;
       }
-      const standard = named.filter((check) =>
+      const forCommit = named.filter((check) =>
+        checkRunIsForCommit(check, resolvedSha),
+      );
+      if (forCommit.length === 0) {
+        const wrongSha = named.find((check) => check.headSha)?.headSha ?? 'unknown';
+        problems.push(
+          `check run ${name} is for ${wrongSha}, expected ${resolvedSha}; ` +
+            'a check run from another commit is not evidence for this head',
+        );
+        continue;
+      }
+      const standard = forCommit.filter((check) =>
         checkRunBelongsToRun(check, normalizedRun),
       );
       if (standard.length === 0) {

@@ -27,7 +27,15 @@ jobs:
     name: verify-ci-rollout
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.number == 65 }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    env:
+      # For a pull_request event the gate is pinned to the exact head commit
+      # being submitted (not whatever the pull request head happens to be
+      # later). For a push to main it stays empty so the gate verifies the
+      # commit that actually landed: the merge commit once PR #65 is merged,
+      # and the pull request head before that. This is what makes the evidence
+      # refer to the submitted/landed commit instead of an older green run.
+      TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,13 +46,18 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
-          echo "event=${GITHUB_EVENT_NAME} ref=${GITHUB_REF} sha=${GITHUB_SHA}" \
+          target_args=()
+          if [ -n "$TARGET_SHA" ]; then
+            target_args=(--sha "$TARGET_SHA")
+          fi
+          echo "event=${GITHUB_EVENT_NAME} ref=${GITHUB_REF} sha=${GITHUB_SHA} target=${TARGET_SHA:-auto}" \
             >>"$GITHUB_STEP_SUMMARY"
           attempt=1
           until node scripts/ci/verify-rollout.mjs \
             --repo "$GITHUB_REPOSITORY" \
-            --pr 65; do
-            if [ "$attempt" -ge 30 ]; then
+            --pr 65 \
+            "${target_args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"; do
+            if [ "$attempt" -ge 60 ]; then
               echo "rollout verification stayed red after ${attempt} attempts" >&2
               exit 1
             fi
@@ -57,7 +70,20 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          target_args=()
+          if [ -n "$TARGET_SHA" ]; then
+            target_args=(--sha "$TARGET_SHA")
+          fi
           node scripts/ci/publish-rollout-evidence.mjs \
             --repo "$GITHUB_REPOSITORY" \
             --pr 65 \
-            --marker '<!-- testeb-63-rollout -->'
+            "${target_args[@]}" \
+            --marker '<!-- testeb-63-rollout -->' \
+            | tee "$RUNNER_TEMP/rollout-evidence.md"
+      - name: Upload the verified rollout evidence
+        if: ${{ success() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollout-evidence
+          path: ${{ runner.temp }}/rollout-evidence.md
+          if-no-files-found: error

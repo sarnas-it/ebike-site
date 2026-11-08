@@ -301,6 +301,31 @@ function testRolloutVerificationWorkflowIsWired() {
     /pull-requests:\s*write/.test(text),
     'publishing the evidence comment requires pull-requests: write',
   );
+  assert.ok(
+    /TARGET_SHA:\s*\$\{\{\s*github\.event_name == 'pull_request'\s*&&\s*github\.event\.pull_request\.head\.sha\s*\|\|\s*''\s*\}\}/.test(
+      text,
+    ),
+    'a pull_request run must pin the verified commit to the actual PR head',
+  );
+  assert.ok(
+    /if \[ -n "\$TARGET_SHA" \]; then[\s\S]*?target_args=\(--sha "\$TARGET_SHA"\)/.test(
+      text,
+    ),
+    'the pinned head must be passed only when the event supplies it (push verifies the landed commit)',
+  );
+  assert.ok(
+    /verify-rollout\.mjs[\s\S]*?"\$\{target_args\[@\]\}"/.test(text),
+    'verify-rollout must verify the pinned commit, not whatever the PR head later becomes',
+  );
+  assert.ok(
+    /publish-rollout-evidence\.mjs[\s\S]*?"\$\{target_args\[@\]\}"/.test(text),
+    'the published evidence comment must be pinned to the same verified commit',
+  );
+  assert.ok(
+    /actions\/upload-artifact@v4/.test(text) &&
+      /path:\s*\$\{\{\s*runner\.temp\s*\}\}\/rollout-evidence\.md/.test(text),
+    'the verified evidence must be stored as an artifact, not only in an editable comment',
+  );
   console.log('PASS: rollout verification runs on PR #65, push to main and manually');
 }
 
