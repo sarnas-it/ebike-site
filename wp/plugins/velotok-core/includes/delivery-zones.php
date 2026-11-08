@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -94,6 +94,38 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'independent_of_zone' => true,
 				'only_russia'         => true,
 				'country'             => 'RU',
+				'points_by_radius'    => true,
+				'points_requirement'  => 'TESTEB-32',
+			),
+			'pickup_points'           => array(
+				'requirement'        => 'TESTEB-32',
+				'source'             => 'provider',
+				'providers'          => array( 'cdek', 'russian_post' ),
+				'unit'               => 'km',
+				'distance'           => 'haversine',
+				'sort'               => 'distance',
+				'sort_by'            => 'distance',
+				'radius_key'         => 'radius_km',
+				'radius_keys'        => array( 'radius_km', 'pickup_radius_km', 'pickup_points_radius_km', 'pickup_points_radius', 'max_distance_km', 'radius' ),
+				'default_radius_km'  => 10.0,
+				'default_radius'     => 10.0,
+				'radius_km'          => 10.0,
+				'radius'             => 10.0,
+				'max_radius_km'      => 100.0,
+				'max_distance_km'    => 100.0,
+				'points_key'         => 'points',
+				'coordinate_keys'    => array( 'lat', 'latitude', 'lon', 'lng', 'longitude', 'coordinates', 'coords', 'location', 'geo' ),
+				'require_address_coordinates' => true,
+				'only_russia'        => true,
+				'country'            => 'RU',
+				'explicit_failure'   => true,
+				'failure_visible'    => true,
+				'unavailable_code'   => 'DELIVERY_PICKUP_POINTS_UNAVAILABLE',
+				'error_code'         => 'DELIVERY_PICKUP_POINTS_ERROR',
+				'no_address_code'    => 'DELIVERY_PICKUP_POINTS_ADDRESS_AMBIGUOUS',
+				'no_coordinates_code'=> 'DELIVERY_PICKUP_POINTS_NO_COORDINATES',
+				'empty_code'         => 'DELIVERY_PICKUP_POINTS_EMPTY',
+				'outside_radius_code'=> 'DELIVERY_PICKUP_POINTS_OUTSIDE_RADIUS',
 			),
 			'out_of_zone'             => array(
 				'code'             => 'DELIVERY_ZONE_NOT_FOUND',
@@ -306,6 +338,16 @@ if ( ! function_exists( 'velotok_core_delivery_zones_address' ) ) {
 		}
 
 		$normalized['country'] = strtoupper( $normalized['country'] );
+
+		$coordinates = velotok_core_delivery_pickup_point_coordinates( $address );
+
+		if ( null !== $coordinates ) {
+			$normalized['lat']         = $coordinates['lat'];
+			$normalized['lon']         = $coordinates['lon'];
+			$normalized['latitude']    = $coordinates['lat'];
+			$normalized['longitude']   = $coordinates['lon'];
+			$normalized['coordinates'] = array( 'lat' => $coordinates['lat'], 'lon' => $coordinates['lon'] );
+		}
 
 		return $normalized;
 	}
@@ -1423,7 +1465,963 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 			}
 		}
 
+		$pickup_providers = isset( $contract['pickup_points']['providers'] ) ? $contract['pickup_points']['providers'] : array();
+
+		if ( in_array( $method_id, $pickup_providers, true ) ) {
+			$points_context = $context;
+			$points_context['provider'] = $method_id;
+			$points_result = velotok_core_delivery_pickup_points(
+				isset( $context['address'] ) ? $context['address'] : array(),
+				null,
+				$points_context
+			);
+			$option['pickup_points']        = isset( $points_result['points'] ) ? $points_result['points'] : array();
+			$option['points']               = isset( $points_result['points'] ) ? $points_result['points'] : array();
+			$option['pickup_points_result'] = $points_result;
+			$option['pickup_points_radius_km'] = isset( $points_result['radius_km'] ) ? $points_result['radius_km'] : null;
+		}
+
 		return array( $key, $option );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_contract' ) ) {
+	/**
+	 * Return the pickup points contract section.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_contract() {
+		$contract = velotok_core_delivery_zones_contract();
+
+		return isset( $contract['pickup_points'] ) && is_array( $contract['pickup_points'] )
+			? $contract['pickup_points']
+			: array();
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_coordinates_pair' ) ) {
+	/**
+	 * Validate and normalize a latitude/longitude pair.
+	 *
+	 * @param mixed $lat Latitude.
+	 * @param mixed $lon Longitude.
+	 * @return array<string,float>|null
+	 */
+	function velotok_core_delivery_pickup_coordinates_pair( $lat, $lon ) {
+		if ( ! is_numeric( $lat ) || ! is_numeric( $lon ) ) {
+			return null;
+		}
+
+		$lat = (float) $lat;
+		$lon = (float) $lon;
+
+		if ( $lat < -90.0 || $lat > 90.0 || $lon < -180.0 || $lon > 180.0 ) {
+			return null;
+		}
+
+		return array(
+			'lat'       => $lat,
+			'lon'       => $lon,
+			'latitude'  => $lat,
+			'longitude' => $lon,
+		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_point_coordinates' ) ) {
+	/**
+	 * Resolve coordinates from an address or a pickup point.
+	 *
+	 * Plain fields (lat/lon, latitude/longitude), nested coordinate arrays,
+	 * GeoJSON points and "lat,lon" strings are accepted so both provider
+	 * adapters can supply their point list in their native shape.
+	 *
+	 * @param mixed $source Address or point data.
+	 * @return array<string,float>|null
+	 */
+	function velotok_core_delivery_pickup_point_coordinates( $source ) {
+		$lat_keys = array( 'lat', 'latitude', 'lat_deg', 'geo_lat', 'location_lat' );
+		$lon_keys = array( 'lon', 'lng', 'longitude', 'lon_deg', 'geo_lon', 'location_lon' );
+
+		if ( is_string( $source ) ) {
+			$text = trim( $source );
+
+			if ( '' === $text ) {
+				return null;
+			}
+
+			$decoded = json_decode( $text, true );
+
+			if ( is_array( $decoded ) ) {
+				return velotok_core_delivery_pickup_point_coordinates( $decoded );
+			}
+
+			if ( preg_match( '/^\s*(-?\d+(?:[.,]\d+)?)\s*[,; ]\s*(-?\d+(?:[.,]\d+)?)\s*$/u', $text, $matches ) ) {
+				return velotok_core_delivery_pickup_coordinates_pair(
+					str_replace( ',', '.', $matches[1] ),
+					str_replace( ',', '.', $matches[2] )
+				);
+			}
+
+			return null;
+		}
+
+		if ( ! is_array( $source ) && ! is_object( $source ) ) {
+			return null;
+		}
+
+		$pair = velotok_core_delivery_pickup_coordinates_pair(
+			velotok_core_delivery_zones_value( $source, $lat_keys, null ),
+			velotok_core_delivery_zones_value( $source, $lon_keys, null )
+		);
+
+		if ( null !== $pair ) {
+			return $pair;
+		}
+
+		$sentinel    = new \stdClass();
+		$source_type = strtolower( velotok_core_delivery_zones_scalar( velotok_core_delivery_zones_value( $source, array( 'type' ), '' ) ) );
+		$source_geo  = velotok_core_delivery_zones_value( $source, array( 'coordinates' ), $sentinel );
+
+		if ( 'point' === $source_type && $sentinel !== $source_geo && ( is_array( $source_geo ) || is_object( $source_geo ) ) ) {
+			$geo_lon = velotok_core_delivery_zones_value( $source_geo, array( 0 ), $sentinel );
+			$geo_lat = velotok_core_delivery_zones_value( $source_geo, array( 1 ), $sentinel );
+
+			if ( $sentinel !== $geo_lon && $sentinel !== $geo_lat ) {
+				$pair = velotok_core_delivery_pickup_coordinates_pair( $geo_lat, $geo_lon );
+
+				if ( null !== $pair ) {
+					return $pair;
+				}
+			}
+		}
+
+		$first    = velotok_core_delivery_zones_value( $source, array( 0 ), $sentinel );
+		$second   = velotok_core_delivery_zones_value( $source, array( 1 ), $sentinel );
+
+		if ( $sentinel !== $first && $sentinel !== $second ) {
+			$type = strtolower( velotok_core_delivery_zones_scalar( velotok_core_delivery_zones_value( $source, array( 'type' ), '' ) ) );
+			$pair = 'point' === $type
+				? velotok_core_delivery_pickup_coordinates_pair( $second, $first )
+				: velotok_core_delivery_pickup_coordinates_pair( $first, $second );
+
+			if ( null !== $pair ) {
+				return $pair;
+			}
+		}
+
+		foreach ( array( 'coordinates', 'coords', 'location', 'geo', 'position', 'point' ) as $key ) {
+			$nested = velotok_core_delivery_zones_value( $source, array( $key ), $sentinel );
+
+			if ( $nested === $sentinel || null === $nested || $nested === $source ) {
+				continue;
+			}
+
+			$found = velotok_core_delivery_pickup_point_coordinates( $nested );
+
+			if ( null !== $found ) {
+				return $found;
+			}
+
+			if ( ! is_array( $nested ) && ! is_object( $nested ) ) {
+				continue;
+			}
+
+			$nested_lat = velotok_core_delivery_zones_value( $nested, $lat_keys, $sentinel );
+			$nested_lon = velotok_core_delivery_zones_value( $nested, $lon_keys, $sentinel );
+
+			if ( $sentinel !== $nested_lat && $sentinel !== $nested_lon ) {
+				$pair = velotok_core_delivery_pickup_coordinates_pair( $nested_lat, $nested_lon );
+
+				if ( null !== $pair ) {
+					return $pair;
+				}
+			}
+
+			$first  = velotok_core_delivery_zones_value( $nested, array( 0, 'x', 'lon', 'lng', 'longitude' ), $sentinel );
+			$second = velotok_core_delivery_zones_value( $nested, array( 1, 'y', 'lat', 'latitude' ), $sentinel );
+
+			if ( $sentinel === $first || $sentinel === $second ) {
+				continue;
+			}
+
+			$type = strtolower( velotok_core_delivery_zones_scalar( velotok_core_delivery_zones_value( $nested, array( 'type' ), '' ) ) );
+			$pair = 'point' === $type
+				? velotok_core_delivery_pickup_coordinates_pair( $second, $first )
+				: velotok_core_delivery_pickup_coordinates_pair( $first, $second );
+
+			if ( null !== $pair ) {
+				return $pair;
+			}
+		}
+
+		return null;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_distance_km' ) ) {
+	/**
+	 * Calculate the great-circle distance between two coordinates in km.
+	 *
+	 * @param mixed $from Origin coordinates.
+	 * @param mixed $to   Destination coordinates.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_pickup_distance_km( $from, $to ) {
+		$origin      = velotok_core_delivery_pickup_point_coordinates( $from );
+		$destination = velotok_core_delivery_pickup_point_coordinates( $to );
+
+		if ( null === $origin || null === $destination ) {
+			return null;
+		}
+
+		$lat1 = deg2rad( $origin['lat'] );
+		$lat2 = deg2rad( $destination['lat'] );
+		$dlat = $lat2 - $lat1;
+		$dlon = deg2rad( $destination['lon'] - $origin['lon'] );
+
+		$haversine = sin( $dlat / 2 ) ** 2 + cos( $lat1 ) * cos( $lat2 ) * sin( $dlon / 2 ) ** 2;
+		$haversine = min( 1.0, max( 0.0, $haversine ) );
+
+		return 6371.0088 * 2 * asin( sqrt( $haversine ) );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_radius_km' ) ) {
+	/**
+	 * Resolve the pickup search radius from the context or method settings.
+	 *
+	 * @param mixed $context Radius, context array or method data.
+	 * @param mixed $method  Optional method data.
+	 * @return float
+	 */
+	function velotok_core_delivery_pickup_radius_km( $context = array(), $method = null ) {
+		$contract = velotok_core_delivery_pickup_points_contract();
+		$default  = isset( $contract['default_radius_km'] ) ? (float) $contract['default_radius_km'] : 10.0;
+		$radius   = null;
+
+		if ( is_numeric( $context ) ) {
+			$radius = (float) $context;
+		} elseif ( is_array( $context ) || is_object( $context ) ) {
+			foreach ( (array) $contract['radius_keys'] as $key ) {
+				$value = velotok_core_delivery_zones_value( $context, array( $key ), null );
+
+				if ( is_numeric( $value ) ) {
+					$radius = (float) $value;
+					break;
+				}
+			}
+
+			if ( null === $radius ) {
+				$settings = velotok_core_delivery_zones_value( $context, array( 'settings', 'options', 'config' ), null );
+
+				if ( is_array( $settings ) || is_object( $settings ) ) {
+					foreach ( (array) $contract['radius_keys'] as $key ) {
+						$value = velotok_core_delivery_zones_value( $settings, array( $key ), null );
+
+						if ( is_numeric( $value ) ) {
+							$radius = (float) $value;
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		if ( null === $radius && is_array( $context ) ) {
+			$context_method = velotok_core_delivery_zones_value( $context, array( 'method', 'shipping_method' ), null );
+
+			if ( null !== $context_method ) {
+				$method = $context_method;
+			}
+		}
+
+		if ( null === $radius && null !== $method ) {
+			$method_settings = velotok_core_delivery_zones_settings( $method );
+
+			foreach ( (array) $contract['radius_keys'] as $key ) {
+				$value = velotok_core_delivery_zones_value( $method, array( $key ), null );
+
+				if ( ! is_numeric( $value ) && isset( $method_settings[ $key ] ) ) {
+					$value = $method_settings[ $key ];
+				}
+
+				if ( is_numeric( $value ) ) {
+					$radius = (float) $value;
+					break;
+				}
+			}
+		}
+
+		if ( null === $radius || ! is_finite( $radius ) ) {
+			$radius = $default;
+		}
+
+		$radius = max( 0.0, $radius );
+
+		if ( function_exists( 'apply_filters' ) ) {
+			$radius = (float) apply_filters( 'velotok_core_delivery_pickup_radius', $radius, $context, $method );
+		}
+
+		return $radius;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_provider_id' ) ) {
+	/**
+	 * Normalize a pickup point provider identifier.
+	 *
+	 * @param mixed $value Provider value.
+	 * @return string
+	 */
+	function velotok_core_delivery_pickup_provider_id( $value ) {
+		$value = strtolower( trim( velotok_core_delivery_zones_scalar( $value ) ) );
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		if ( false !== strpos( $value, 'cdek' ) || false !== strpos( $value, 'сдэк' ) ) {
+			return 'cdek';
+		}
+
+		if ( false !== strpos( $value, 'russian' ) || false !== strpos( $value, 'post' ) || false !== strpos( $value, 'pochta' ) || false !== strpos( $value, 'почт' ) ) {
+			return 'russian_post';
+		}
+
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_flatten' ) ) {
+	/**
+	 * Flatten a provider-keyed point list into one list of points.
+	 *
+	 * @param mixed $points Points.
+	 * @return array<int,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_flatten( $points ) {
+		if ( ! is_array( $points ) ) {
+			return array();
+		}
+
+		if ( isset( $points['points'] ) && is_array( $points['points'] ) && ! isset( $points['id'] ) && ! isset( $points['lat'] ) ) {
+			$points = $points['points'];
+		}
+
+		$flat = array();
+
+		foreach ( $points as $key => $point ) {
+			$provider_key = ! is_numeric( $key ) ? velotok_core_delivery_pickup_provider_id( $key ) : '';
+
+			if ( ! is_numeric( $key ) && is_array( $point ) && in_array( $provider_key, array( 'cdek', 'russian_post' ), true ) ) {
+				if ( ! isset( $point['provider'] ) && ! isset( $point['provider_id'] ) && ! isset( $point['carrier'] ) ) {
+					$point['provider'] = $provider_key;
+				}
+
+				$flat[] = $point;
+
+				continue;
+			}
+
+			if ( is_array( $point ) && ! is_numeric( $key ) && isset( $point[0] ) && ( is_array( $point[0] ) || is_object( $point[0] ) ) ) {
+				foreach ( $point as $nested ) {
+					if ( is_array( $nested ) ) {
+						if ( ! isset( $nested['provider'] ) && ! isset( $nested['provider_id'] ) && ! isset( $nested['carrier'] ) ) {
+							$nested['provider'] = velotok_core_delivery_pickup_provider_id( $key );
+						}
+
+						$flat[] = $nested;
+					} elseif ( is_object( $nested ) ) {
+						$flat[] = $nested;
+					}
+				}
+
+				continue;
+			}
+
+			$flat[] = $point;
+		}
+
+		return $flat;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_source' ) ) {
+	/**
+	 * Resolve the raw pickup point list.
+	 *
+	 * The list can be injected directly, read from the documented filters or
+	 * fetched from provider-specific callbacks. A provider failure is returned
+	 * explicitly instead of being replaced with an empty successful list.
+	 *
+	 * @param mixed $points  Direct point list.
+	 * @param mixed $address Address data.
+	 * @param array $context Context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_source( $points, $address, $context = array() ) {
+		$contract = velotok_core_delivery_pickup_points_contract();
+
+		if ( null !== $points ) {
+			if ( ! is_array( $points ) ) {
+				return array(
+					'ok'     => false,
+					'code'   => $contract['error_code'],
+					'message'=> 'Список пунктов выдачи имеет некорректный формат.',
+					'points' => array(),
+					'errors' => array(
+						array( 'code' => $contract['error_code'], 'message' => 'Список пунктов выдачи имеет некорректный формат.', 'visible' => true ),
+					),
+					'source' => 'provided',
+				);
+			}
+
+			return array(
+				'ok'     => true,
+				'points' => velotok_core_delivery_pickup_points_flatten( $points ),
+				'source' => 'provided',
+				'errors' => array(),
+			);
+		}
+
+		foreach ( array( 'pickup_points', 'pickup_points_list', 'pickup_points_data', 'points' ) as $key ) {
+			if ( isset( $context[ $key ] ) && is_array( $context[ $key ] ) ) {
+				return array(
+					'ok'     => true,
+					'points' => velotok_core_delivery_pickup_points_flatten( $context[ $key ] ),
+					'source' => 'context',
+					'errors' => array(),
+				);
+			}
+		}
+
+		foreach ( array( 'pickup_point_providers', 'pickup_providers' ) as $key ) {
+			if ( empty( $context[ $key ] ) || ! is_array( $context[ $key ] ) ) {
+				continue;
+			}
+
+			$collected = array();
+			$errors    = array();
+
+			foreach ( $context[ $key ] as $provider => $callback ) {
+				if ( ! is_callable( $callback ) ) {
+					continue;
+				}
+
+				try {
+					$result = call_user_func( $callback, $address, $context );
+				} catch ( \Throwable $exception ) {
+					$errors[] = array(
+						'code'    => $contract['error_code'],
+						'message' => $exception->getMessage(),
+						'provider'=> velotok_core_delivery_pickup_provider_id( $provider ),
+						'visible' => true,
+					);
+					continue;
+				}
+
+				$error = null;
+
+				if ( is_object( $result ) && ( 'WP_Error' === get_class( $result ) || is_a( $result, 'WP_Error' ) ) ) {
+					$error = method_exists( $result, 'get_error_message' ) ? $result->get_error_message() : 'Провайдер вернул ошибку.';
+				} elseif ( is_array( $result ) && isset( $result['error'] ) && is_scalar( $result['error'] ) && '' !== (string) $result['error'] ) {
+					$error = (string) $result['error'];
+				}
+
+				if ( null !== $error ) {
+					$errors[] = array(
+						'code'    => $contract['error_code'],
+						'message' => $error,
+						'provider'=> velotok_core_delivery_pickup_provider_id( $provider ),
+						'visible' => true,
+					);
+					continue;
+				}
+
+				$list = is_array( $result )
+					? velotok_core_delivery_zones_value( $result, array( 'points', 'list', 'items' ), $result )
+					: array();
+
+				foreach ( velotok_core_delivery_pickup_points_flatten( $list ) as $point ) {
+					$collected[] = $point;
+				}
+			}
+
+			if ( empty( $collected ) && ! empty( $errors ) ) {
+				return array(
+					'ok'     => false,
+					'code'   => $contract['error_code'],
+					'message'=> $errors[0]['message'],
+					'points' => array(),
+					'errors' => $errors,
+					'source' => 'provider',
+				);
+			}
+
+			return array(
+				'ok'     => true,
+				'points' => $collected,
+				'source' => 'provider',
+				'errors' => $errors,
+			);
+		}
+
+		if ( function_exists( 'apply_filters' ) ) {
+			foreach ( array( 'velotok_core_delivery_pickup_points', 'velotok_core_delivery_pickup_points_data' ) as $hook ) {
+				$filtered = apply_filters( $hook, null, $address, $context );
+
+				if ( is_array( $filtered ) ) {
+					return array(
+						'ok'     => true,
+						'points' => velotok_core_delivery_pickup_points_flatten( $filtered ),
+						'source' => 'filter',
+						'errors' => array(),
+					);
+				}
+			}
+		}
+
+		return array(
+			'ok'     => false,
+			'code'   => $contract['unavailable_code'],
+			'message'=> 'Список пунктов выдачи недоступен.',
+			'points' => array(),
+			'errors' => array(
+				array( 'code' => $contract['unavailable_code'], 'message' => 'Список пунктов выдачи недоступен.', 'visible' => true ),
+			),
+			'source' => 'unavailable',
+		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points' ) ) {
+	/**
+	 * Build the pickup point list inside a radius of the delivery address.
+	 *
+	 * Points without coordinates cannot be placed by radius and are reported
+	 * explicitly. Points are sorted by distance from the address.
+	 *
+	 * @param mixed $address Address data.
+	 * @param mixed $points  Point list or null to resolve from providers.
+	 * @param mixed $context Radius, context array or method data.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points( $address = array(), $points = null, $context = array() ) {
+		$contract = velotok_core_delivery_pickup_points_contract();
+
+		if ( func_num_args() >= 4 ) {
+			$extra = func_get_arg( 3 );
+
+			if ( is_numeric( $extra ) ) {
+				$context = is_array( $context ) ? $context : array();
+				$context['radius_km'] = (float) $extra;
+			} elseif ( null !== $extra ) {
+				$context = is_array( $context ) ? $context : array();
+				$context['method'] = $extra;
+			}
+		}
+
+		$address_is_list = is_array( $address )
+			&& isset( $address[0] )
+			&& ( is_array( $address[0] ) || is_object( $address[0] ) )
+			&& ( ! isset( $address['country'] ) && ! isset( $address['city'] ) && ! isset( $address['lat'] ) );
+		$points_is_address = is_array( $points )
+			&& ( isset( $points['country'] ) || isset( $points['city'] ) || isset( $points['postcode'] ) || isset( $points['lat'] ) || isset( $points['coordinates'] ) );
+
+		if ( $address_is_list && $points_is_address ) {
+			$swapped = $address;
+			$address = $points;
+			$points  = $swapped;
+		}
+
+		if ( is_numeric( $context ) ) {
+			$context = array( 'radius_km' => (float) $context );
+		} elseif ( ! is_array( $context ) ) {
+			$context = array();
+		}
+
+		if ( isset( $context['address'] ) && ( ! is_array( $address ) || empty( $address ) ) ) {
+			$address = $context['address'];
+		}
+
+		$normalized_address = velotok_core_delivery_zones_address( $address );
+		$radius             = velotok_core_delivery_pickup_radius_km( $context );
+		$origin             = velotok_core_delivery_pickup_point_coordinates( $address );
+
+		if ( null === $origin && isset( $context['origin'] ) ) {
+			$origin = velotok_core_delivery_pickup_point_coordinates( $context['origin'] );
+		}
+
+		if ( null === $origin && isset( $context['coordinates'] ) ) {
+			$origin = velotok_core_delivery_pickup_point_coordinates( $context['coordinates'] );
+		}
+
+		$source = velotok_core_delivery_pickup_points_source( $points, $address, $context );
+		$base   = array(
+			'ok'                     => false,
+			'available'              => false,
+			'points'                 => array(),
+			'pickup_points'          => array(),
+			'list'                   => array(),
+			'items'                  => array(),
+			'count'                  => 0,
+			'total'                  => 0,
+			'found'                  => 0,
+			'radius_km'              => $radius,
+			'radius'                 => $radius,
+			'unit'                   => isset( $contract['unit'] ) ? $contract['unit'] : 'km',
+			'distance'               => isset( $contract['distance'] ) ? $contract['distance'] : 'haversine',
+			'origin'                 => $origin,
+			'address'                => $normalized_address,
+			'code'                   => '',
+			'message'                => '',
+			'errors'                 => array(),
+			'source'                 => $source['source'],
+			'providers'              => isset( $contract['providers'] ) ? $contract['providers'] : array(),
+			'only_russia'            => ! empty( $contract['only_russia'] ),
+			'country'                => isset( $contract['country'] ) ? $contract['country'] : 'RU',
+			'mocked'                 => false,
+			'requirement'            => isset( $contract['requirement'] ) ? $contract['requirement'] : '',
+			'pickup_points_radius_km'=> $radius,
+		);
+
+		if ( empty( $source['ok'] ) ) {
+			$base['code']    = $source['code'];
+			$base['message'] = $source['message'];
+			$base['errors']  = $source['errors'];
+
+			return $base;
+		}
+
+		if ( null === $origin ) {
+			$message = 'Адрес доставки не позволяет определить координаты для поиска пунктов выдачи.';
+			$base['code']    = $contract['no_address_code'];
+			$base['message'] = $message;
+			$base['errors']  = array(
+				array( 'code' => $contract['no_address_code'], 'message' => $message, 'visible' => true ),
+			);
+
+			return $base;
+		}
+
+		$errors       = $source['errors'];
+		$normalized   = array();
+		$provider_hint= velotok_core_delivery_pickup_provider_id(
+			velotok_core_delivery_zones_value( $context, array( 'provider', 'provider_id' ), '' )
+		);
+
+		foreach ( $source['points'] as $raw_point ) {
+			if ( ! is_array( $raw_point ) && ! is_object( $raw_point ) ) {
+				continue;
+			}
+
+			$country = strtoupper(
+				velotok_core_delivery_zones_scalar(
+					velotok_core_delivery_zones_value( $raw_point, array( 'country', 'country_code' ), '' )
+				)
+			);
+			$provider = velotok_core_delivery_pickup_provider_id(
+				velotok_core_delivery_zones_value( $raw_point, array( 'provider', 'provider_id', 'carrier', 'delivery_provider' ), $provider_hint )
+			);
+
+			if ( '' === $provider ) {
+				$provider = $provider_hint;
+			}
+
+			if ( '' !== $provider_hint && $provider !== $provider_hint ) {
+				continue;
+			}
+
+			if ( ! empty( $contract['only_russia'] ) && '' !== $country && $contract['country'] !== $country ) {
+				continue;
+			}
+
+			$coordinates = velotok_core_delivery_pickup_point_coordinates( $raw_point );
+
+			if ( null === $coordinates ) {
+				$errors[] = array(
+					'code'    => $contract['no_coordinates_code'],
+					'message' => 'У пункта выдачи не заданы координаты.',
+					'provider'=> $provider,
+					'point'   => velotok_core_delivery_zones_scalar(
+						velotok_core_delivery_zones_value( $raw_point, array( 'id', 'point_id', 'code' ), '' )
+					),
+					'visible' => true,
+				);
+				continue;
+			}
+
+			$distance = velotok_core_delivery_pickup_distance_km( $origin, $coordinates );
+
+			if ( null === $distance ) {
+				continue;
+			}
+
+			if ( $distance > $radius + 0.000001 ) {
+				continue;
+			}
+
+			$id = velotok_core_delivery_zones_scalar(
+				velotok_core_delivery_zones_value( $raw_point, array( 'id', 'point_id', 'code', 'uuid', 'code_pvz' ), '' )
+			);
+			$name = velotok_core_delivery_zones_scalar(
+				velotok_core_delivery_zones_value( $raw_point, array( 'name', 'title', 'label', 'address_name' ), '' )
+			);
+			$point_address = velotok_core_delivery_zones_scalar(
+				velotok_core_delivery_zones_value( $raw_point, array( 'address', 'address_full', 'full_address', 'addr' ), '' )
+			);
+			$city = velotok_core_delivery_zones_scalar(
+				velotok_core_delivery_zones_value( $raw_point, array( 'city', 'settlement' ), '' )
+			);
+			$postcode = velotok_core_delivery_zones_scalar(
+				velotok_core_delivery_zones_value( $raw_point, array( 'postcode', 'zip', 'index' ), '' )
+			);
+
+			$normalized[] = array(
+				'id'          => $id,
+				'point_id'    => $id,
+				'code'        => $id,
+				'provider'    => $provider,
+				'provider_id' => $provider,
+				'name'        => $name,
+				'title'       => $name,
+				'label'       => $name,
+				'address'     => $point_address,
+				'address_full'=> $point_address,
+				'city'        => $city,
+				'postcode'    => $postcode,
+				'country'     => '' !== $country ? $country : ( isset( $contract['country'] ) ? $contract['country'] : 'RU' ),
+				'lat'         => $coordinates['lat'],
+				'lon'         => $coordinates['lon'],
+				'latitude'    => $coordinates['lat'],
+				'longitude'   => $coordinates['lon'],
+				'coordinates' => array( 'lat' => $coordinates['lat'], 'lon' => $coordinates['lon'] ),
+				'distance'    => round( $distance, 3 ),
+				'distance_km' => round( $distance, 3 ),
+				'distance_m'  => (int) round( $distance * 1000 ),
+				'radius_km'   => $radius,
+				'within_radius' => true,
+			);
+		}
+
+		usort(
+			$normalized,
+			function ( $left, $right ) {
+				if ( $left['distance_km'] === $right['distance_km'] ) {
+					return strcmp( (string) $left['id'], (string) $right['id'] );
+				}
+
+				return $left['distance_km'] <=> $right['distance_km'];
+			}
+		);
+
+		$available = ! empty( $normalized );
+		$code      = '';
+		$message   = '';
+
+		if ( ! $available ) {
+			$code    = ! empty( $source['errors'] ) ? $contract['error_code'] : $contract['empty_code'];
+			$message = ! empty( $source['errors'] )
+				? 'Не удалось получить список пунктов выдачи.'
+				: 'В радиусе от адреса нет пунктов выдачи.';
+		} elseif ( ! empty( $source['errors'] ) ) {
+			$code = $contract['error_code'];
+			$message = 'Часть пунктов выдачи недоступна.';
+		}
+
+		return array_merge(
+			$base,
+			array(
+				'ok'        => true,
+				'available' => $available,
+				'points'    => array_values( $normalized ),
+				'pickup_points' => array_values( $normalized ),
+				'list'      => array_values( $normalized ),
+				'items'     => array_values( $normalized ),
+				'count'     => count( $normalized ),
+				'total'     => count( $normalized ),
+				'found'     => count( $normalized ),
+				'code'      => $code,
+				'message'   => $message,
+				'errors'    => $errors,
+			)
+		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_for_address' ) ) {
+	/**
+	 * Alias for the radius-based pickup point list.
+	 *
+	 * @param mixed $address Address data.
+	 * @param mixed $points  Point list.
+	 * @param mixed $context Context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_for_address( $address = array(), $points = null, $context = array() ) {
+		return velotok_core_delivery_pickup_points( $address, $points, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_by_radius' ) ) {
+	/**
+	 * Alias for the radius-based pickup point list.
+	 *
+	 * @param mixed $address Address data.
+	 * @param mixed $points  Point list.
+	 * @param mixed $context Context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_by_radius( $address = array(), $points = null, $context = array() ) {
+		return velotok_core_delivery_pickup_points( $address, $points, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_near_address' ) ) {
+	/**
+	 * Alias for the radius-based pickup point list.
+	 *
+	 * @param mixed $address Address data.
+	 * @param mixed $points  Point list.
+	 * @param mixed $context Context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_near_address( $address = array(), $points = null, $context = array() ) {
+		return velotok_core_delivery_pickup_points( $address, $points, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_pickup_points' ) ) {
+	/**
+	 * Alias for the radius-based pickup point list.
+	 *
+	 * @param mixed $address Address data.
+	 * @param mixed $points  Point list.
+	 * @param mixed $context Context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_zones_pickup_points( $address = array(), $points = null, $context = array() ) {
+		return velotok_core_delivery_pickup_points( $address, $points, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_pickup_points_contract' ) ) {
+	/**
+	 * Alias for the pickup points contract section.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_zones_pickup_points_contract() {
+		return velotok_core_delivery_pickup_points_contract();
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_nearby' ) ) {
+	/**
+	 * Alias for the radius-based pickup point list.
+	 *
+	 * @param mixed $address Address data.
+	 * @param mixed $points  Point list.
+	 * @param mixed $context Context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_nearby( $address = array(), $points = null, $context = array() ) {
+		return velotok_core_delivery_pickup_points( $address, $points, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_by_address' ) ) {
+	/**
+	 * Alias for the radius-based pickup point list.
+	 *
+	 * @param mixed $address Address data.
+	 * @param mixed $points  Point list.
+	 * @param mixed $context Context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_by_address( $address = array(), $points = null, $context = array() ) {
+		return velotok_core_delivery_pickup_points( $address, $points, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_list' ) ) {
+	/**
+	 * Alias for the radius-based pickup point list.
+	 *
+	 * @param mixed $address Address data.
+	 * @param mixed $points  Point list.
+	 * @param mixed $context Context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_pickup_points_list( $address = array(), $points = null, $context = array() ) {
+		return velotok_core_delivery_pickup_points( $address, $points, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_radius' ) ) {
+	/**
+	 * Alias for the pickup search radius helper.
+	 *
+	 * @param mixed $context Radius or context.
+	 * @param mixed $method  Optional method data.
+	 * @return float
+	 */
+	function velotok_core_delivery_pickup_radius( $context = array(), $method = null ) {
+		return velotok_core_delivery_pickup_radius_km( $context, $method );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_radius' ) ) {
+	/**
+	 * Alias for the pickup search radius helper.
+	 *
+	 * @param mixed $context Radius or context.
+	 * @param mixed $method  Optional method data.
+	 * @return float
+	 */
+	function velotok_core_delivery_pickup_points_radius( $context = array(), $method = null ) {
+		return velotok_core_delivery_pickup_radius_km( $context, $method );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_pickup_points_distance' ) ) {
+	/**
+	 * Alias for the pickup point distance helper.
+	 *
+	 * @param mixed $from Origin.
+	 * @param mixed $to   Destination.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_pickup_points_distance( $from, $to ) {
+		return velotok_core_delivery_pickup_distance_km( $from, $to );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_distance_km' ) ) {
+	/**
+	 * Alias for the pickup point distance helper.
+	 *
+	 * @param mixed $from Origin.
+	 * @param mixed $to   Destination.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_distance_km( $from, $to ) {
+		return velotok_core_delivery_pickup_distance_km( $from, $to );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_distance_km' ) ) {
+	/**
+	 * Alias for the pickup point distance helper.
+	 *
+	 * @param mixed $from Origin.
+	 * @param mixed $to   Destination.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_zones_distance_km( $from, $to ) {
+		return velotok_core_delivery_pickup_distance_km( $from, $to );
 	}
 }
 
@@ -1435,8 +2433,16 @@ if ( ! function_exists( 'velotok_core_delivery_zones_pickup_option' ) ) {
 	 * @return array<string,mixed>
 	 */
 	function velotok_core_delivery_zones_pickup_option( $context = array() ) {
-		$contract = velotok_core_delivery_zones_contract();
-		$pickup   = $contract['pickup'];
+		$contract    = velotok_core_delivery_zones_contract();
+		$pickup      = $contract['pickup'];
+		$point_context = $context;
+		$address     = isset( $context['address'] ) ? $context['address'] : array();
+
+		if ( isset( $context['pickup_points_result'] ) && is_array( $context['pickup_points_result'] ) ) {
+			$points_result = $context['pickup_points_result'];
+		} else {
+			$points_result = velotok_core_delivery_pickup_points( $address, null, $point_context );
+		}
 
 		return array(
 			'id'                  => $pickup['method_id'],
@@ -1464,6 +2470,11 @@ if ( ! function_exists( 'velotok_core_delivery_zones_pickup_option' ) ) {
 			'free'                => true,
 			'mocked'              => false,
 			'test_mode'           => isset( $context['test_mode'] ) ? (bool) $context['test_mode'] : false,
+			'points_by_radius'    => true,
+			'pickup_points'       => isset( $points_result['points'] ) ? $points_result['points'] : array(),
+			'points'              => isset( $points_result['points'] ) ? $points_result['points'] : array(),
+			'pickup_points_result'=> $points_result,
+			'radius_km'           => isset( $points_result['radius_km'] ) ? $points_result['radius_km'] : null,
 		);
 	}
 }
@@ -1485,6 +2496,8 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 		$errors   = isset( $match['errors'] ) ? $match['errors'] : array();
 		$matched  = ! empty( $match['matched'] );
 		$country  = isset( $match['address']['country'] ) ? $match['address']['country'] : '';
+		$method_context = $context;
+		$method_context['address'] = isset( $match['address'] ) ? $match['address'] : array();
 		$pickup_allowed = true === $contract['pickup']['enabled']
 			&& ( '' === $country || $contract['pickup']['country'] === $country );
 
@@ -1500,7 +2513,7 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 					$raw_method,
 					(int) $match['zone_id'],
 					$order,
-					$context
+					$method_context
 				);
 
 				if ( isset( $methods[ $key ] ) ) {
@@ -1526,8 +2539,16 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			}
 		}
 
+		$pickup_points = velotok_core_delivery_pickup_points(
+			isset( $match['address'] ) ? $match['address'] : array(),
+			null,
+			$method_context
+		);
+
 		if ( $pickup_allowed ) {
-			$methods['local_pickup'] = velotok_core_delivery_zones_pickup_option( $context );
+			$pickup_context = $method_context;
+			$pickup_context['pickup_points_result'] = $pickup_points;
+			$methods['local_pickup'] = velotok_core_delivery_zones_pickup_option( $pickup_context );
 		}
 
 		$available = false;
@@ -1551,6 +2572,9 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			'list'            => array_values( $methods ),
 			'errors'          => $errors,
 			'pickup'          => $pickup_allowed,
+			'pickup_points'   => isset( $pickup_points['points'] ) ? $pickup_points['points'] : array(),
+			'pickup_points_result' => $pickup_points,
+			'pickup_points_radius_km' => isset( $pickup_points['radius_km'] ) ? $pickup_points['radius_km'] : null,
 			'source'          => $contract['source'],
 			'requirement'     => $contract['requirement'],
 			'mocked'          => false,
