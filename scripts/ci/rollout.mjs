@@ -15,6 +15,7 @@ export const BASE_BRANCH = 'main';
 export const EXPECTED_CI_JOBS = [
   'php-lint',
   'php-tests',
+  'php-plugin-tests',
   'plugin-tests',
   'ci-repair-tests',
 ];
@@ -87,8 +88,8 @@ function checkRunBelongsToRun(check, run) {
 }
 
 // Even a check run that belongs to the verified ci run must be attached to the
-// exact commit this gate is certifying. A check run for an older head (for
-// example 7052bf2 when the submission is b774c408) must not count.
+// exact commit this gate is certifying. A check run for an older head must not
+// count for a newer submitted head.
 function checkRunIsForCommit(check, targetSha) {
   if (!targetSha || !check.headSha) {
     return true;
@@ -144,7 +145,10 @@ export function summarizeRolloutEvidence({
   const state = pr?.state ?? null;
   const mergeable = pr?.mergeable ?? null;
   const mergeableState = pr?.mergeable_state ?? null;
-  const mergeCommitSha = pr?.merge_commit_sha ?? null;
+  // GitHub returns a temporary test-merge commit in merge_commit_sha even for
+  // an open pull request. It is not a landed merge commit, so only report it
+  // after the pull request is actually merged.
+  const mergeCommitSha = merged ? (pr?.merge_commit_sha ?? null) : null;
   const headSha = pr?.head?.sha ?? null;
   const prBase = pr?.base?.ref ?? null;
   const resolvedSha = targetSha || headSha;

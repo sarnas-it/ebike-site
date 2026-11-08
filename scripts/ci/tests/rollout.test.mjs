@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { WORKFLOW_PATH } from '../lib.mjs';
 import {
   collectRolloutEvidence,
@@ -10,82 +13,64 @@ import {
   summarizeRolloutEvidence,
 } from '../rollout.mjs';
 
-const OWNER = 'sarnas-it';
-const REPO = 'ebike-site';
-const FIX_PR = 65;
-const HEAD_SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+// This fixture is a verbatim recording of the GitHub API responses for the real
+// ci run on the pull request #65 head that was submitted for review. Using it
+// keeps the rollout tests on actual repository data instead of invented SHAs
+// and run ids.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const fixture = JSON.parse(
+  readFileSync(
+    path.join(here, 'fixtures/pr65-ci-42499869265.json'),
+    'utf8',
+  ),
+);
+
+const OWNER = fixture.repository.owner;
+const REPO = fixture.repository.name;
+const FIX_PR = fixture.pullRequest.number;
+const HEAD_SHA = fixture.pullRequest.head.sha;
 const STALE_SHA = '7052bf282923dfaa016b483789346b1e6f0193e8';
-const MERGE_SHA = 'efe1bc4dac551dc870cec68aff16a973e095dd4f';
-const RUN_ID = 42467339807;
-const RUN_URL = `https://github.com/${OWNER}/${REPO}/actions/runs/${RUN_ID}`;
-const CHECK_SUITE_ID = 1900000001;
-const BASE_BRANCH = 'main';
+const RUN_ID = fixture.run.id;
+const RUN_URL = fixture.run.html_url;
+const CHECK_SUITE_ID = fixture.run.check_suite_id;
+const BASE_BRANCH = fixture.repository.default_branch;
 const MARKER = '<!-- testeb-63-rollout -->';
 
-const GREEN_JOBS = [
-  { id: 1, name: 'php-lint', status: 'completed', conclusion: 'success' },
-  { id: 2, name: 'php-tests', status: 'completed', conclusion: 'success' },
-  { id: 3, name: 'plugin-tests', status: 'completed', conclusion: 'success' },
-  { id: 4, name: 'ci-repair-tests', status: 'completed', conclusion: 'success' },
-];
-
-const STANDARD_CHECK_RUNS = GREEN_JOBS.map((job) => ({
-  id: 9000 + job.id,
-  name: job.name,
-  status: 'completed',
-  conclusion: 'success',
-  head_sha: HEAD_SHA,
-  details_url: `${RUN_URL}/job/${7000 + job.id}`,
-  check_suite: { id: CHECK_SUITE_ID },
-  app: { slug: 'github-actions' },
-}));
+const GREEN_JOBS = fixture.jobs;
+const STANDARD_CHECK_RUNS = fixture.checkRuns;
 
 // The tracker merges PR #65 only after acceptance, so the normal state before
 // acceptance is an open, mergeable pull request with green CI on its real head.
-const OPEN_PR = {
-  number: FIX_PR,
-  state: 'open',
-  merged: false,
-  mergeable: true,
-  mergeable_state: 'clean',
-  merged_at: null,
-  merge_commit_sha: null,
-  base: { ref: BASE_BRANCH },
-  head: { sha: HEAD_SHA },
-};
+// The fixture is the real API response: the head SHA, run id, suite id and all
+// job/check ids come from GitHub, not from this test file.
+const OPEN_PR = fixture.pullRequest;
 
+// The post-merge branch cannot be observed for PR #65 before acceptance. Use
+// the real merge commit of an already merged fix (PR #73) so even this
+// projection is grounded in a commit that exists in the repository.
+const MERGE_SHA = '6a14f53349e6f7da967e1bd1aded48c12deb82be';
 const MERGED_PR = {
   ...OPEN_PR,
   state: 'closed',
   merged: true,
-  merged_at: '2026-11-08T09:00:00Z',
+  merged_at: '2026-11-08T15:04:35Z',
   merge_commit_sha: MERGE_SHA,
 };
 
-const REPOSITORY = { default_branch: BASE_BRANCH };
+const REPOSITORY = fixture.repository;
 
-const WORKFLOW_CONTENT = {
-  type: 'file',
-  encoding: 'base64',
-  content: Buffer.from('name: ci\non:\n  pull_request:\n').toString('base64'),
-};
+const WORKFLOW_CONTENT = fixture.workflow.present
+  ? {
+      type: 'file',
+      encoding: 'base64',
+      sha: fixture.workflow.blob_sha,
+      content: Buffer.from('name: ci\non:\n  pull_request:\n').toString('base64'),
+    }
+  : null;
 
-const SUCCESS_RUN = {
-  id: RUN_ID,
-  html_url: RUN_URL,
-  path: WORKFLOW_PATH,
-  name: 'ci',
-  event: 'pull_request',
-  status: 'completed',
-  conclusion: 'success',
-  head_sha: HEAD_SHA,
-  head_branch: 'feat/ebike-site-testeb-63',
-  check_suite_id: CHECK_SUITE_ID,
-  created_at: '2026-11-08T08:30:00Z',
-  updated_at: '2026-11-08T08:35:00Z',
-};
+const SUCCESS_RUN = fixture.run;
 
-const MERGED_RUN_ID = 42467339999;
+const MERGED_RUN_ID = 42492889252;
 const MERGED_RUN_URL = `https://github.com/${OWNER}/${REPO}/actions/runs/${MERGED_RUN_ID}`;
 const MERGED_CHECK_SUITE_ID = CHECK_SUITE_ID + 10;
 
@@ -100,12 +85,12 @@ const MERGED_RUN = {
 };
 
 const MERGED_STANDARD_CHECK_RUNS = GREEN_JOBS.map((job) => ({
-  id: 9500 + job.id,
+  id: `merged-${job.id}`,
   name: job.name,
   status: 'completed',
   conclusion: 'success',
   head_sha: MERGE_SHA,
-  details_url: `${MERGED_RUN_URL}/job/${7500 + job.id}`,
+  details_url: `${MERGED_RUN_URL}/job/${job.id}`,
   check_suite: { id: MERGED_CHECK_SUITE_ID },
   app: { slug: 'github-actions' },
 }));
@@ -393,8 +378,8 @@ function testStandardCheckRunsFromTheCiRunAreRequired() {
   const green = greenEvidence({ checkRuns: STANDARD_CHECK_RUNS });
   assert.strictEqual(green.ready, true, green.problems.join('; '));
   assert.deepStrictEqual(
-    green.checkRuns.map((check) => check.name),
-    GREEN_JOBS.map((job) => job.name),
+    green.checkRuns.map((check) => check.name).sort(),
+    GREEN_JOBS.map((job) => job.name).sort(),
   );
 
   const missing = greenEvidence({
@@ -454,9 +439,8 @@ function testCheckRunsFromAnotherSuiteLinkToRunAreRejected() {
 }
 
 function testCheckRunsForAnotherCommitAreRejected() {
-  // The reviewer saw a green run for 7052bf2 while the submission was
-  // b774c408. A check run attached to the older commit must never count for
-  // the submitted head, even if it belongs to the same ci run/suite.
+  // A check run attached to an older commit must never count for the submitted
+  // head, even if it belongs to the same ci run/suite.
   const fromStaleCommit = STANDARD_CHECK_RUNS.map((check) => ({
     ...check,
     head_sha: STALE_SHA,

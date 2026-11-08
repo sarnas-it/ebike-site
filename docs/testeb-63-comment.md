@@ -23,6 +23,38 @@ allow-list интеграции содержит `sarnas-it/ebike-site`.
 `.github/workflows/ci.yml`, поэтому новые PR получают реальные прогоны на
 каждом `pull_request`, `push` в `main` и по `workflow_dispatch`.
 
+## Зафиксированное доказательство по PR #65 (фактические данные GitHub)
+
+На момент проверки (`2026-11-08T16:30Z`) актуальный head PR #65 был
+`a93a94563a176f148a1c31ae6464e2b1a91d86e3`, и по нему существовал **штатный**
+прогон `ci` [#42499869265](https://github.com/sarnas-it/ebike-site/actions/runs/42499869265)
+(`event=pull_request`, `status=completed`, `conclusion=success`,
+`head_sha=a93a94563a176f148a1c31ae6464e2b1a91d86e3`,
+`check_suite_id=115124170132`). Все job прогона завершились успешно:
+
+* `php-lint=success` (`128790072463`);
+* `php-tests=success` (`128790072714`);
+* `php-plugin-tests=success` (`128790072617`);
+* `plugin-tests=success` (`128790072611`);
+* `ci-repair-tests=success` (`128790072591`).
+
+Штатные check runs этих job привязаны к тому же коммиту и к check suite
+`115124170132`, то есть к проверяемому прогону `ci`, а не созданы через Checks
+API в обход workflow. PR #65 нацелен в `main`, `state=open`, `merged=false`,
+`mergeable=true`, `mergeable_state=clean` (конфликтов с базовой веткой нет);
+`.github/workflows/ci.yml` присутствует в дереве head (blob
+`bfbbedad5b9cbae52fad917e955f4ed276275d38`).
+
+Эти данные записаны в `scripts/ci/tests/fixtures/pr65-ci-42499869265.json` и
+проверяются `scripts/ci/tests/rollout.test.mjs`: тесты берут фактические SHA,
+run id, check suite id, job id и check run id из GitHub API, а не синтетические
+константы. Любой новый push (включая этот коммит) сдвигает head; workflow
+`verify-ci-rollout` на событии `pull_request` автоматически проверяет уже новый
+head и обновляет комментарий `<!-- testeb-63-rollout -->` на PR #65. Гейт
+сравнивает `head_sha` прогона и каждого check run с проверяемым коммитом, поэтому
+доказательство всегда относится к актуальному сдаваемому head, а не к этому
+зафиксированному прогону.
+
 Критерий «CI на актуальном head PR #65 успешен» подтверждается штатным прогоном
 `ci` на реальном head-коммите PR #65, а не ссылкой на прогон прошлой сдачи.
 Workflow `verify-ci-rollout` теперь запускается на самом PR #65
@@ -40,8 +72,8 @@ Workflow `verify-ci-rollout` теперь запускается на самом
 * `ci.yml` отсутствует в дереве head PR #65 (до мержа) или в `main` (после);
 * прогон `ci` именно на `TARGET_SHA` (а после мержа — на merge commit) не
   завершился успешно;
-* в прогоне нет полного набора job (`php-lint`, `php-tests`, `plugin-tests`,
-  `ci-repair-tests`) или какой-то job упал;
+* в прогоне нет полного набора job (`php-lint`, `php-tests`,
+  `php-plugin-tests`, `plugin-tests`, `ci-repair-tests`) или какой-то job упал;
 * на проверяемом коммите нет штатных check runs этих job, привязанных к check
   suite проверяемого прогона `ci` и к тому же `head_sha` (зелёные check runs,
   созданные через Checks API в обход workflow или принадлежащие другому check
@@ -55,8 +87,8 @@ Workflow `verify-ci-rollout` теперь запускается на самом
 на merge commit и требует зелёный `ci` и штатные check runs уже на нём. Прогон
 на другом SHA не принимается, потому что его `head_sha` не совпадает с
 проверяемым коммитом. В частности, зелёный прогон прошлой сдачи на `7052bf2`
-не подтверждает сдаваемый `b774c408` (или его преемника); SHA не захардкожен,
-а берётся из события запуска.
+или recovery-прогон PR #62 `42445204104` не подтверждает сдаваемый head PR #65;
+SHA не захардкожен, а берётся из события запуска.
 
 После зелёного гейта workflow публикует на PR #65 идемпотентный комментарий
 `<!-- testeb-63-rollout -->` со ссылкой на штатный run `ci`, его `head_sha`,
