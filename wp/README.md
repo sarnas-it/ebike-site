@@ -35,6 +35,11 @@ php wp/plugins/velotok-core/tests/product-attributes-contract-test.php
 php wp/plugins/velotok-core/tests/product-attributes-card-test.php
 php wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
 node wp/plugins/velotok-core/tests/payment-gateway-contract.test.js
+php wp/plugins/velotok-core/tests/accounts-contract-test.php
+php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
+node wp/plugins/velotok-core/tests/accounts-contract.test.js
+node wp/plugins/velotok-core/tests/accounts-redgreen.test.js
+node wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
 bash wp/tests/smoke.sh
 ```
 
@@ -52,6 +57,21 @@ WooCommerce → список моделей → шаблон каталога �
 создание платежа, подпись и идемпотентность webhook, статусы заказа и полный
 возврат в `refunded`; секреты читаются только из окружения или настроек.
 Дымовой тест дополнительно проверяет эти элементы на реальной главной странице.
+
+Тест аккаунтов `accounts-contract-test.php` проверяет регистрацию по email и
+паролю, обязательное подтверждение email, вход существующего пользователя без
+дубля, запрет доступа неподтверждённому пользователю к личному кабинету,
+перенос гостевой корзины с переходом на `/checkout/` и завершение сессии
+выходом. Red-green тест падает, если регистрация перестаёт требовать
+подтверждения email.
+
+Тест `accounts-wordpress-integration-test.php` проверяет реальную интеграцию:
+пользователь сохраняется через `wc_create_new_customer()`, повторный email не
+создаёт дубль, аккаунт остаётся `pending` до подтверждения, вход выполняется
+через `wp_signon()`, выход — через `wp_logout()`, а форма регистрации
+отправляется в `admin-post.php`. Его red-green версия
+`accounts-wordpress-integration.test.js` падает, если при регистрации аккаунт
+сразу помечается подтверждённым.
 
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
 

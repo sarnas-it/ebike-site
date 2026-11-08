@@ -12,7 +12,7 @@
  * @package Velotok
  */
 
-if ( false ) {
+if ( 'cli' !== PHP_SAPI ) {
 	fwrite( STDERR, 'This test must be run from the command line.' . PHP_EOL );
 	exit( 1 );
 }
