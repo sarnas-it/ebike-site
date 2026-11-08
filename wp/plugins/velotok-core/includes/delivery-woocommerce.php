@@ -392,9 +392,27 @@ if ( ! function_exists( 'velotok_core_delivery_test_mode_enabled' ) ) {
 	/**
 	 * Whether the delivery test mode is enabled.
 	 *
+	 * Without arguments the shop-wide option is returned. When a shipping
+	 * method or a delivery context is supplied, its explicit test-mode flag is
+	 * resolved as well so a provider-configured test mode is never hidden.
+	 *
+	 * @param mixed $method  Optional shipping method data.
+	 * @param mixed $context Optional delivery context.
 	 * @return bool
 	 */
-	function velotok_core_delivery_test_mode_enabled() {
+	function velotok_core_delivery_test_mode_enabled( $method = null, $context = array() ) {
+		if ( null !== $method || ( is_array( $context ) && ! empty( $context ) ) ) {
+			$info = velotok_core_delivery_test_mode_info( $method, $context );
+
+			if ( ! empty( $info['enabled'] ) ) {
+				return true;
+			}
+
+			if ( null !== $method ) {
+				return false;
+			}
+		}
+
 		$enabled = function_exists( 'get_option' ) ? get_option( 'velotok_core_delivery_test_mode', 'no' ) : 'no';
 		$enabled = in_array( strtolower( (string) $enabled ), array( 'yes', '1', 'true', 'on' ), true );
 
