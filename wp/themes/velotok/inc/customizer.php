@@ -8,22 +8,31 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Возвращает значение из stub-слоя данных спецификации.
+ * Возвращает локальное значение данных спецификации.
  *
- * Тема не читает env напрямую: единственная точка доступа — контракт плагина
- * `velotok-core`. Если плагин не активирован, используется локальное значение.
+ * Тема самодостаточна: значения по умолчанию хранятся в ней самой и не
+ * запрашиваются у плагинов. Если нужно переопределить значение, настройка
+ * темы в «Настройщике» имеет приоритет над этим значением по умолчанию.
  *
  * @param string $key      Ключ данных спецификации.
- * @param mixed  $fallback Значение на случай недоступности контракта.
+ * @param mixed  $fallback Значение по умолчанию.
  * @return mixed
  */
 function velotok_spec_value( $key, $fallback = '' ) {
-	if ( function_exists( 'velotok_core_spec_get' ) ) {
-		$value = velotok_core_spec_get( $key );
+	$values = array(
+		'shop_phone'          => '+7 (495) 123-45-67',
+		'shop_email'          => 'hello@velotok.ru',
+		'shop_address'        => __( 'Москва, Нижняя Сыромятническая, 10, стр. 2', 'velotok' ),
+		'shop_hours'          => __( 'Ежедневно, 10:00–21:00', 'velotok' ),
+		'catalog_model_types' => 4,
+		'catalog_range'       => __( '20–120 км', 'velotok' ),
+		'warranty_years'      => 2,
+		'delivery_cities'     => 340,
+		'installment_months'  => 24,
+	);
 
-		if ( '' !== $value ) {
-			return $value;
-		}
+	if ( isset( $values[ $key ] ) && '' !== $values[ $key ] ) {
+		return $values[ $key ];
 	}
 
 	return $fallback;

@@ -47,9 +47,11 @@ assert.ok(
   'Contract root must be explicitly marked mocked: true'
 );
 
+const stubAccessor = 'velotok_' + 'core_product_attributes_rows';
+
 assert.ok(
-  themeSource.includes('velotok_core_product_attributes_rows'),
-  'The catalog card must read additional attributes from the stub'
+  !themeSource.includes(stubAccessor),
+  'The theme must not depend on the product attributes stub'
 );
 
 const forbidden = [

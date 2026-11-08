@@ -6,8 +6,9 @@
  *   php wp/plugins/velotok-core/tests/product-attributes-card-test.php
  *
  * The test combines the theme card renderer with the product attributes stub.
- * It fails if the catalog stops showing arbitrary stub attributes or if real
- * seller attributes stop taking precedence over the stub.
+ * It fails if the catalog stops showing arbitrary seller attributes. The theme
+ * itself must not read the stub: TESTEB-54 makes the card independent, so the
+ * stub is not loaded by the theme and cannot leak into the card output.
  *
  * @package Velotok_Core
  */
@@ -140,12 +141,12 @@ foreach ( $fallback['specs'] as $spec ) {
 	$fallback_labels[ $spec[0] ] = $spec[1];
 }
 
-velotok_product_attributes_card_assert( isset( $fallback_labels['Модель'] ) && 'Riviera City' === $fallback_labels['Модель'], 'Демо-карточка не получает дополнительный атрибут «Модель».' );
-velotok_product_attributes_card_assert( isset( $fallback_labels['Рама'] ) && 'Алюминий 6061' === $fallback_labels['Рама'], 'Демо-карточка не получает дополнительный атрибут «Рама».' );
+velotok_product_attributes_card_assert( isset( $fallback_labels['Запас хода'] ), 'Демо-карточка потеряла обязательные характеристики.' );
+velotok_product_attributes_card_assert( ! isset( $fallback_labels['Модель'] ), 'Демо-карточка не должна получать атрибуты из плагина-заглушки.' );
 
 $fallback_html = velotok_product_attributes_render_card( $fallback );
-velotok_product_attributes_card_assert( false !== strpos( $fallback_html, 'Riviera City' ), 'Дополнительный атрибут демо-карточки не выведен.' );
-velotok_product_attributes_card_assert( false !== strpos( $fallback_html, '2 года' ), 'Произвольный атрибут «Гарантия» не выведен в демо-карточке.' );
+velotok_product_attributes_card_assert( false !== strpos( $fallback_html, $fallback['name'] ), 'Демо-карточка не выводит название.' );
+velotok_product_attributes_card_assert( false !== strpos( $fallback_html, $fallback['description'] ), 'Демо-карточка не выводит описание.' );
 
 $product = new WC_Product(
 	array(
@@ -171,8 +172,8 @@ foreach ( $model['specs'] as $spec ) {
 	$labels[ $spec[0] ] = $spec[1];
 }
 
-velotok_product_attributes_card_assert( isset( $labels['Модель'] ) && 'Riviera City' === $labels['Модель'], 'Товар без атрибутов продавца не получает данные из заглушки.' );
-velotok_product_attributes_card_assert( isset( $labels['Гарантия'] ) && '2 года' === $labels['Гарантия'], 'Товар без атрибутов продавца не получает «Гарантию» из заглушки.' );
+velotok_product_attributes_card_assert( ! isset( $labels['Модель'] ), 'Товар без атрибутов продавца не должен получать данные из плагина-заглушки.' );
+velotok_product_attributes_card_assert( ! isset( $labels['Гарантия'] ), 'Товар без атрибутов продавца не должен получать «Гарантию» из плагина-заглушки.' );
 
 $seller_product = new WC_Product(
 	array(
@@ -187,6 +188,7 @@ $seller_product = new WC_Product(
 		'description'       => '',
 		'attributes'        => array(
 			new WC_Product_Attribute( 'Модель', array( 'Seller Model' ) ),
+			new WC_Product_Attribute( 'Рама', array( 'Seller Frame' ) ),
 		),
 		'type'              => 'simple',
 		'purchasable'       => true,
@@ -200,8 +202,9 @@ foreach ( $seller_model['specs'] as $spec ) {
 	$seller_labels[ $spec[0] ] = $spec[1];
 }
 
-velotok_product_attributes_card_assert( isset( $seller_labels['Модель'] ) && 'Seller Model' === $seller_labels['Модель'], 'Атрибут продавца не имеет приоритета над заглушкой.' );
-velotok_product_attributes_card_assert( isset( $seller_labels['Рама'] ), 'Недостающие атрибуты продавца не дополняются заглушкой.' );
+velotok_product_attributes_card_assert( isset( $seller_labels['Модель'] ) && 'Seller Model' === $seller_labels['Модель'], 'Атрибут продавца «Модель» не выводится в карточке.' );
+velotok_product_attributes_card_assert( isset( $seller_labels['Рама'] ) && 'Seller Frame' === $seller_labels['Рама'], 'Атрибут продавца «Рама» не выводится в карточке.' );
+velotok_product_attributes_card_assert( ! isset( $seller_labels['Гарантия'] ), 'Карточка не должна дополнять атрибуты продавца данными из плагина-заглушки.' );
 
 if ( $failures ) {
 	foreach ( $failures as $failure ) {
@@ -210,4 +213,4 @@ if ( $failures ) {
 	exit( 1 );
 }
 
-echo 'OK: карточки каталога выводят произвольные дополнительные атрибуты из заглушки.' . PHP_EOL;
+echo 'OK: карточки каталога выводят атрибуты продавца и не зависят от плагина-заглушки.' . PHP_EOL;

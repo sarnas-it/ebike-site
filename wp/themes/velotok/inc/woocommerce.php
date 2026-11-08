@@ -370,19 +370,6 @@ function velotok_product_extra_attributes( $product ) {
 		$extra[]      = array( $label, implode( ', ', $clean ) );
 	}
 
-	if ( function_exists( 'velotok_core_product_attributes_rows' ) && method_exists( $product, 'get_slug' ) ) {
-		foreach ( velotok_core_product_attributes_rows( $product->get_slug() ) as $stub_attribute ) {
-			$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $stub_attribute[0] ) : strtolower( $stub_attribute[0] );
-
-			if ( isset( $seen[ $key ] ) ) {
-				continue;
-			}
-
-			$seen[ $key ] = true;
-			$extra[]      = $stub_attribute;
-		}
-	}
-
 	return $extra;
 }
 
@@ -733,10 +720,6 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 			/* translators: %s: вес в килограммах. */
 			sprintf( __( '%s кг', 'velotok' ), $model['weight'] ),
 		);
-	}
-
-	if ( function_exists( 'velotok_core_product_attributes_rows' ) ) {
-		$specs = array_merge( $specs, velotok_core_product_attributes_rows( $model['slug'] ) );
 	}
 
 	$image = sprintf(
