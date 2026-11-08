@@ -110,7 +110,7 @@ function velotok_core_cart_contract() {
 		'spec'              => 'cart',
 		'requirement'       => 'TESTEB-7',
 		'task'              => 'TESTEB-7',
-		'requirement_ids'   => array( 'TESTEB-7', 'TESTEB-8', 'TESTEB-9', 'TESTEB-10', 'TESTEB-151' ),
+		'requirement_ids'   => array( 'TESTEB-7', 'TESTEB-8', 'TESTEB-9', 'TESTEB-10', 'TESTEB-13', 'TESTEB-151' ),
 		'parent_spec'       => 'ecommerce-store',
 		'catalog_spec'      => 'ecommerce-store',
 		'checkout_spec'     => 'clarify-096bb945',

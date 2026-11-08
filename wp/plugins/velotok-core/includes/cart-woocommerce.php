@@ -51,7 +51,7 @@ function velotok_core_cart_woocommerce_contract() {
 		'parent_spec'      => 'ecommerce-store',
 		'requirement'      => 'TESTEB-7',
 		'task'             => 'TESTEB-7',
-		'requirement_ids'  => array( 'TESTEB-7', 'TESTEB-8', 'TESTEB-9', 'TESTEB-10' ),
+		'requirement_ids'  => array( 'TESTEB-7', 'TESTEB-8', 'TESTEB-9', 'TESTEB-10', 'TESTEB-13' ),
 		'requirements'     => array(
 			'woocommerce_cart'  => 'Система SHALL вести корзину на WooCommerce',
 			'guest_transfer'    => 'Гостевая корзина SHALL переноситься при входе',
