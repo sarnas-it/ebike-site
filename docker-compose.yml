@@ -93,6 +93,8 @@ services:
         php wp-content/themes/velotok/tests/catalog-display-test.php
         echo "Running catalog all products test:"
         php wp-content/themes/velotok/tests/catalog-all-products-test.php
+        echo "Running catalog published products test:"
+        php wp-content/themes/velotok/tests/catalog-published-products-test.php
         exec tail -f /dev/null
 
 volumes:

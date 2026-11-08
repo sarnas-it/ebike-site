@@ -78,7 +78,7 @@ function taxonomy_exists( $taxonomy ) { return false; }
 function get_term_by() { return false; }
 function is_wp_error( $thing ) { return false; }
 function get_term_link() { return ''; }
-function wc_get_products( $args = array() ) { return array(); }
+/* WooCommerce intentionally absent: the built-in fallback catalog must render. */
 function wc_get_product( $id ) { return null; }
 function wc_get_related_products() { return array(); }
 function wc_get_template_part() {}
