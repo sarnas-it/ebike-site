@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -120,6 +120,11 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'country'            => 'RU',
 				'explicit_failure'   => true,
 				'failure_visible'    => true,
+				'failure_requirement'=> 'TESTEB-33',
+				'failure_explicit'   => true,
+				'failure_silent'     => false,
+				'failure_fallback_to_empty_list' => false,
+				'failure_fallback_to_fake_points' => false,
 				'unavailable_code'   => 'DELIVERY_PICKUP_POINTS_UNAVAILABLE',
 				'error_code'         => 'DELIVERY_PICKUP_POINTS_ERROR',
 				'no_address_code'    => 'DELIVERY_PICKUP_POINTS_ADDRESS_AMBIGUOUS',
@@ -165,6 +170,38 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'error_code'    => 'DELIVERY_PROVIDER_CONFIGURATION_ERROR',
 			),
 		);
+
+		$pickup_failure = array(
+			'requirement'          => 'TESTEB-33',
+			'explicit'             => true,
+			'visible'              => true,
+			'silent'               => false,
+			'fallback_to_empty_list' => false,
+			'fallback_to_fake_points' => false,
+			'success_on_failure'   => false,
+			'mark_success'         => false,
+			'keep_pickup_available'=> true,
+			'codes'                => array(
+				'unavailable'    => 'DELIVERY_PICKUP_POINTS_UNAVAILABLE',
+				'error'          => 'DELIVERY_PICKUP_POINTS_ERROR',
+				'no_address'     => 'DELIVERY_PICKUP_POINTS_ADDRESS_AMBIGUOUS',
+				'no_coordinates' => 'DELIVERY_PICKUP_POINTS_NO_COORDINATES',
+				'empty'          => 'DELIVERY_PICKUP_POINTS_EMPTY',
+				'outside_radius' => 'DELIVERY_PICKUP_POINTS_OUTSIDE_RADIUS',
+			),
+			'unavailable_code'     => 'DELIVERY_PICKUP_POINTS_UNAVAILABLE',
+			'error_code'           => 'DELIVERY_PICKUP_POINTS_ERROR',
+			'no_address_code'      => 'DELIVERY_PICKUP_POINTS_ADDRESS_AMBIGUOUS',
+			'no_coordinates_code'  => 'DELIVERY_PICKUP_POINTS_NO_COORDINATES',
+			'empty_code'           => 'DELIVERY_PICKUP_POINTS_EMPTY',
+			'outside_radius_code'  => 'DELIVERY_PICKUP_POINTS_OUTSIDE_RADIUS',
+		);
+
+		$contract['pickup_points']['failure_behavior'] = $pickup_failure;
+		$contract['pickup_points_failure']   = $pickup_failure;
+		$contract['pickup_points_unavailable'] = $pickup_failure;
+		$contract['pickup_points_error']     = $pickup_failure;
+		$contract['pickup_points_availability'] = $pickup_failure;
 
 		return $contract;
 	}
@@ -1479,6 +1516,12 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 			$option['points']               = isset( $points_result['points'] ) ? $points_result['points'] : array();
 			$option['pickup_points_result'] = $points_result;
 			$option['pickup_points_radius_km'] = isset( $points_result['radius_km'] ) ? $points_result['radius_km'] : null;
+			$option['pickup_points_ok']        = ! empty( $points_result['ok'] );
+			$option['pickup_points_available'] = ! empty( $points_result['available'] );
+			$option['pickup_points_code']      = isset( $points_result['code'] ) ? $points_result['code'] : '';
+			$option['pickup_points_message']   = isset( $points_result['message'] ) ? $points_result['message'] : '';
+			$option['pickup_points_errors']    = isset( $points_result['errors'] ) ? $points_result['errors'] : array();
+			$option['pickup_points_explicit_failure'] = true;
 		}
 
 		return array( $key, $option );
@@ -1906,7 +1949,15 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points_source' ) ) {
 			$errors    = array();
 
 			foreach ( $context[ $key ] as $provider => $callback ) {
+				$provider_id = velotok_core_delivery_pickup_provider_id( $provider );
+
 				if ( ! is_callable( $callback ) ) {
+					$errors[] = array(
+						'code'    => $contract['error_code'],
+						'message' => 'Провайдер пунктов выдачи недоступен.',
+						'provider'=> $provider_id,
+						'visible' => true,
+					);
 					continue;
 				}
 
@@ -1916,7 +1967,7 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points_source' ) ) {
 					$errors[] = array(
 						'code'    => $contract['error_code'],
 						'message' => $exception->getMessage(),
-						'provider'=> velotok_core_delivery_pickup_provider_id( $provider ),
+						'provider'=> $provider_id,
 						'visible' => true,
 					);
 					continue;
@@ -1924,17 +1975,25 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points_source' ) ) {
 
 				$error = null;
 
-				if ( is_object( $result ) && ( 'WP_Error' === get_class( $result ) || is_a( $result, 'WP_Error' ) ) ) {
+				if ( null === $result || false === $result ) {
+					$error = 'Провайдер пунктов выдачи не вернул данные.';
+				} elseif ( is_object( $result ) && ( 'WP_Error' === get_class( $result ) || is_a( $result, 'WP_Error' ) ) ) {
 					$error = method_exists( $result, 'get_error_message' ) ? $result->get_error_message() : 'Провайдер вернул ошибку.';
+				} elseif ( is_array( $result ) && isset( $result['ok'] ) && false === $result['ok'] ) {
+					$error = isset( $result['error'] ) && is_scalar( $result['error'] ) && '' !== (string) $result['error']
+						? (string) $result['error']
+						: ( isset( $result['message'] ) && is_scalar( $result['message'] ) && '' !== (string) $result['message'] ? (string) $result['message'] : 'Провайдер вернул ошибку.' );
 				} elseif ( is_array( $result ) && isset( $result['error'] ) && is_scalar( $result['error'] ) && '' !== (string) $result['error'] ) {
 					$error = (string) $result['error'];
+				} elseif ( ! is_array( $result ) && ! is_object( $result ) ) {
+					$error = 'Провайдер вернул список пунктов выдачи в некорректном формате.';
 				}
 
 				if ( null !== $error ) {
 					$errors[] = array(
 						'code'    => $contract['error_code'],
 						'message' => $error,
-						'provider'=> velotok_core_delivery_pickup_provider_id( $provider ),
+						'provider'=> $provider_id,
 						'visible' => true,
 					);
 					continue;
@@ -1944,6 +2003,16 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points_source' ) ) {
 					? velotok_core_delivery_zones_value( $result, array( 'points', 'list', 'items' ), $result )
 					: array();
 
+				if ( ! is_array( $list ) ) {
+					$errors[] = array(
+						'code'    => $contract['error_code'],
+						'message' => 'Провайдер вернул список пунктов выдачи в некорректном формате.',
+						'provider'=> $provider_id,
+						'visible' => true,
+					);
+					continue;
+				}
+
 				foreach ( velotok_core_delivery_pickup_points_flatten( $list ) as $point ) {
 					$collected[] = $point;
 				}
@@ -1951,20 +2020,22 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points_source' ) ) {
 
 			if ( empty( $collected ) && ! empty( $errors ) ) {
 				return array(
-					'ok'     => false,
-					'code'   => $contract['error_code'],
-					'message'=> $errors[0]['message'],
-					'points' => array(),
-					'errors' => $errors,
-					'source' => 'provider',
+					'ok'       => false,
+					'code'     => $contract['error_code'],
+					'message'  => $errors[0]['message'],
+					'points'   => array(),
+					'errors'   => $errors,
+					'source'   => 'provider',
+					'degraded' => false,
 				);
 			}
 
 			return array(
-				'ok'     => true,
-				'points' => $collected,
-				'source' => 'provider',
-				'errors' => $errors,
+				'ok'       => true,
+				'points'   => $collected,
+				'source'   => 'provider',
+				'errors'   => $errors,
+				'degraded' => ! empty( $errors ),
 			);
 		}
 
@@ -2084,6 +2155,11 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points' ) ) {
 			'country'                => isset( $contract['country'] ) ? $contract['country'] : 'RU',
 			'mocked'                 => false,
 			'requirement'            => isset( $contract['requirement'] ) ? $contract['requirement'] : '',
+			'failure_requirement'    => isset( $contract['failure_requirement'] ) ? $contract['failure_requirement'] : 'TESTEB-33',
+			'explicit_failure'       => true,
+			'failure_visible'        => true,
+			'failure'                => null,
+			'degraded'               => false,
 			'pickup_points_radius_km'=> $radius,
 		);
 
@@ -2091,6 +2167,12 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points' ) ) {
 			$base['code']    = $source['code'];
 			$base['message'] = $source['message'];
 			$base['errors']  = $source['errors'];
+			$base['failure'] = array(
+				'code'    => $source['code'],
+				'message' => $source['message'],
+				'source'  => $source['source'],
+				'visible' => true,
+			);
 
 			return $base;
 		}
@@ -2101,6 +2183,12 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points' ) ) {
 			$base['message'] = $message;
 			$base['errors']  = array(
 				array( 'code' => $contract['no_address_code'], 'message' => $message, 'visible' => true ),
+			);
+			$base['failure'] = array(
+				'code'    => $contract['no_address_code'],
+				'message' => $message,
+				'source'  => $source['source'],
+				'visible' => true,
 			);
 
 			return $base;
@@ -2231,6 +2319,18 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points' ) ) {
 			$message = 'Часть пунктов выдачи недоступна.';
 		}
 
+		$degraded = ! empty( $errors ) || ! empty( $source['degraded'] );
+		$failure  = null;
+
+		if ( $contract['error_code'] === $code ) {
+			$failure = array(
+				'code'    => $code,
+				'message' => $message,
+				'visible' => true,
+				'source'  => $source['source'],
+			);
+		}
+
 		return array_merge(
 			$base,
 			array(
@@ -2246,6 +2346,8 @@ if ( ! function_exists( 'velotok_core_delivery_pickup_points' ) ) {
 				'code'      => $code,
 				'message'   => $message,
 				'errors'    => $errors,
+				'degraded'  => $degraded,
+				'failure'   => $failure,
 			)
 		);
 	}
@@ -2474,6 +2576,13 @@ if ( ! function_exists( 'velotok_core_delivery_zones_pickup_option' ) ) {
 			'pickup_points'       => isset( $points_result['points'] ) ? $points_result['points'] : array(),
 			'points'              => isset( $points_result['points'] ) ? $points_result['points'] : array(),
 			'pickup_points_result'=> $points_result,
+			'pickup_points_ok'    => ! empty( $points_result['ok'] ),
+			'pickup_points_available' => ! empty( $points_result['available'] ),
+			'pickup_points_code'  => isset( $points_result['code'] ) ? $points_result['code'] : '',
+			'pickup_points_message' => isset( $points_result['message'] ) ? $points_result['message'] : '',
+			'pickup_points_errors' => isset( $points_result['errors'] ) ? $points_result['errors'] : array(),
+			'pickup_points_explicit_failure' => true,
+			'points_visible_error' => empty( $points_result['ok'] ) || ! empty( $points_result['errors'] ),
 			'radius_km'           => isset( $points_result['radius_km'] ) ? $points_result['radius_km'] : null,
 		);
 	}
@@ -2545,6 +2654,28 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			$method_context
 		);
 
+		if ( empty( $pickup_points['ok'] ) || ! empty( $pickup_points['errors'] ) ) {
+			$pickup_errors = ! empty( $pickup_points['errors'] )
+				? $pickup_points['errors']
+				: array(
+					array(
+						'code'    => isset( $pickup_points['code'] ) ? $pickup_points['code'] : $contract['pickup_points']['unavailable_code'],
+						'message' => isset( $pickup_points['message'] ) ? $pickup_points['message'] : 'Список пунктов выдачи недоступен.',
+						'visible' => true,
+					),
+				);
+
+			foreach ( $pickup_errors as $pickup_error ) {
+				if ( ! is_array( $pickup_error ) ) {
+					continue;
+				}
+
+				$pickup_error['visible'] = true;
+				$pickup_error['source']  = 'pickup_points';
+				$errors[] = $pickup_error;
+			}
+		}
+
 		if ( $pickup_allowed ) {
 			$pickup_context = $method_context;
 			$pickup_context['pickup_points_result'] = $pickup_points;
@@ -2575,6 +2706,11 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			'pickup_points'   => isset( $pickup_points['points'] ) ? $pickup_points['points'] : array(),
 			'pickup_points_result' => $pickup_points,
 			'pickup_points_radius_km' => isset( $pickup_points['radius_km'] ) ? $pickup_points['radius_km'] : null,
+			'pickup_points_ok' => ! empty( $pickup_points['ok'] ),
+			'pickup_points_code' => isset( $pickup_points['code'] ) ? $pickup_points['code'] : '',
+			'pickup_points_message' => isset( $pickup_points['message'] ) ? $pickup_points['message'] : '',
+			'pickup_points_errors' => isset( $pickup_points['errors'] ) ? $pickup_points['errors'] : array(),
+			'pickup_points_explicit_failure' => true,
 			'source'          => $contract['source'],
 			'requirement'     => $contract['requirement'],
 			'mocked'          => false,
