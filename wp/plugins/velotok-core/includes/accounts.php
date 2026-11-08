@@ -2,11 +2,14 @@
 /**
  * Accounts stub contract: email/password registration, confirmation and login.
  *
- * This is the single access point for customer accounts. The current iteration
- * deliberately keeps accounts and sessions in memory: it does not read
- * environment variables, files, the database or remote services and it does
- * not persist users between requests. Real WooCommerce customer creation,
- * email delivery and password recovery are out of scope for this iteration.
+ * This file is the single access point for customer accounts and keeps an
+ * in-memory implementation so the contract can be exercised without a
+ * WordPress installation. On a live site the helpers delegate to
+ * accounts-wordpress.php, which persists customers through
+ * wc_create_new_customer()/wp_create_user(), requires email confirmation,
+ * logs users in with wp_signon(), blocks unconfirmed access to the personal
+ * area and ends sessions with wp_logout(). Password recovery remains out of
+ * scope for this iteration.
  *
  * Spec: accounts (requirement TESTEB-1).
  *
@@ -44,11 +47,20 @@ function velotok_core_accounts_contract() {
 			'logout'            => 'Сессия SHALL завершаться выходом',
 			'account_access'    => 'Неподтверждённый пользователь SHALL не иметь доступа к личному кабинету',
 		),
-		'source'         => 'stub',
-		'provider'       => 'stub',
-		'mocked'         => true,
+		'source'         => 'wordpress',
+		'provider'       => 'woocommerce',
+		'mocked'         => false,
 		'network'        => false,
-		'persistent'     => false,
+		'persistent'     => true,
+		'runtime'        => 'wordpress',
+		'in_memory_fallback' => true,
+		'integration'    => array(
+			'file'        => 'includes/accounts-wordpress.php',
+			'create_user' => 'wc_create_new_customer',
+			'login'       => 'wp_signon',
+			'logout'      => 'wp_logout',
+			'confirmation' => 'email_token',
+		),
 		'operation'      => 'account_register_confirm_login',
 		'operations'     => array(
 			'register'             => 'velotok_core_account_register',
@@ -72,8 +84,9 @@ function velotok_core_accounts_contract() {
 			'duplicate_account'           => false,
 			'existing_email_strategy'     => 'login',
 			'auto_login'                  => false,
-			'mocked'                      => true,
-			'source'                      => 'stub',
+			'persistent'                  => true,
+			'mocked'                      => false,
+			'source'                      => 'wordpress',
 		),
 		'confirmation'   => array(
 			'required'       => true,
@@ -82,8 +95,8 @@ function velotok_core_accounts_contract() {
 			'token_field'    => 'confirmation_token',
 			'auto_login'     => true,
 			'creates_session' => true,
-			'mocked'         => true,
-			'source'         => 'stub',
+			'mocked'         => false,
+			'source'         => 'wordpress',
 		),
 		'login'          => array(
 			'enabled'                       => true,
@@ -92,14 +105,14 @@ function velotok_core_accounts_contract() {
 			'unconfirmed_access'            => false,
 			'invalid_credentials_code'      => 'ACCOUNT_INVALID_CREDENTIALS',
 			'reveals_account_existence'     => false,
-			'mocked'                        => true,
-			'source'                        => 'stub',
+			'mocked'                        => false,
+			'source'                        => 'wordpress',
 		),
 		'logout'         => array(
 			'enabled'      => true,
 			'ends_session' => true,
-			'mocked'       => true,
-			'source'       => 'stub',
+			'mocked'       => false,
+			'source'       => 'wordpress',
 		),
 		'account'        => array(
 			'personal_area'        => true,
@@ -108,16 +121,16 @@ function velotok_core_accounts_contract() {
 			'guests_allowed'       => false,
 			'unconfirmed_allowed'  => false,
 			'access_denied_code'   => 'ACCOUNT_ACCESS_DENIED',
-			'mocked'               => true,
-			'source'               => 'stub',
+			'mocked'               => false,
+			'source'               => 'wordpress',
 		),
 		'cart'           => array(
 			'transfer_on_registration' => true,
 			'transfer_on_login'        => true,
 			'merge_strategy'           => 'merge_quantities',
 			'clear_guest_after_transfer' => true,
-			'mocked'                   => true,
-			'source'                   => 'stub',
+			'mocked'                   => false,
+			'source'                   => 'wordpress',
 		),
 		'checkout'       => array(
 			'after_transfer' => true,
@@ -125,8 +138,8 @@ function velotok_core_accounts_contract() {
 			'target_url'     => '/checkout/',
 			'requires_items' => true,
 			'empty_error'    => 'CART_EMPTY',
-			'mocked'         => true,
-			'source'         => 'stub',
+			'mocked'         => false,
+			'source'         => 'wordpress',
 		),
 		'privacy'        => array(
 			'reveal_existing_account'    => false,
@@ -147,9 +160,9 @@ function velotok_core_accounts_contract() {
 		),
 		'open_questions' => array(
 			'password_recovery' => 'Восстановление забытого пароля вне объёма текущей итерации.',
-			'email_delivery'    => 'Реальная доставка письма с подтверждением не выполняется, токен возвращается заглушкой.',
+			'email_delivery'    => 'Письмо подтверждения отправляется через wp_mail(); настройка реального SMTP-провайдера остаётся задачей окружения.',
 			'authentication'    => 'Вход выполняется только по email и паролю; социальные сети вне объёма.',
-			'customer_storage'  => 'Реальное хранение пользователей в WooCommerce не выполняется.',
+			'customer_storage'  => 'Пользователи сохраняются в WordPress/WooCommerce через wc_create_new_customer(); in-memory реализация используется только изолированными тестами.',
 		),
 	);
 
@@ -471,6 +484,10 @@ function velotok_core_account_failure( $code, $contract ) {
  * @return array<string,mixed>
  */
 function velotok_core_account_register( $email = '', $password = '', $options = array() ) {
+	if ( function_exists( 'velotok_core_wp_register_account' ) && function_exists( 'velotok_core_wp_accounts_available' ) && velotok_core_wp_accounts_available() ) {
+		return velotok_core_wp_register_account( $email, $password, $options );
+	}
+
 	$contract = velotok_core_accounts_contract();
 
 	if ( is_array( $email ) ) {
@@ -595,6 +612,10 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
  * @return array<string,mixed>
  */
 function velotok_core_account_confirm_email( $token_or_email = '', $token = '', $options = array() ) {
+	if ( function_exists( 'velotok_core_wp_confirm_email' ) && function_exists( 'velotok_core_wp_accounts_available' ) && velotok_core_wp_accounts_available() ) {
+		return velotok_core_wp_confirm_email( $token_or_email, $token, $options );
+	}
+
 	$contract = velotok_core_accounts_contract();
 	$email    = '';
 	$guest_cart = array();
@@ -707,6 +728,10 @@ function velotok_core_account_confirm_email( $token_or_email = '', $token = '', 
  * @return array<string,mixed>
  */
 function velotok_core_account_login( $email = '', $password = '', $options = array() ) {
+	if ( function_exists( 'velotok_core_wp_login' ) && function_exists( 'velotok_core_wp_accounts_available' ) && velotok_core_wp_accounts_available() ) {
+		return velotok_core_wp_login( $email, $password, $options );
+	}
+
 	$contract = velotok_core_accounts_contract();
 	$guest_cart = array();
 	$user_cart  = array();
@@ -840,6 +865,10 @@ function velotok_core_account_login( $email = '', $password = '', $options = arr
  * @return array|null
  */
 function velotok_core_account_current_user( $session = '' ) {
+	if ( function_exists( 'velotok_core_wp_current_user' ) && function_exists( 'velotok_core_wp_accounts_available' ) && velotok_core_wp_accounts_available() ) {
+		return velotok_core_wp_current_user( $session );
+	}
+
 	if ( is_array( $session ) ) {
 		$session = isset( $session['session_token'] ) ? $session['session_token'] : '';
 	}
@@ -888,6 +917,10 @@ function velotok_core_account_is_logged_in( $session = '' ) {
  * @return array<string,mixed>
  */
 function velotok_core_account_logout( $session = '' ) {
+	if ( function_exists( 'velotok_core_wp_logout' ) && function_exists( 'velotok_core_wp_accounts_available' ) && velotok_core_wp_accounts_available() ) {
+		return velotok_core_wp_logout( $session );
+	}
+
 	if ( is_array( $session ) ) {
 		$session = isset( $session['session_token'] ) ? $session['session_token'] : '';
 	}
@@ -923,6 +956,10 @@ function velotok_core_account_logout( $session = '' ) {
  * @return array<string,mixed>
  */
 function velotok_core_account_can_access( $subject = '' ) {
+	if ( function_exists( 'velotok_core_wp_can_access_account' ) && function_exists( 'velotok_core_wp_accounts_available' ) && velotok_core_wp_accounts_available() ) {
+		return velotok_core_wp_can_access_account( $subject );
+	}
+
 	$contract = velotok_core_accounts_contract();
 	$session  = '';
 	$email    = '';
@@ -1123,4 +1160,8 @@ if ( ! function_exists( 'velotok_core_account_has_access' ) ) {
 	function velotok_core_account_has_access( $subject = '' ) {
 		return velotok_core_account_can_access( $subject );
 	}
+}
+
+if ( ! defined( 'VELOTOK_ACCOUNTS_SKIP_WP_INTEGRATION' ) && ( function_exists( 'add_action' ) || function_exists( 'wp_insert_user' ) || function_exists( 'wp_create_user' ) || function_exists( 'wc_create_new_customer' ) ) && is_readable( __DIR__ . '/accounts-wordpress.php' ) ) {
+	require_once __DIR__ . '/accounts-wordpress.php';
 }

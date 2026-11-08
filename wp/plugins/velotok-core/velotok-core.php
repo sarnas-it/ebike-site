@@ -28,6 +28,7 @@ require_once VELOTOK_CORE_PATH . 'includes/catalog.php';
 require_once VELOTOK_CORE_PATH . 'includes/cart.php';
 require_once VELOTOK_CORE_PATH . 'includes/guest-cart-registration.php';
 require_once VELOTOK_CORE_PATH . 'includes/accounts.php';
+require_once VELOTOK_CORE_PATH . 'includes/accounts-wordpress.php';
 
 /**
  * Load plugin translations.

@@ -47,25 +47,31 @@ php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 ```
 
-= Аккаунты: регистрация по email, подтверждение и вход (stub) =
+= Аккаунты: регистрация по email, подтверждение и вход =
 
-Единая точка доступа — `velotok_core_accounts_contract()` в `includes/accounts.php`. Контракт помечен `mocked => true`, ссылается на спеку `accounts` и требование `TESTEB-1`.
+Единая точка доступа — `velotok_core_accounts_contract()` в `includes/accounts.php`. Контракт ссылается на спеку `accounts` и требование `TESTEB-1` и объявляет постоянное хранение пользователей (`persistent => true`, `source => 'wordpress'`).
 
-Правила контракта:
+На реальном сайте helpers из `includes/accounts.php` делегируют в `includes/accounts-wordpress.php`, который:
 
-* `velotok_core_account_register()` создаёт аккаунт по email и паролю в статусе `pending` и выдаёт токен подтверждения; без подтверждения вход запрещён;
-* `velotok_core_account_confirm_email()` активирует аккаунт, создаёт сессию, переносит гостевую корзину и при наличии товаров ведёт на `/checkout/`;
-* `velotok_core_account_login()` входит существующим подтверждённым пользователем, переносит гостевую корзину и не раскрывает существование аккаунта при неверных данных;
-* повторная регистрация существующего email не создаёт дубль и ведёт ко входу;
-* `velotok_core_account_can_access()` запрещает доступ к личному кабинету гостю и неподтверждённому пользователю;
-* `velotok_core_account_logout()` завершает сессию.
+* регистрирует пользователя по email и паролю через `wc_create_new_customer()` (или `wp_create_user()` / `wp_insert_user()` без WooCommerce) и сохраняет его в WordPress;
+* помечает новый аккаунт как `pending`, отправляет письмо с токеном подтверждения и не пускает в личный кабинет до подтверждения;
+* обрабатывает ссылку подтверждения, создаёт сессию через `wp_set_auth_cookie()` и переносит корзину WooCommerce на `/checkout/`;
+* входит существующим подтверждённым пользователем через `wp_signon()`; повторная регистрация существующего email не создаёт дубль и ведёт ко входу;
+* завершает сессию через `wp_logout()`;
+* блокирует неподтверждённый вход фильтром `authenticate` и закрывает страницу личного кабинета на `template_redirect`.
 
-Запуск контрактных тестов аккаунтов:
+Форма регистрации доступна через shortcode `[velotok_register]`, форма входа — `[velotok_login]`; обе отправляются в `admin-post.php`. Стандартная форма регистрации WooCommerce тоже переводит покупателя в статус `pending` через hook `woocommerce_created_customer`.
+
+In-memory реализация в `accounts.php` сохранена как fallback для изолированных тестов без WordPress.
+
+Запуск тестов аккаунтов:
 
 ```bash
 php wp/plugins/velotok-core/tests/accounts-contract-test.php
+php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
 node wp/plugins/velotok-core/tests/accounts-contract.test.js
 node wp/plugins/velotok-core/tests/accounts-redgreen.test.js
+node wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
 ```
 
 == Installation ==
