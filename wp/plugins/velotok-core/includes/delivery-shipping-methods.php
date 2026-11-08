@@ -148,24 +148,37 @@ abstract class Velotok_Shipping_Method extends WC_Shipping_Method {
 			return;
 		}
 
-		$eta  = velotok_core_delivery_zones_eta_range( $this );
-		$rate = array(
+		$eta            = velotok_core_delivery_zones_eta_range( $this );
+		$destination    = isset( $package['destination'] ) ? $package['destination'] : array();
+		$points_context = array_merge(
+			$context,
+			array(
+				'address'  => $destination,
+				'provider' => $this->id,
+			)
+		);
+		$pickup_points  = velotok_core_delivery_pickup_points( $destination, null, $points_context );
+		$rate           = array(
 			'id'        => $this->id . ':' . velotok_core_delivery_woocommerce_absint( $this->instance_id ),
 			'label'     => $this->title,
 			'cost'      => $cost['amount'],
 			'calc_tax'  => 'per_order',
 			'meta_data' => array(
-				'_velotok_delivery_provider' => $this->id,
-				'_velotok_eta_min_days'      => $eta['min_days'],
-				'_velotok_eta_max_days'      => $eta['max_days'],
-				'_velotok_eta_label'         => $eta['label'],
-				'_velotok_eta_range'         => $eta['range'],
-				'_velotok_delivery_eta'      => array(
+				'_velotok_delivery_provider'      => $this->id,
+				'_velotok_eta_min_days'           => $eta['min_days'],
+				'_velotok_eta_max_days'           => $eta['max_days'],
+				'_velotok_eta_label'              => $eta['label'],
+				'_velotok_eta_range'              => $eta['range'],
+				'_velotok_delivery_eta'           => array(
 					'min_days' => $eta['min_days'],
 					'max_days' => $eta['max_days'],
 					'label'    => $eta['label'],
 				),
-				'_velotok_test_mode'         => $context['test_mode'] ? 'yes' : 'no',
+				'_velotok_pickup_points'          => isset( $pickup_points['points'] ) ? $pickup_points['points'] : array(),
+				'_velotok_pickup_points_radius_km'=> isset( $pickup_points['radius_km'] ) ? $pickup_points['radius_km'] : null,
+				'_velotok_pickup_points_code'     => isset( $pickup_points['code'] ) ? $pickup_points['code'] : '',
+				'_velotok_pickup_points_message'  => isset( $pickup_points['message'] ) ? $pickup_points['message'] : '',
+				'_velotok_test_mode'              => $context['test_mode'] ? 'yes' : 'no',
 			),
 		);
 
