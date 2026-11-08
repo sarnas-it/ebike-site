@@ -20,6 +20,7 @@
 $root            = dirname( __DIR__ );
 $integrationPath = $root . '/includes/accounts-wordpress.php';
 $focusedTest     = __DIR__ . '/accounts-email-confirmation-wp-test.php';
+$registrationTest = __DIR__ . '/accounts-registration-confirmation-required-test.php';
 $contractTest    = __DIR__ . '/accounts-contract-test.php';
 
 if ( ! is_readable( $integrationPath ) ) {
@@ -104,7 +105,7 @@ foreach ( $variants as $name => $variant ) {
 	$brokenPath = $tmpDir . '/accounts-wordpress-' . $name . '.php';
 	file_put_contents( $brokenPath, $variant );
 
-	foreach ( array( 'focused' => $focusedTest, 'contract' => $contractTest ) as $label => $testPath ) {
+	foreach ( array( 'focused' => $focusedTest, 'registration' => $registrationTest, 'contract' => $contractTest ) as $label => $testPath ) {
 		$broken = velotok_testeb_2_run_php( $testPath, 'VELOTOK_ACCOUNTS_WP_INTEGRATION', $brokenPath );
 
 		if ( 0 === $broken['status'] ) {
@@ -113,7 +114,7 @@ foreach ( $variants as $name => $variant ) {
 	}
 }
 
-foreach ( array( 'focused' => $focusedTest, 'contract' => $contractTest ) as $label => $testPath ) {
+foreach ( array( 'focused' => $focusedTest, 'registration' => $registrationTest, 'contract' => $contractTest ) as $label => $testPath ) {
 	$real = velotok_testeb_2_run_php( $testPath, 'VELOTOK_ACCOUNTS_WP_INTEGRATION', '' );
 
 	if ( 0 !== $real['status'] ) {

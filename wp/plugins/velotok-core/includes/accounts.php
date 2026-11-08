@@ -471,6 +471,35 @@ function velotok_core_account_failure( $code, $contract ) {
 }
 
 /**
+ * Remove caller-supplied confirmation state from registration options.
+ *
+ * Registration always starts unconfirmed. Callers may provide a token for
+ * deterministic tests, but they must not be able to mark the account as
+ * confirmed, active or authenticated while registering.
+ *
+ * @param mixed $options Raw registration options.
+ * @return array<string,mixed>
+ */
+function velotok_core_account_registration_options( $options ) {
+	if ( ! is_array( $options ) ) {
+		return array();
+	}
+
+	unset(
+		$options['email_confirmed'],
+		$options['email_verified'],
+		$options['confirmed'],
+		$options['status'],
+		$options['account_status'],
+		$options['authenticated'],
+		$options['logged_in'],
+		$options['session_token']
+	);
+
+	return $options;
+}
+
+/**
  * Register a user by email and password.
  *
  * Registration creates a pending account that cannot log in until the email is
@@ -497,11 +526,7 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		$options  = isset( $request['options'] ) && is_array( $request['options'] ) ? $request['options'] : $options;
 	}
 
-	if ( ! is_array( $options ) ) {
-		$options = array();
-	}
-
-	unset( $options['email_confirmed'], $options['status'], $options['authenticated'] );
+	$options = velotok_core_account_registration_options( $options );
 
 	$email    = is_scalar( $email ) ? trim( (string) $email ) : '';
 	$password = is_scalar( $password ) ? (string) $password : '';
