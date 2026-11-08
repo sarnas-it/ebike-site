@@ -20,6 +20,8 @@ function includes(fragment, message) {
 }
 
 includes('TESTEB-23', 'Contract must reference requirement TESTEB-23');
+includes('TESTEB-25', 'Contract must reference requirement TESTEB-25');
+includes("'requirement'       => 'TESTEB-25'", 'Order section must own the TESTEB-25 persistence requirement');
 includes("'spec'            => 'checkout'", 'Contract must reference the checkout spec');
 includes('WC_Checkout', 'WooCommerce Checkout class is missing');
 includes('uses_wc_checkout', 'WooCommerce Checkout usage must be declared');
