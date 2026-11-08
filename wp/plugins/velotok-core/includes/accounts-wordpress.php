@@ -534,6 +534,28 @@ function velotok_core_wp_transfer_guest_cart( $options = array() ) {
 		$options = array();
 	}
 
+	$guest_cart = isset( $options['guest_cart'] ) ? $options['guest_cart'] : array();
+
+	if ( function_exists( 'velotok_core_wc_cart_transfer_guest_cart' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		$user_id = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+		$wc_cart = velotok_core_wc_cart_transfer_guest_cart( $guest_cart, $user_id );
+
+		if ( is_array( $wc_cart ) ) {
+			$wc_items = isset( $wc_cart['items'] ) && is_array( $wc_cart['items'] ) ? $wc_cart['items'] : array();
+			$wc_count = isset( $wc_cart['item_count'] ) && is_numeric( $wc_cart['item_count'] ) ? (int) $wc_cart['item_count'] : 0;
+
+			$wc_cart['valid']                  = true;
+			$wc_cart['authenticated']          = true;
+			$wc_cart['guest']                  = false;
+			$wc_cart['has_items']              = ! empty( $wc_items );
+			$wc_cart['item_count']             = $wc_count;
+			$wc_cart['guest_cart_transferred'] = ! empty( $wc_cart['guest_cart_transferred'] );
+			$wc_cart['guest_cart_cleared']     = true;
+
+			return $wc_cart;
+		}
+	}
+
 	$has_items = false;
 	$count     = 0;
 
