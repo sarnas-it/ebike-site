@@ -2,24 +2,31 @@
 import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { getWorkflowRun } from './lib.mjs';
+import { getWorkflowRun, getWorkflowRuns } from './lib.mjs';
 import {
   RECOVERY_WORKFLOW_PATH,
   publishRecoveryEvidence,
 } from './evidence.mjs';
 
 const USAGE = `Usage:
-  wait-and-publish-evidence.mjs --pr <number> --sha <sha> --run-id <id> [options]
+  wait-and-publish-evidence.mjs --pr <number> --sha <sha> [--run-id <id> | --trigger-sha <sha>] [options]
 
 Waits for the recovery workflow run to finish, then verifies and publishes the
 completed evidence. This is what makes the comment show a real final result
 instead of an in-progress run.
 
+The finalizer is triggered by the same push as recovery, so it normally finds
+the matching recovery run by --trigger-sha instead of receiving a run id. The
+run is discovered by its exact head SHA, never guessed from the incident report
+and never taken from the finalizer's own GITHUB_RUN_ID.
+
 Options:
   --repo <owner/name>    Repository (default: $GITHUB_REPOSITORY or sarnas-it/ebike-site)
   --pr <number>          Pull request number (required)
   --sha <sha>            Exact commit under test (required)
-  --run-id <id>          Recovery workflow run to wait for (required)
+  --run-id <id>          Recovery workflow run to wait for (optional)
+  --trigger-sha <sha>    Head SHA that triggered recovery; used to discover the
+                         matching recovery run when --run-id is absent
   --workflow <path>      Recovery workflow path (default: ${RECOVERY_WORKFLOW_PATH})
   --comment-file <path>  Markdown template to publish/update on the pull request
   --comment-marker <s>   Idempotency marker for the comment
@@ -33,6 +40,55 @@ Authentication: set GITHUB_TOKEN (never printed).
 
 export function isSuccessfulRecoveryRun(run) {
   return run?.status === 'completed' && run?.conclusion === 'success';
+}
+
+function runPath(run) {
+  return run?.path || run?.workflow_path || null;
+}
+
+export async function findRecoveryRunForTrigger({
+  owner,
+  repo,
+  triggerSha,
+  workflow = RECOVERY_WORKFLOW_PATH,
+  token,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 40 * 60 * 1000,
+  intervalMs = 15 * 1000,
+  now = () => Date.now(),
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  log = () => {},
+}) {
+  const deadline = now() + timeoutMs;
+  while (now() <= deadline) {
+    const response = await getWorkflowRuns({
+      owner,
+      repo,
+      ref: triggerSha,
+      token,
+      fetchImpl,
+    });
+    const candidates = (response?.workflow_runs || [])
+      .filter((run) => runPath(run) === workflow)
+      .sort((a, b) => {
+        const left = Date.parse(a.created_at || 0);
+        const right = Date.parse(b.created_at || 0);
+        return right - left;
+      });
+    if (candidates.length > 0) {
+      log(
+        `found recovery run ${candidates[0].id} for trigger ${triggerSha} ` +
+          `(${workflow})`,
+      );
+      return candidates[0];
+    }
+    log(`no recovery run yet for trigger ${triggerSha} (${workflow})`);
+    if (now() >= deadline) {
+      break;
+    }
+    await sleep(intervalMs);
+  }
+  return null;
 }
 
 export async function waitForRunCompletion({
@@ -68,7 +124,8 @@ export async function finalizeRecoveryEvidence({
   repo,
   pullNumber,
   targetSha,
-  runId,
+  runId = null,
+  triggerSha = null,
   workflow = RECOVERY_WORKFLOW_PATH,
   template = '',
   marker = null,
@@ -80,8 +137,36 @@ export async function finalizeRecoveryEvidence({
   sleep,
   log = () => {},
 }) {
+  let resolvedRunId = runId;
+  if (!resolvedRunId) {
+    if (!triggerSha) {
+      throw new Error('either --run-id or --trigger-sha is required');
+    }
+    const discovered = await findRecoveryRunForTrigger({
+      owner,
+      repo,
+      triggerSha,
+      workflow,
+      token,
+      fetchImpl,
+      timeoutMs,
+      intervalMs,
+      now,
+      sleep,
+      log,
+    });
+    if (!discovered) {
+      return {
+        run: null,
+        published: false,
+        reason: `no recovery run found for trigger ${triggerSha}`,
+      };
+    }
+    resolvedRunId = discovered.id;
+  }
+
   const run = await waitForRunCompletion({
-    runId,
+    runId: resolvedRunId,
     getRun: (id) =>
       getWorkflowRun({ owner, repo, runId: id, token, fetchImpl }),
     timeoutMs,
@@ -95,7 +180,7 @@ export async function finalizeRecoveryEvidence({
     return {
       run,
       published: false,
-      reason: `recovery run ${runId} did not complete in time`,
+      reason: `recovery run ${resolvedRunId} did not complete in time`,
     };
   }
   if (!isSuccessfulRecoveryRun(run)) {
@@ -103,7 +188,7 @@ export async function finalizeRecoveryEvidence({
       run,
       published: false,
       reason:
-        `recovery run ${runId} completed with ` +
+        `recovery run ${resolvedRunId} completed with ` +
         `${run.conclusion ?? 'no conclusion'}`,
     };
   }
@@ -113,7 +198,7 @@ export async function finalizeRecoveryEvidence({
     repo,
     pullNumber,
     targetSha,
-    runId,
+    runId: resolvedRunId,
     workflow,
     template,
     marker,
@@ -124,12 +209,17 @@ export async function finalizeRecoveryEvidence({
   return { run, published: true, ...result };
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     repo: process.env.GITHUB_REPOSITORY || 'sarnas-it/ebike-site',
     pr: null,
     sha: null,
-    runId: process.env.GITHUB_RUN_ID || null,
+    // The finalizer is a different workflow run from recovery. Defaulting to
+    // GITHUB_RUN_ID here would make it wait for itself forever and never
+    // discover the recovery run that actually published the checks. The run is
+    // therefore selected explicitly: --run-id, or --trigger-sha discovery.
+    runId: null,
+    triggerSha: null,
     workflow: RECOVERY_WORKFLOW_PATH,
     commentFile: null,
     commentMarker: '<!-- testeb-65-recovery -->',
@@ -151,6 +241,8 @@ function parseArgs(argv) {
       options.sha = argv[++i];
     } else if (arg === '--run-id') {
       options.runId = argv[++i];
+    } else if (arg === '--trigger-sha') {
+      options.triggerSha = argv[++i];
     } else if (arg === '--workflow') {
       options.workflow = argv[++i];
     } else if (arg === '--comment-file') {
@@ -180,8 +272,15 @@ async function main() {
   if (!options.sha || !/^[0-9a-f]{7,40}$/.test(options.sha)) {
     throw new Error('--sha <commit sha> is required');
   }
-  if (!options.runId || !/^[0-9]+$/.test(String(options.runId))) {
-    throw new Error('--run-id <numeric run id> is required');
+  if (options.runId && !/^[0-9]+$/.test(String(options.runId))) {
+    throw new Error('--run-id must be numeric when provided');
+  }
+  if (!options.runId) {
+    if (!options.triggerSha || !/^[0-9a-f]{7,40}$/i.test(options.triggerSha)) {
+      throw new Error(
+        'either --run-id <numeric run id> or --trigger-sha <commit sha> is required',
+      );
+    }
   }
   const [owner, repo] = options.repo.split('/');
   if (!owner || !repo) {
@@ -196,8 +295,28 @@ async function main() {
   }
 
   if (options.dryRun) {
+    let runId = options.runId;
+    if (!runId) {
+      const discovered = await findRecoveryRunForTrigger({
+        owner,
+        repo,
+        triggerSha: options.triggerSha,
+        workflow: options.workflow,
+        token,
+        timeoutMs: options.timeoutMs,
+        intervalMs: options.intervalMs,
+        log,
+      });
+      if (!discovered) {
+        process.stderr.write(
+          `no recovery run found for trigger ${options.triggerSha}\n`,
+        );
+        return 1;
+      }
+      runId = discovered.id;
+    }
     const run = await waitForRunCompletion({
-      runId: options.runId,
+      runId,
       getRun: (id) =>
         getWorkflowRun({ owner, repo, runId: id, token }),
       timeoutMs: options.timeoutMs,
@@ -205,7 +324,7 @@ async function main() {
       log,
     });
     log(
-      `recovery run ${options.runId}: status=${run?.status ?? 'unknown'} ` +
+      `recovery run ${runId}: status=${run?.status ?? 'unknown'} ` +
         `conclusion=${run?.conclusion ?? 'none'}`,
     );
     return isSuccessfulRecoveryRun(run) ? 0 : 1;
@@ -217,6 +336,7 @@ async function main() {
     pullNumber: options.pr,
     targetSha: options.sha,
     runId: options.runId,
+    triggerSha: options.triggerSha,
     workflow: options.workflow,
     template,
     marker: options.commentFile ? options.commentMarker : null,

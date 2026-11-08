@@ -4,7 +4,9 @@ import process from 'node:process';
 import { EVIDENCE_START } from '../evidence.mjs';
 import {
   finalizeRecoveryEvidence,
+  findRecoveryRunForTrigger,
   isSuccessfulRecoveryRun,
+  parseArgs,
   waitForRunCompletion,
 } from '../wait-and-publish-evidence.mjs';
 
@@ -21,6 +23,7 @@ const GREEN_CHECKS = [
   { name: 'php-lint', conclusion: 'success' },
   { name: 'php-tests', conclusion: 'success' },
   { name: 'plugin-tests', conclusion: 'success' },
+  { name: 'php-plugin-tests', conclusion: 'success' },
 ];
 
 const SUCCESS_RUN = {
@@ -42,6 +45,15 @@ const MERGED_PR = {
   merged_at: '2026-11-08T00:00:00Z',
   head: { sha: TARGET_SHA },
 };
+
+const GREEN_STATUSES = [
+  {
+    context: 'ci/recover',
+    state: 'success',
+    target_url: RUN_URL,
+    description: 'Recovered checks passed for the pull request',
+  },
+];
 
 function response(status, body) {
   return {
@@ -159,7 +171,11 @@ async function testCompletedRunPublishesFinalEvidence() {
       return response(200, { total_count: GREEN_CHECKS.length, check_runs: GREEN_CHECKS });
     }
     if (url.includes(`/commits/${TARGET_SHA}/status`) && method === 'GET') {
-      return response(200, { state: 'success', total_count: 1, statuses: [] });
+      return response(200, {
+        state: 'success',
+        total_count: GREEN_STATUSES.length,
+        statuses: GREEN_STATUSES,
+      });
     }
     if (url.includes('/issues/') && url.includes('/comments') && method === 'GET') {
       return response(200, [{ id: 1, body: stale }]);
@@ -203,11 +219,208 @@ async function testCompletedRunPublishesFinalEvidence() {
   console.log('PASS: completed run evidence replaces the stale in-progress block');
 }
 
+async function testDiscoversRecoveryRunForTriggerSha() {
+  const finalizerRun = {
+    id: 777,
+    path: '.github/workflows/finalize-pr68-evidence.yml',
+    status: 'in_progress',
+    conclusion: null,
+    created_at: '2026-11-08T00:00:01Z',
+  };
+  const recoveryRun = {
+    id: 778,
+    path: '.github/workflows/recover-pr68.yml',
+    status: 'in_progress',
+    conclusion: null,
+    created_at: '2026-11-08T00:00:00Z',
+  };
+  const { fetchImpl } = makeFetch((call) => {
+    if (call.url.includes('/actions/runs?') && call.method === 'GET') {
+      return response(200, { workflow_runs: [finalizerRun, recoveryRun] });
+    }
+    throw new Error(`unexpected request: ${call.method} ${call.url}`);
+  });
+
+  const run = await findRecoveryRunForTrigger({
+    owner: OWNER,
+    repo: REPO,
+    triggerSha: TARGET_SHA,
+    token: 'test-token',
+    fetchImpl,
+    timeoutMs: 0,
+  });
+
+  assert.strictEqual(run.id, recoveryRun.id);
+  assert.strictEqual(
+    run.path,
+    '.github/workflows/recover-pr68.yml',
+    'the finalizer must never mistake its own run for the recovery run',
+  );
+  console.log('PASS: the finalizer discovers the matching recovery run by trigger sha');
+}
+
+async function testMissingRecoveryRunIsNotInvented() {
+  const { fetchImpl } = makeFetch((call) => {
+    if (call.url.includes('/actions/runs?') && call.method === 'GET') {
+      return response(200, {
+        workflow_runs: [
+          {
+            id: 779,
+            path: '.github/workflows/finalize-pr68-evidence.yml',
+            status: 'completed',
+            conclusion: 'success',
+          },
+        ],
+      });
+    }
+    throw new Error(`unexpected request: ${call.method} ${call.url}`);
+  });
+
+  const run = await findRecoveryRunForTrigger({
+    owner: OWNER,
+    repo: REPO,
+    triggerSha: TARGET_SHA,
+    token: 'test-token',
+    fetchImpl,
+    timeoutMs: 0,
+  });
+
+  assert.strictEqual(run, null);
+  console.log('PASS: a finalizer run without a recovery run is red, not invented');
+}
+
+function testTriggerShaIgnoresFinalizerRunIdEnv() {
+  const previous = process.env.GITHUB_RUN_ID;
+  process.env.GITHUB_RUN_ID = '777';
+  try {
+    const options = parseArgs([
+      '--pr',
+      String(PR_NUMBER),
+      '--sha',
+      TARGET_SHA,
+      '--trigger-sha',
+      TARGET_SHA,
+    ]);
+    assert.strictEqual(
+      options.runId,
+      null,
+      'the finalizer must not default to its own GITHUB_RUN_ID when --trigger-sha is used',
+    );
+    assert.strictEqual(options.triggerSha, TARGET_SHA);
+
+    const explicit = parseArgs([
+      '--pr',
+      String(PR_NUMBER),
+      '--sha',
+      TARGET_SHA,
+      '--run-id',
+      String(RUN_ID),
+    ]);
+    assert.strictEqual(explicit.runId, String(RUN_ID));
+  } finally {
+    if (previous === undefined) {
+      delete process.env.GITHUB_RUN_ID;
+    } else {
+      process.env.GITHUB_RUN_ID = previous;
+    }
+  }
+  console.log('PASS: --trigger-sha discovery ignores the finalizer GITHUB_RUN_ID');
+}
+
+async function testFinalizerFollowsTriggerShaInsteadOfItself() {
+  const finalizerRun = {
+    id: 9001,
+    path: '.github/workflows/finalize-pr68-evidence.yml',
+    event: 'push',
+    status: 'in_progress',
+    conclusion: null,
+    head_sha: TARGET_SHA,
+    created_at: '2026-11-08T00:00:01Z',
+  };
+  const recoveryRun = {
+    ...SUCCESS_RUN,
+    created_at: '2026-11-08T00:00:00Z',
+  };
+
+  const { fetchImpl, calls } = makeFetch((call) => {
+    const { url, method } = call;
+    if (url.includes('/actions/runs?') && method === 'GET') {
+      return response(200, { workflow_runs: [finalizerRun, recoveryRun] });
+    }
+    if (url.includes(`/actions/runs/${RUN_ID}`) && method === 'GET') {
+      return response(200, SUCCESS_RUN);
+    }
+    if (url.includes('/actions/runs/9001')) {
+      throw new Error('the finalizer must not wait for its own run');
+    }
+    if (url.endsWith(`/pulls/${PR_NUMBER}`) && method === 'GET') {
+      return response(200, MERGED_PR);
+    }
+    if (url.includes(`/commits/${TARGET_SHA}/check-runs`) && method === 'GET') {
+      return response(200, {
+        total_count: GREEN_CHECKS.length,
+        check_runs: GREEN_CHECKS,
+      });
+    }
+    if (url.includes(`/commits/${TARGET_SHA}/status`) && method === 'GET') {
+      return response(200, {
+        state: 'success',
+        total_count: GREEN_STATUSES.length,
+        statuses: GREEN_STATUSES,
+      });
+    }
+    if (url.includes('/issues/') && url.includes('/comments') && method === 'GET') {
+      return response(200, []);
+    }
+    if (url.includes('/issues/') && url.includes('/comments') && method === 'POST') {
+      return response(201, { id: 702, ...call.body });
+    }
+    throw new Error(`unexpected request: ${method} ${url}`);
+  });
+
+  const result = await finalizeRecoveryEvidence({
+    owner: OWNER,
+    repo: REPO,
+    pullNumber: PR_NUMBER,
+    targetSha: TARGET_SHA,
+    runId: null,
+    triggerSha: TARGET_SHA,
+    template: `${MARKER}\nпричина`,
+    marker: MARKER,
+    token: 'test-token',
+    fetchImpl,
+    timeoutMs: 1000,
+    intervalMs: 10,
+  });
+
+  assert.strictEqual(result.published, true);
+  assert.strictEqual(result.run.id, RUN_ID);
+  assert.strictEqual(result.comment.created, true);
+  assert.ok(
+    calls.some((call) => call.url.includes(`/actions/runs/${RUN_ID}`)),
+    'the finalizer must wait for the discovered recovery run',
+  );
+  assert.ok(
+    !calls.some((call) => call.url.includes('/actions/runs/9001')),
+    'the finalizer must never wait for its own run',
+  );
+  const posted = calls.find(
+    (call) => call.method === 'POST' && call.url.includes('/comments'),
+  );
+  assert.ok(posted.body.body.includes(RUN_URL));
+  assert.ok(posted.body.body.includes('php-plugin-tests=success'));
+  console.log('PASS: the finalizer follows the trigger SHA and publishes the recovery evidence');
+}
+
 async function main() {
   await testWaitPollsUntilCompleted();
   await testWaitTimesOutWithoutFinishedRun();
   await testFailedRunIsNotPublished();
   await testCompletedRunPublishesFinalEvidence();
+  await testDiscoversRecoveryRunForTriggerSha();
+  await testMissingRecoveryRunIsNotInvented();
+  testTriggerShaIgnoresFinalizerRunIdEnv();
+  await testFinalizerFollowsTriggerShaInsteadOfItself();
 }
 
 main().catch((error) => {

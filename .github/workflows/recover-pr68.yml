@@ -10,6 +10,12 @@ run-name: "Recover PR #68 checks from ${{ github.sha }}"
 # The SHA from the incident report is only used for auditing. Pinning recovery to
 # it would skip the merge whenever the head moved, which is exactly what must not
 # happen.
+#
+# Evidence publication is handled by the separate finalizer workflow, which is
+# triggered by the same push instead of being dispatched from this job. A
+# workflow_dispatch call from here failed because the finalizer did not exist on
+# the default branch yet, even though the checks had already passed and the PR
+# had already been merged.
 on:
   push:
   workflow_dispatch:
@@ -20,7 +26,6 @@ permissions:
   statuses: write
   pull-requests: write
   issues: write
-  actions: write
 
 concurrency:
   group: recover-pr-68
@@ -113,16 +118,3 @@ jobs:
             --details-url "$CI_RUN_URL" \
             --summary "Recovered checks for PR #${TARGET_PR} at ${TARGET_SHA}"
 
-      - name: Request completed evidence finalization
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          TARGET_SHA: ${{ steps.target.outputs.sha }}
-          FINALIZER_REF: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          node tooling/scripts/ci/request-evidence-finalize.mjs \
-            --repo "$GITHUB_REPOSITORY" \
-            --ref "$FINALIZER_REF" \
-            --pr "$TARGET_PR" \
-            --sha "$TARGET_SHA" \
-            --run-id "$GITHUB_RUN_ID"

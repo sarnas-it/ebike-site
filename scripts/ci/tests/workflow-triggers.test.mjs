@@ -9,6 +9,7 @@ import { WORKFLOW_PATH } from '../lib.mjs';
 const EXPECTED_CI_JOBS = [
   'php-lint',
   'php-tests',
+  'php-plugin-tests',
   'plugin-tests',
   'ci-repair-tests',
 ];
@@ -99,6 +100,7 @@ function main() {
   testRecoveryWorkflowIsGreen();
   testFinalizerWorkflowIsGreen();
   testSharedCheckRunnerCoversAllGroups();
+  testCiWorkflowRunsPluginPhpContracts();
   testCiWorkflowKeepsTheVerifiedJobSet();
 }
 
@@ -168,7 +170,7 @@ function recoveryWorkflowChecks(text) {
     runNameQuoted: /^run-name:\s*["'].*#68.*["']\s*$/m.test(text),
     runsSharedChecks: /scripts\/ci\/run-checks\.sh/.test(text),
     publishesAndMerges: /scripts\/ci\/recover-pr\.mjs/.test(text),
-    requestsCompletedEvidenceFinalizer:
+    dispatchesEvidenceFinalizer:
       /scripts\/ci\/request-evidence-finalize\.mjs/.test(text),
     publishesInProgressEvidence: /--allow-running/.test(text),
   };
@@ -199,7 +201,7 @@ function testBrokenRecoveryWorkflowIsRed() {
   assert.strictEqual(checks.checksOutResolvedHead, false);
   assert.strictEqual(checks.runsSharedChecks, false);
   assert.strictEqual(checks.publishesAndMerges, false);
-  assert.strictEqual(checks.requestsCompletedEvidenceFinalizer, false);
+  assert.strictEqual(checks.dispatchesEvidenceFinalizer, false);
   assert.strictEqual(checks.nameQuoted, false);
   assert.strictEqual(checks.runNameQuoted, false);
   console.log('PASS: a recovery workflow without write permissions and dynamic head is red');
@@ -255,9 +257,9 @@ function testRecoveryWorkflowIsGreen() {
     'recovery must publish checks and complete the deferred merge',
   );
   assert.strictEqual(
-    checks.requestsCompletedEvidenceFinalizer,
-    true,
-    'recovery must hand evidence publication to the finalizer after it completes',
+    checks.dispatchesEvidenceFinalizer,
+    false,
+    'recovery must not dispatch the finalizer: workflow_dispatch fails until the finalizer is on the default branch',
   );
   assert.strictEqual(
     checks.publishesInProgressEvidence,
@@ -274,11 +276,7 @@ function testRecoveryWorkflowIsGreen() {
     true,
     'the run name must be quoted and identify PR #68 so the run is auditable',
   );
-  assert.ok(
-    text.includes('request-evidence-finalize.mjs'),
-    'recovery must dispatch the finalizer that publishes the completed comment',
-  );
-  console.log('PASS: recovery follows the current PR #68 head and publishes verified evidence');
+  console.log('PASS: recovery follows the current PR #68 head without a fragile finalizer dispatch');
 }
 
 function testFinalizerWorkflowIsGreen() {
@@ -290,15 +288,28 @@ function testFinalizerWorkflowIsGreen() {
   const permissions = analyzePermissions(text);
 
   assert.ok(
+    analysis.triggers.includes('push'),
+    'the finalizer must run from the same push as recovery instead of relying on workflow_dispatch',
+  );
+  assert.ok(
     analysis.triggers.includes('workflow_dispatch'),
-    'the finalizer must be dispatchable by the recovery workflow',
+    'the finalizer must still be manually dispatchable',
   );
   assert.strictEqual(analysis.hasPathsFilter, false);
   assert.strictEqual(permissions['issues'], 'write');
+  assert.strictEqual(
+    permissions['pull-requests'],
+    'write',
+    'the finalizer must be allowed to create/update the pull request comment',
+  );
   assert.strictEqual(permissions['actions'], 'read');
   assert.ok(
     /scripts\/ci\/wait-and-publish-evidence\.mjs/.test(text),
     'the finalizer must wait for the run to complete before publishing',
+  );
+  assert.ok(
+    text.includes('--trigger-sha'),
+    'the finalizer must discover the recovery run from the triggering commit',
   );
   assert.ok(
     text.includes('--comment-file docs/testeb-65-comment.md'),
@@ -308,15 +319,40 @@ function testFinalizerWorkflowIsGreen() {
     !text.includes('--allow-running'),
     'the finalizer must only accept a completed successful run',
   );
-  console.log('PASS: the finalizer waits for completion and publishes final evidence');
+  console.log('PASS: the push-triggered finalizer waits for completion and publishes final evidence');
 }
 
 function testSharedCheckRunnerCoversAllGroups() {
   const runner = readFileSync(path.join(repoRoot, 'scripts/ci/run-checks.sh'), 'utf8');
-  for (const group of ['php-lint', 'php-tests', 'plugin-tests', 'ci-repair-tests']) {
+  for (const group of [
+    'php-lint',
+    'php-tests',
+    'plugin-tests',
+    'php-plugin-tests',
+    'ci-repair-tests',
+  ]) {
     assert.ok(runner.includes(group), `run-checks.sh must keep the ${group} check`);
   }
   console.log('PASS: the shared runner keeps the full check set');
+}
+
+function testCiWorkflowRunsPluginPhpContracts() {
+  const text = readFileSync(workflowPath, 'utf8');
+  assert.ok(
+    /for test in wp\/plugins\/velotok-core\/tests\/\*-test\.php/.test(text),
+    'ci must execute every plugin PHP contract test, not only lint it',
+  );
+  assert.ok(
+    /php "\$\{test\}"/.test(text),
+    'ci must run plugin PHP contract tests with php',
+  );
+  assert.ok(
+    text.includes(
+      'php wp/plugins/velotok-core/tests/accounts-contract-test.php',
+    ),
+    'ci must run the exact accounts acceptance command',
+  );
+  console.log('PASS: ci executes the plugin PHP acceptance tests');
 }
 
 function testCiWorkflowKeepsTheVerifiedJobSet() {
