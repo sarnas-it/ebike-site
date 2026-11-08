@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -55,8 +55,14 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'max_label' => '{max} дн.',
 			),
 			'weight'                  => array(
+				'requirement'    => 'TESTEB-30',
 				'unit'           => 'kg',
 				'source'         => 'order.weight',
+				'fallback_source'=> 'items',
+				'sources'        => array( 'order.weight', 'items', 'empty_order' ),
+				'keys'           => array( 'weight', 'order_weight', 'total_weight' ),
+				'item_keys'      => array( 'weight', 'product_weight' ),
+				'quantity_keys'  => array( 'quantity', 'qty' ),
 				'rounding'       => 'ceil',
 				'ambiguous_code' => 'DELIVERY_WEIGHT_AMBIGUOUS',
 			),
@@ -688,21 +694,133 @@ if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_zones_weight_number' ) ) {
+	/**
+	 * Normalize a numeric weight value.
+	 *
+	 * Accepts numbers and numeric strings. A decimal comma is normalized so
+	 * the same order never yields two different weights depending on how the
+	 * value was formatted.
+	 *
+	 * @param mixed $value Weight value.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_zones_weight_number( $value ) {
+		if ( is_int( $value ) || is_float( $value ) ) {
+			return (float) $value;
+		}
+
+		if ( ! is_string( $value ) ) {
+			return null;
+		}
+
+		$value = trim( $value );
+
+		if ( '' === $value ) {
+			return null;
+		}
+
+		if ( false !== strpos( $value, ',' ) && false === strpos( $value, '.' ) ) {
+			$value = str_replace( ',', '.', $value );
+		}
+
+		return is_numeric( $value ) ? (float) $value : null;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_item_weight' ) ) {
+	/**
+	 * Resolve the weight of one order line without guessing.
+	 *
+	 * Supports plain item arrays, WooCommerce-like line item objects and the
+	 * product object stored inside a line item. The stored product weight is
+	 * used as a fallback for the shop's own kilogram meta field.
+	 *
+	 * @param mixed $item Order line item.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_zones_item_weight( $item ) {
+		$contract = velotok_core_delivery_zones_contract();
+		$direct   = velotok_core_delivery_zones_weight_number(
+			velotok_core_delivery_zones_value( $item, $contract['weight']['item_keys'], null )
+		);
+
+		if ( null !== $direct ) {
+			return $direct;
+		}
+
+		$product = null;
+
+		if ( is_object( $item ) && method_exists( $item, 'get_product' ) ) {
+			$product = $item->get_product();
+		} else {
+			$product = velotok_core_delivery_zones_value( $item, array( 'product', 'data', 'variation' ), null );
+		}
+
+		if ( null === $product || $product === $item ) {
+			return null;
+		}
+
+		$product_weight = velotok_core_delivery_zones_weight_number(
+			velotok_core_delivery_zones_value( $product, $contract['weight']['item_keys'], null )
+		);
+
+		if ( null !== $product_weight ) {
+			return $product_weight;
+		}
+
+		if ( function_exists( 'get_post_meta' ) ) {
+			$product_id = (int) velotok_core_delivery_zones_number(
+				velotok_core_delivery_zones_value( $product, array( 'id', 'product_id' ), 0 )
+			);
+
+			if ( $product_id > 0 ) {
+				$meta_weight = velotok_core_delivery_zones_weight_number(
+					get_post_meta( $product_id, '_velotok_weight_kg', true )
+				);
+
+				if ( null !== $meta_weight ) {
+					return $meta_weight;
+				}
+			}
+		}
+
+		return null;
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_zones_order_weight' ) ) {
 	/**
 	 * Resolve order weight without ambiguity.
+	 *
+	 * The order weight is authoritative when present. If it is absent, the
+	 * weight is summed from the order lines; a line without a numeric weight
+	 * makes the whole result ambiguous instead of silently becoming zero.
 	 *
 	 * @param mixed $order Order data.
 	 * @return array<string,mixed>
 	 */
 	function velotok_core_delivery_zones_order_weight( $order = array() ) {
 		$contract = velotok_core_delivery_zones_contract();
-		$weight   = velotok_core_delivery_zones_value( $order, array( 'weight', 'order_weight' ), null );
+		$weight   = velotok_core_delivery_zones_weight_number(
+			velotok_core_delivery_zones_value( $order, $contract['weight']['keys'], null )
+		);
 
-		if ( is_numeric( $weight ) ) {
+		if ( null !== $weight ) {
+			if ( $weight < 0 ) {
+				return array(
+					'ok'     => false,
+					'weight' => null,
+					'source' => 'order.weight',
+					'unit'   => $contract['weight']['unit'],
+					'code'   => $contract['weight']['ambiguous_code'],
+					'error'  => 'Вес заказа не может быть отрицательным.',
+				);
+			}
+
 			return array(
 				'ok'     => true,
-				'weight' => (float) $weight,
+				'weight' => $weight,
 				'source' => 'order.weight',
 				'unit'   => $contract['weight']['unit'],
 			);
@@ -722,23 +840,25 @@ if ( ! function_exists( 'velotok_core_delivery_zones_order_weight' ) ) {
 		$total = 0.0;
 
 		foreach ( $items as $item ) {
-			$item_weight = velotok_core_delivery_zones_value( $item, array( 'weight', 'product_weight' ), null );
+			$item_weight = velotok_core_delivery_zones_item_weight( $item );
 
-			if ( ! is_numeric( $item_weight ) ) {
+			if ( null === $item_weight || $item_weight < 0 ) {
 				return array(
 					'ok'     => false,
 					'weight' => null,
 					'source' => 'items',
 					'unit'   => $contract['weight']['unit'],
 					'code'   => $contract['weight']['ambiguous_code'],
-					'error'  => 'Вес хотя бы одного товара не задан.',
+					'error'  => null === $item_weight
+						? 'Вес хотя бы одного товара не задан.'
+						: 'Вес товара не может быть отрицательным.',
 				);
 			}
 
-			$quantity = velotok_core_delivery_zones_value( $item, array( 'quantity', 'qty' ), 1 );
+			$quantity = velotok_core_delivery_zones_value( $item, $contract['weight']['quantity_keys'], 1 );
 			$quantity = is_numeric( $quantity ) ? max( 0, (float) $quantity ) : 1.0;
 
-			$total += (float) $item_weight * $quantity;
+			$total += $item_weight * $quantity;
 		}
 
 		return array(

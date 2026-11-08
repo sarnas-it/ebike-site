@@ -136,29 +136,22 @@ if ( ! function_exists( 'velotok_core_delivery_package_order' ) ) {
 
 		foreach ( (array) velotok_core_delivery_zones_value( $package, array( 'contents' ), array() ) as $line ) {
 			$product  = velotok_core_delivery_zones_value( $line, array( 'data', 'product' ), null );
-			$quantity = velotok_core_delivery_zones_number( velotok_core_delivery_zones_value( $line, array( 'quantity', 'qty' ), 1 ), 1 );
-			$item_weight = null;
-
-			if ( is_object( $product ) ) {
-				if ( method_exists( $product, 'get_weight' ) ) {
-					$item_weight = $product->get_weight();
-				}
-
-				if ( ( ! is_numeric( $item_weight ) || '' === (string) $item_weight ) && method_exists( $product, 'get_id' ) && function_exists( 'get_post_meta' ) ) {
-					$item_weight = get_post_meta( (int) $product->get_id(), '_velotok_weight_kg', true );
-				}
-			} else {
-				$item_weight = velotok_core_delivery_zones_value( $line, array( 'weight', 'product_weight' ), null );
-			}
-
-			$item = array(
-				'quantity' => max( 0, $quantity ),
+			$quantity = max(
+				0,
+				velotok_core_delivery_zones_number( velotok_core_delivery_zones_value( $line, array( 'quantity', 'qty' ), 1 ), 1 )
 			);
+			$item     = array(
+				'quantity' => $quantity,
+				'product'  => $product,
+				'weight'   => velotok_core_delivery_zones_value( $line, array( 'weight', 'product_weight' ), null ),
+			);
+			$item_weight = velotok_core_delivery_zones_item_weight( $item );
 
-			if ( is_numeric( $item_weight ) && '' !== (string) $item_weight ) {
-				$item['weight'] = (float) $item_weight;
-				$weight        += (float) $item_weight * max( 0, $quantity );
+			if ( null !== $item_weight ) {
+				$item['weight'] = $item_weight;
+				$weight        += $item_weight * $quantity;
 			} else {
+				unset( $item['weight'] );
 				$complete = false;
 			}
 
