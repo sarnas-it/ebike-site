@@ -26,6 +26,11 @@ Recovery-механизм из TESTEB-67 был зашит на PR #73, поэт
   свежий результат по имени/контексту; старый pending-дубликат больше не
   перекрывает успешно завершённую проверку. При публикации recovery завершает
   все оставшиеся pending-дубликаты.
+- `scripts/ci/lib.mjs` (вторая причина, найденная на реальном прогоне): если
+  чужой check run нельзя обновить через PATCH (`403 Resource not accessible by
+  integration`), recovery больше не падает, а публикует новый завершённый check
+  run. Без этого первый recovery-прогон #42504665607 обрывался на шаге
+  публикации и не доходил ни до `ci/recover`, ни до мержа.
 - `.github/workflows/ci.yml`: `cancel-in-progress: false`, чтобы отменённые
   прогоны не оставляли зависшие `in_progress` check runs.
 - `.github/workflows/recover-pr.yml`: общий recovery для будущих PR — запуск
@@ -48,10 +53,26 @@ Recovery-механизм из TESTEB-67 был зашит на PR #73, поэт
   `841470c19d9e62c1a6c4e4c402dff322c81fd747`.
 - Исходный CI-прогон:
   [#42500219010](https://github.com/sarnas-it/ebike-site/actions/runs/42500219010)
-  — джоба `php-tests` успешна по журналу, но check run остался `in_progress`.
-- Recovery публикует на проверяемом SHA завершённые check runs `php-lint`,
-  `php-tests`, `php-plugin-tests`, `plugin-tests` и статус `ci/recover`,
-  после чего отложенный мерж выполняется без ручного вмешательства.
+  — джоба `php-tests` успешна по журналу, но check run `php-tests` id
+  `128791152777` остался `status=in_progress` при `conclusion=success` и
+  `completed_at=2026-11-08T16:30:32Z`; именно он блокировал обязательную
+  проверку.
+- Первый recovery-прогон
+  [#42504665607](https://github.com/sarnas-it/ebike-site/actions/runs/42504665607)
+  упал на шаге `Publish checks and complete deferred merge`: на коммите не
+  появились ни новые check runs, ни `ci/recover`, потому что PATCH чужого
+  check run вернул `403 Resource not accessible by integration`. Это и есть
+  причина, по которой предыдущая попытка починки не довела PR #78 до мержа.
+- Red-green тесты на исправление:
+  `node scripts/ci/tests/stale-checks.test.mjs` и
+  `node scripts/ci/tests/recover-pr.test.mjs` воспроизводят `403` на PATCH
+  чужого check run и проверяют, что recovery публикует новые завершённые
+  проверки на нужном SHA и всё равно завершает отложенный мерж. Без ветки
+  fallback в `upsertCheckRun` эти тесты падают.
+- После push с починкой recovery публикует на проверяемом SHA завершённые
+  check runs `php-lint`, `php-tests`, `php-plugin-tests`, `plugin-tests`,
+  `ci-repair-tests` и статус `ci/recover=success`, после чего отложенный мерж
+  PR #78 выполняется без ручного вмешательства.
 - Локальная проверка полного набора:
   `for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done`
   — все тесты проходят.

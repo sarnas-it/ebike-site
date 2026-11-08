@@ -154,10 +154,74 @@ function testRecoveryDecisionHandlesStaleDuplicates() {
   console.log('PASS: recovery is requested for stale duplicates but not for green or failed checks');
 }
 
+async function testForeignCheckRunsAreRepublishedWhenPatchFails() {
+  const { fetchImpl, calls } = makeFetch((call) => {
+    if (call.url.includes('/check-runs') && call.method === 'GET') {
+      return response(200, {
+        total_count: 2,
+        check_runs: [
+          {
+            id: 21,
+            name: 'php-tests',
+            status: 'completed',
+            conclusion: 'success',
+            completed_at: '2026-11-08T16:30:32Z',
+          },
+          {
+            id: 22,
+            name: 'php-tests',
+            // The incident left an in_progress duplicate whose conclusion is
+            // already success. It belongs to another workflow run, so recovery
+            // cannot patch it with its own token.
+            status: 'in_progress',
+            conclusion: 'success',
+            completed_at: '2026-11-08T16:30:32Z',
+          },
+        ],
+      });
+    }
+    if (/\/check-runs\/\d+$/.test(call.url) && call.method === 'PATCH') {
+      return response(403, {
+        message: 'Resource not accessible by integration',
+      });
+    }
+    if (call.url.endsWith('/check-runs') && call.method === 'POST') {
+      return response(201, { id: 700, ...call.body });
+    }
+    throw new Error(`unexpected request: ${call.method} ${call.url}`);
+  });
+
+  const result = await upsertCheckRun({
+    owner: OWNER,
+    repo: REPO,
+    headSha: SHA,
+    name: 'php-tests',
+    conclusion: 'success',
+    token: 'test-token',
+    fetchImpl,
+  });
+
+  assert.strictEqual(result.id, 700);
+  assert.strictEqual(result.conclusion, 'success');
+  const posts = calls.filter(
+    (call) => call.method === 'POST' && call.url.endsWith('/check-runs'),
+  );
+  assert.strictEqual(
+    posts.length,
+    1,
+    'an unpatchable foreign check run must be republished, not abort recovery',
+  );
+  assert.strictEqual(posts[0].body.head_sha, SHA);
+  assert.strictEqual(posts[0].body.status, 'completed');
+  assert.strictEqual(posts[0].body.conclusion, 'success');
+  console.log('PASS: unpatchable foreign check runs are republished as fresh completed checks');
+}
+
 async function main() {
   testStalePendingIsSupersededByCompletedRun();
   testNewerPendingRunStillBlocks();
   await testPendingDuplicatesAreCompleted();
+  await testForeignCheckRunsAreRepublishedWhenPatchFails();
   testRecoveryDecisionHandlesStaleDuplicates();
 }
 

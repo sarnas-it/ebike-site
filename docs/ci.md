@@ -289,6 +289,11 @@ bash scripts/ci/run-checks.sh .
   самый свежий commit status для каждого контекста), поэтому старый pending не
   перекрывает завершённую успешную проверку. При публикации recovery
   завершаются все оставшиеся pending-дубликаты check runs.
+* Если чужой check run нельзя обновить через PATCH (`403 Resource not
+  accessible by integration`), recovery публикует новый завершённый check run,
+  а не падает. Первый recovery-прогон #42504665607 упал именно на этом шаге и
+  не дошёл до публикации `ci/recover` и мержа. Раньше `upsertCheckRun`
+  пробрасывал ошибку PATCH, когда у проверки не было pending-дубликатов.
 * `.github/workflows/ci.yml` не отменяет предыдущий прогон
   (`cancel-in-progress: false`), чтобы отменённые джобы не оставляли вечные
   `in_progress`.

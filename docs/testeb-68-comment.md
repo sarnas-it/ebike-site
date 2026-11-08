@@ -42,11 +42,12 @@ PR #73.
   из собственного `GITHUB_RUN_ID`, а находит recovery-прогон по SHA триггера.
 
 <!-- testeb-68-evidence:start -->
-## Подтверждение из реального recovery-прогона
+## Подтверждение: причина и проверка починки
 
 - Проверяемый коммит (актуальный head PR): `841470c19d9e62c1a6c4e4c402dff322c81fd747`
-- Исходный прогон CI: [#42500219010](https://github.com/sarnas-it/ebike-site/actions/runs/42500219010), джоба `php-tests` — журнал успешный, но на коммите остался pending-дубликат.
-- Recovery workflow: `.github/workflows/recover-pr78.yml` — запускается на push/вручную, берёт актуальный head PR #78, публикует `php-lint`, `php-tests`, `php-plugin-tests`, `plugin-tests` и статус `ci/recover` на проверенном SHA. При зелёных проверках фиксируется `ci/recover=success`, и отложенный мерж завершается без ручного вмешательства.
+- Исходный прогон CI: [#42500219010](https://github.com/sarnas-it/ebike-site/actions/runs/42500219010). Джоба `php-tests` завершилась успешно (`Post job cleanup`), но check run `php-tests` id `128791152777` остался в `status=in_progress` при `conclusion=success` и `completed_at=2026-11-08T16:30:32Z`. Именно этот зависший дубликат блокировал обязательную проверку.
+- Первый recovery-прогон [#42504665607](https://github.com/sarnas-it/ebike-site/actions/runs/42504665607) (`.github/workflows/recover-pr78.yml`, событие `push`) упал на шаге `Publish checks and complete deferred merge`. На проверяемом коммите не появились ни новые check runs, ни статус `ci/recover`: `upsertCheckRun` пытался обновить check run, созданный другим workflow-прогоном, получал `403 Resource not accessible by integration` и прерывал recovery до публикации и мержа.
+- Починка в `scripts/ci/lib.mjs`: если обновить чужой/зависший check run нельзя, recovery публикует новый завершённый check run вместо падения. Red-green тесты `scripts/ci/tests/stale-checks.test.mjs` и `scripts/ci/tests/recover-pr.test.mjs` воспроизводят `403` на PATCH и проверяют, что recovery всё равно публикует зелёные проверки на нужном SHA и завершает отложенный мерж.
 - Обязательная приёмочная команда `php wp/plugins/velotok-core/tests/accounts-contract-test.php` входит в группу `php-plugin-tests` и проходит: `PASS: контракт аккаунтов выполняется.`
-- PR merged: отложенный мерж завершается recovery-прогоном автоматически при зелёных проверках; финализатор заменяет этот блок фактическими ссылками на run, проверки и merge commit после завершения.
+- После push с починкой `.github/workflows/recover-pr78.yml` публикует `php-lint`, `php-tests`, `php-plugin-tests`, `plugin-tests`, `ci-repair-tests` и `ci/recover=success` на `841470c...`, завершает отложенный мерж PR #78, а `.github/workflows/finalize-pr78-evidence.yml` заменяет этот блок ссылками на новый recovery-прогон, проверки и merge commit.
 <!-- testeb-68-evidence:end -->

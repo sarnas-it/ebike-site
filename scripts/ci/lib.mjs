@@ -670,7 +670,6 @@ export async function upsertCheckRun({
     : latestCheckRunPerName(matching).slice(0, 1);
   if (targets.length > 0) {
     let last = null;
-    let updateError = null;
     for (const target of targets) {
       try {
         last = await updateCheckRun({
@@ -683,19 +682,20 @@ export async function upsertCheckRun({
           token,
           fetchImpl,
         });
-      } catch (error) {
-        updateError = error;
+      } catch {
+        // A check run created by a different workflow run cannot reliably be
+        // patched from recovery ("Resource not accessible by integration").
+        // That must not abort recovery: fall through and publish a fresh run.
       }
     }
     if (last) {
       return last;
     }
-    if (pending.length === 0) {
-      throw updateError;
-    }
-    // A pending run owned by another app cannot always be patched. Publish a
-    // completed check run of our own so the newest run for this name is green.
   }
+  // Publishing a new completed check run is the safe fallback for both a
+  // stale pending duplicate owned by another run and an existing completed run
+  // that cannot be patched. The newest run for a name is authoritative, so a
+  // freshly created completed run unblocks the required check.
   return createCheckRun({
     owner,
     repo,
