@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39', 'TESTEB-40' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39', 'TESTEB-40', 'TESTEB-41' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -306,6 +306,23 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'owner_visible'  => true,
 				'legacy_keys'    => array( '_tracking_number', 'tracking_number', '_velotok_tracking_number' ),
 			),
+			'configuration'           => array(
+				'requirement'              => 'TESTEB-41',
+				'source'                   => 'woocommerce_store_configuration',
+				'reads_store_configuration'=> true,
+				'options_source'           => 'woocommerce_shipping_zone_methods',
+				'eta_source'               => 'shipping_method_settings',
+				'recalculation_source'     => 'shipping_method_settings',
+				'options'                  => array( 'title', 'enabled', 'provider' ),
+				'option_keys'              => array( 'title', 'label', 'method_title', 'enabled', 'provider', 'provider_id' ),
+				'eta_keys'                 => array( 'eta_min_days', 'eta_max_days', 'delivery_min_days', 'delivery_max_days' ),
+				'recalculation_keys'       => array( 'base', 'per_kg', 'free_from', 'min_amount' ),
+				'weight_rounding'          => 'ceil',
+				'threshold'                => 'subtotal',
+				'hardcoded_tariffs'        => false,
+				'defaults'                 => false,
+				'mocked'                   => false,
+			),
 			'provider_configuration'  => array(
 				'admin_visible' => true,
 				'error_code'    => 'DELIVERY_PROVIDER_CONFIGURATION_ERROR',
@@ -356,6 +373,8 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 		$contract['buyer_banner'] = $contract['test_mode_banner'];
 		$contract['test_mode_banner_visible'] = true;
 		$contract['test_mode_banner_buyer_visible'] = true;
+		$contract['store_configuration'] = $contract['configuration'];
+		$contract['store_delivery_configuration'] = $contract['configuration'];
 
 		return $contract;
 	}
@@ -1464,6 +1483,161 @@ if ( ! function_exists( 'velotok_core_delivery_zones_free_shipping_threshold' ) 
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_store_method_configuration' ) ) {
+	/**
+	 * Return the store configuration of one delivery method.
+	 *
+	 * The store configuration is the single source of truth for the offered
+	 * option, its delivery ETA range and the tariff used to recalculate the
+	 * order cost. Nothing is hard-coded or replaced with a fake tariff.
+	 *
+	 * @param mixed $method  Method data.
+	 * @param array $context Delivery context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_store_method_configuration( $method = null, $context = array() ) {
+		$contract       = velotok_core_delivery_zones_contract();
+		$section        = isset( $contract['configuration'] ) ? $contract['configuration'] : array();
+		$store_settings = velotok_core_delivery_zones_settings( $method );
+		$method_id      = velotok_core_delivery_zones_method_id( $method );
+		$enabled        = velotok_core_delivery_zones_method_enabled( $method );
+		$label          = velotok_core_delivery_zones_scalar(
+			velotok_core_delivery_zones_value( $method, array( 'title', 'label', 'method_title', 'name' ), '' )
+		);
+
+		if ( '' === $label && isset( $contract['methods'][ $method_id ] ) ) {
+			$label = $contract['methods'][ $method_id ];
+		}
+
+		$eta       = velotok_core_delivery_zones_eta_range( $method );
+		$free_from = velotok_core_delivery_zones_free_shipping_threshold( $method );
+		$base      = velotok_core_delivery_zones_number(
+			velotok_core_delivery_zones_value(
+				$method,
+				array( 'base', 'base_amount', 'cost' ),
+				isset( $store_settings['base'] ) ? $store_settings['base'] : ( isset( $store_settings['cost'] ) ? $store_settings['cost'] : 0 )
+			)
+		);
+		$per_kg    = velotok_core_delivery_zones_number(
+			velotok_core_delivery_zones_value(
+				$method,
+				array( 'per_kg', 'per_kg_cost' ),
+				isset( $store_settings['per_kg'] ) ? $store_settings['per_kg'] : 0
+			)
+		);
+		$test_info = velotok_core_delivery_test_mode_info( $method, $context );
+
+		return array(
+			'requirement'      => 'TESTEB-41',
+			'source'           => isset( $section['source'] ) ? $section['source'] : 'woocommerce_store_configuration',
+			'store_source'     => isset( $section['source'] ) ? $section['source'] : 'woocommerce_store_configuration',
+			'method'           => $method_id,
+			'method_id'        => $method_id,
+			'provider'         => $method_id,
+			'provider_id'      => $method_id,
+			'enabled'          => (bool) $enabled,
+			'available'        => (bool) $enabled,
+			'label'            => $label,
+			'title'            => $label,
+			'option'           => array(
+				'method_id' => $method_id,
+				'label'     => $label,
+				'title'     => $label,
+				'enabled'   => (bool) $enabled,
+				'available' => (bool) $enabled,
+			),
+			'eta'              => array(
+				'min_days' => $eta['min_days'],
+				'max_days' => $eta['max_days'],
+				'label'    => $eta['label'],
+			),
+			'eta_min_days'     => $eta['min_days'],
+			'eta_max_days'     => $eta['max_days'],
+			'eta_label'        => $eta['label'],
+			'eta_range'        => $eta['range'],
+			'delivery_time'    => $eta['label'],
+			'recalculation'    => array(
+				'base'                 => $base,
+				'per_kg'               => $per_kg,
+				'free_from'            => $free_from,
+				'weight_rounding'      => isset( $contract['weight']['rounding'] ) ? $contract['weight']['rounding'] : 'ceil',
+				'formula'              => isset( $contract['cost']['tariff'] ) ? $contract['cost']['tariff'] : '',
+				'threshold_applies_to' => isset( $contract['cost']['threshold_applies_to'] ) ? $contract['cost']['threshold_applies_to'] : 'subtotal',
+				'provider_tariff'      => isset( $contract['cost']['provider_tariff'] ) ? $contract['cost']['provider_tariff'] : 'provider',
+			),
+			'tariff'           => array(
+				'base'      => $base,
+				'per_kg'    => $per_kg,
+				'free_from' => $free_from,
+			),
+			'free_shipping'    => array(
+				'threshold' => $free_from,
+				'enabled'   => null !== $free_from,
+			),
+			'test_mode'        => ! empty( $test_info['enabled'] ),
+			'test_mode_info'   => $test_info,
+			'settings'         => $store_settings,
+			'configured'       => true,
+			'source_of_truth'  => 'store',
+			'mocked'           => false,
+		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_store_configuration' ) ) {
+	/**
+	 * Return the store delivery configuration of a shipping zone.
+	 *
+	 * @param mixed $zone    Zone data.
+	 * @param array $context Delivery context.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_store_configuration( $zone = array(), $context = array() ) {
+		$contract = velotok_core_delivery_zones_contract();
+		$section  = isset( $contract['configuration'] ) ? $contract['configuration'] : array();
+		$zone_id  = (int) velotok_core_delivery_zones_number(
+			velotok_core_delivery_zones_value( $zone, array( 'zone_id', 'id' ), 0 )
+		);
+		$methods  = array();
+
+		foreach ( velotok_core_delivery_zones_zone_methods( $zone ) as $raw_method ) {
+			$config = velotok_core_delivery_store_method_configuration( $raw_method, $context );
+
+			if ( 'local_pickup' === $config['method_id'] ) {
+				continue;
+			}
+
+			$key   = $config['method_id'];
+			$base  = $key;
+			$index = 2;
+
+			while ( isset( $methods[ $key ] ) ) {
+				$key = $base . '-' . $index;
+				++$index;
+			}
+
+			$methods[ $key ] = $config;
+		}
+
+		return array(
+			'requirement'              => 'TESTEB-41',
+			'source'                   => isset( $section['source'] ) ? $section['source'] : 'woocommerce_store_configuration',
+			'zone_id'                  => $zone_id,
+			'zone'                     => $zone,
+			'methods'                  => $methods,
+			'configuration'            => $methods,
+			'options'                  => array_values( $methods ),
+			'list'                     => array_values( $methods ),
+			'count'                    => count( $methods ),
+			'configured_methods'       => array_keys( $methods ),
+			'reads_store_configuration'=> true,
+			'source_of_truth'          => 'store',
+			'hardcoded_tariffs'        => false,
+			'mocked'                   => false,
+		);
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 	/**
 	 * Calculate a method cost from the provider or the configured tariff.
@@ -1479,9 +1653,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 	 */
 	function velotok_core_delivery_zones_method_cost( $method, $order = array(), $context = array() ) {
 		$contract  = velotok_core_delivery_zones_contract();
-		$settings  = velotok_core_delivery_zones_settings( $method );
 		$weight    = velotok_core_delivery_zones_order_weight( $order );
 		$test_info = velotok_core_delivery_test_mode_info( $method, $context );
+		$store_configuration = velotok_core_delivery_store_method_configuration( $method, $context );
 
 		if ( empty( $weight['ok'] ) ) {
 			return array(
@@ -1502,7 +1676,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 			velotok_core_delivery_zones_value( $order, array( 'total', 'cart_total' ), $subtotal )
 		);
 		$base_total = $subtotal > 0 ? $subtotal : $total;
-		$free_from  = velotok_core_delivery_zones_free_shipping_threshold( $method );
+		$free_from  = $store_configuration['recalculation']['free_from'];
 		$free       = null !== $free_from && $base_total >= $free_from;
 		$round_weight = 'ceil' === $contract['weight']['rounding'] ? ceil( $weight['weight'] ) : $weight['weight'];
 		$weight_info = array(
@@ -1586,20 +1760,8 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 			);
 		}
 
-		$base = velotok_core_delivery_zones_number(
-			velotok_core_delivery_zones_value(
-				$method,
-				array( 'base', 'base_amount', 'cost' ),
-				isset( $settings['base'] ) ? $settings['base'] : ( isset( $settings['cost'] ) ? $settings['cost'] : 0 )
-			)
-		);
-		$per_kg = velotok_core_delivery_zones_number(
-			velotok_core_delivery_zones_value(
-				$method,
-				array( 'per_kg', 'per_kg_cost' ),
-				isset( $settings['per_kg'] ) ? $settings['per_kg'] : 0
-			)
-		);
+		$base   = $store_configuration['recalculation']['base'];
+		$per_kg = $store_configuration['recalculation']['per_kg'];
 		$amount = $base + $per_kg * $round_weight;
 
 		if ( $free ) {
@@ -1638,18 +1800,13 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 	 * @return array<string,mixed>
 	 */
 	function velotok_core_delivery_zones_method_option( $method, $zone_id = 0, $order = array(), $context = array() ) {
-		$contract  = velotok_core_delivery_zones_contract();
-		$settings  = velotok_core_delivery_zones_settings( $method );
-		$method_id = velotok_core_delivery_zones_method_id( $method );
-		$eta       = velotok_core_delivery_zones_eta_range( $method );
-		$enabled   = velotok_core_delivery_zones_method_enabled( $method );
-		$label     = velotok_core_delivery_zones_scalar(
-			velotok_core_delivery_zones_value( $method, array( 'title', 'label', 'method_title', 'name' ), '' )
-		);
-
-		if ( '' === $label && isset( $contract['methods'][ $method_id ] ) ) {
-			$label = $contract['methods'][ $method_id ];
-		}
+		$contract            = velotok_core_delivery_zones_contract();
+		$store_configuration = velotok_core_delivery_store_method_configuration( $method, $context );
+		$settings            = $store_configuration['settings'];
+		$method_id           = $store_configuration['method_id'];
+		$eta                 = velotok_core_delivery_zones_eta_range( $method );
+		$enabled             = $store_configuration['enabled'];
+		$label               = $store_configuration['label'];
 
 		$instance_id = velotok_core_delivery_zones_value( $method, array( 'instance_id', 'id' ), '' );
 		$key         = $method_id;
@@ -1691,6 +1848,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 			'weight_kg'      => null,
 			'billable_weight'=> null,
 			'settings'       => $settings,
+			'configuration'  => $store_configuration,
+			'configuration_requirement' => 'TESTEB-41',
+			'configuration_source'      => $store_configuration['source'],
 		);
 
 		if ( $enabled ) {
@@ -2966,6 +3126,11 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			$test_info['providers']       = $test_providers;
 		}
 
+		$store_configuration = velotok_core_delivery_store_configuration(
+			$matched && isset( $match['zone'] ) ? $match['zone'] : array(),
+			$method_context
+		);
+
 		return array(
 			'available'       => $available,
 			'zone_matched'    => $matched,
@@ -3002,6 +3167,10 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			'test_mode_banner'=> ! empty( $test_info['enabled'] ) ? velotok_core_delivery_test_mode_banner( true ) : '',
 			'source'          => $contract['source'],
 			'requirement'     => $contract['requirement'],
+			'configuration'   => $store_configuration,
+			'store_configuration' => $store_configuration,
+			'configuration_requirement' => 'TESTEB-41',
+			'configuration_source' => isset( $store_configuration['source'] ) ? $store_configuration['source'] : '',
 			'mocked'          => false,
 		);
 	}
@@ -3801,5 +3970,23 @@ if ( ! function_exists( 'velotok_core_delivery_methods_from_zones' ) ) {
 if ( ! function_exists( 'velotok_core_woocommerce_delivery_options' ) ) {
 	function velotok_core_woocommerce_delivery_options( $address = array(), $zones = null, $context = array() ) {
 		return velotok_core_delivery_zone_methods( $address, $zones, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_configuration' ) ) {
+	function velotok_core_delivery_configuration( $zone = array(), $context = array() ) {
+		return velotok_core_delivery_store_configuration( $zone, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_configuration' ) ) {
+	function velotok_core_delivery_zones_configuration( $zone = array(), $context = array() ) {
+		return velotok_core_delivery_store_configuration( $zone, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_method_configuration' ) ) {
+	function velotok_core_delivery_method_configuration( $method = null, $context = array() ) {
+		return velotok_core_delivery_store_method_configuration( $method, $context );
 	}
 }
