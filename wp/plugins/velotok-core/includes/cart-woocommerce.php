@@ -106,6 +106,8 @@ function velotok_core_cart_woocommerce_contract() {
 			'user_storage'    => 'woocommerce_persistent_cart',
 			'guest_key'       => 'velotok_guest_cart',
 			'guest_persistent' => true,
+			'guest_cookie'    => 'velotok_guest_cart',
+			'guest_cookie_lifetime' => 2592000,
 			'user_persistent' => true,
 			'merge_by'        => 'product_id',
 			'clear_after_checkout' => true,
@@ -956,28 +958,212 @@ function velotok_core_wc_cart_clear() {
 }
 
 /**
+ * Name of the long-lived guest cart cookie.
+ *
+ * @return string
+ */
+function velotok_core_wc_cart_guest_cookie_name() {
+	$contract = velotok_core_cart_woocommerce_contract();
+
+	return isset( $contract['storage']['guest_cookie'] ) && '' !== (string) $contract['storage']['guest_cookie']
+		? (string) $contract['storage']['guest_cookie']
+		: 'velotok_guest_cart';
+}
+
+/**
+ * Guest cart cookie lifetime in seconds.
+ *
+ * @return int
+ */
+function velotok_core_wc_cart_guest_cookie_lifetime() {
+	$contract = velotok_core_cart_woocommerce_contract();
+	$lifetime = isset( $contract['storage']['guest_cookie_lifetime'] )
+		? (int) $contract['storage']['guest_cookie_lifetime']
+		: 2592000;
+
+	return $lifetime > 0 ? $lifetime : 2592000;
+}
+
+/**
+ * Reduce a snapshot to the fields needed to rebuild a guest cart.
+ *
+ * @param array<int,array<string,mixed>> $items Snapshot items.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_wc_cart_guest_cookie_items( $items ) {
+	$compact = array();
+
+	if ( ! is_array( $items ) ) {
+		return $compact;
+	}
+
+	foreach ( $items as $item ) {
+		if ( ! is_array( $item ) ) {
+			continue;
+		}
+
+		$product_id = isset( $item['product_id'] ) && is_numeric( $item['product_id'] )
+			? (int) $item['product_id']
+			: 0;
+
+		if ( $product_id <= 0 ) {
+			continue;
+		}
+
+		$quantity = isset( $item['quantity'] ) && is_numeric( $item['quantity'] )
+			? (int) $item['quantity']
+			: 1;
+
+		if ( $quantity < 1 ) {
+			continue;
+		}
+
+		$compact[] = array(
+			'product_id'   => $product_id,
+			'variation_id' => isset( $item['variation_id'] ) && is_numeric( $item['variation_id'] )
+				? (int) $item['variation_id']
+				: 0,
+			'quantity'     => $quantity,
+		);
+	}
+
+	return $compact;
+}
+
+/**
+ * Read the guest cart that survived in the long-lived cookie.
+ *
+ * WooCommerce keeps a guest cart in the session. The cookie mirrors the
+ * position list so a visitor who returns with a fresh session can get the cart
+ * back instead of starting empty.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_wc_cart_read_guest_cookie() {
+	$name = velotok_core_wc_cart_guest_cookie_name();
+
+	if ( ! isset( $_COOKIE[ $name ] ) || ! is_string( $_COOKIE[ $name ] ) || '' === $_COOKIE[ $name ] ) {
+		return array();
+	}
+
+	$raw = $_COOKIE[ $name ];
+
+	if ( function_exists( 'wp_unslash' ) ) {
+		$raw = wp_unslash( $raw );
+	}
+
+	$data = json_decode( $raw, true );
+
+	if ( ! is_array( $data ) ) {
+		return array();
+	}
+
+	$items = isset( $data['items'] ) && is_array( $data['items'] ) ? $data['items'] : $data;
+
+	return velotok_core_wc_cart_guest_cookie_items( $items );
+}
+
+/**
+ * Store the guest cart in the long-lived cookie.
+ *
+ * An empty guest cart expires the cookie so that a removed cart is not
+ * resurrected in the next session.
+ *
+ * @param array<int,array<string,mixed>> $items Snapshot items.
+ * @return bool Whether the cookie state was written.
+ */
+function velotok_core_wc_cart_write_guest_cookie( $items ) {
+	$name  = velotok_core_wc_cart_guest_cookie_name();
+	$items = velotok_core_wc_cart_guest_cookie_items( $items );
+
+	if ( empty( $items ) ) {
+		return velotok_core_wc_cart_clear_guest_cookie();
+	}
+
+	$payload = array(
+		'version'    => 1,
+		'updated_at' => time(),
+		'items'      => $items,
+	);
+
+	$value = function_exists( 'wp_json_encode' ) ? wp_json_encode( $payload ) : json_encode( $payload );
+
+	if ( ! is_string( $value ) || '' === $value ) {
+		return false;
+	}
+
+	$_COOKIE[ $name ] = $value;
+
+	if ( 'cli' === PHP_SAPI || headers_sent() || ! function_exists( 'setcookie' ) ) {
+		return true;
+	}
+
+	$path   = defined( 'COOKIEPATH' ) && COOKIEPATH ? COOKIEPATH : '/';
+	$domain = defined( 'COOKIE_DOMAIN' ) && COOKIE_DOMAIN ? COOKIE_DOMAIN : '';
+	$secure = function_exists( 'is_ssl' )
+		? (bool) is_ssl()
+		: ( ! empty( $_SERVER['HTTPS'] ) && 'off' !== strtolower( (string) $_SERVER['HTTPS'] ) );
+
+	return (bool) setcookie( $name, $value, time() + velotok_core_wc_cart_guest_cookie_lifetime(), $path, $domain, $secure, true );
+}
+
+/**
+ * Remove the long-lived guest cart cookie.
+ *
+ * @return bool
+ */
+function velotok_core_wc_cart_clear_guest_cookie() {
+	$name = velotok_core_wc_cart_guest_cookie_name();
+
+	unset( $_COOKIE[ $name ] );
+
+	if ( 'cli' === PHP_SAPI || headers_sent() || ! function_exists( 'setcookie' ) ) {
+		return true;
+	}
+
+	$path   = defined( 'COOKIEPATH' ) && COOKIEPATH ? COOKIEPATH : '/';
+	$domain = defined( 'COOKIE_DOMAIN' ) && COOKIE_DOMAIN ? COOKIE_DOMAIN : '';
+	$secure = function_exists( 'is_ssl' )
+		? (bool) is_ssl()
+		: ( ! empty( $_SERVER['HTTPS'] ) && 'off' !== strtolower( (string) $_SERVER['HTTPS'] ) );
+
+	return (bool) setcookie( $name, '', time() - ( defined( 'HOUR_IN_SECONDS' ) ? HOUR_IN_SECONDS : 3600 ), $path, $domain, $secure, true );
+}
+
+/**
  * Return the guest cart snapshot stored in the WooCommerce session.
+ *
+ * When the current session has no snapshot yet, the long-lived cookie written
+ * by earlier sessions is used instead.
  *
  * @return array<int,array<string,mixed>>
  */
 function velotok_core_wc_cart_guest_snapshot() {
 	$session = velotok_core_wc_cart_session();
+	$items   = array();
 
-	if ( null === $session || ! method_exists( $session, 'get' ) ) {
-		return array();
+	if ( null !== $session && method_exists( $session, 'get' ) ) {
+		$snapshot = $session->get( 'velotok_guest_cart' );
+
+		if ( is_array( $snapshot ) && isset( $snapshot['items'] ) && is_array( $snapshot['items'] ) ) {
+			$items = array_values( array_filter( $snapshot['items'], 'is_array' ) );
+		} elseif ( is_array( $snapshot ) ) {
+			$items = array_values( array_filter( $snapshot, 'is_array' ) );
+		}
 	}
 
-	$snapshot = $session->get( 'velotok_guest_cart' );
-
-	if ( is_array( $snapshot ) && isset( $snapshot['items'] ) && is_array( $snapshot['items'] ) ) {
-		return array_values( array_filter( $snapshot['items'], 'is_array' ) );
+	if ( empty( $items ) ) {
+		$items = velotok_core_wc_cart_read_guest_cookie();
 	}
 
-	return is_array( $snapshot ) ? array_values( array_filter( $snapshot, 'is_array' ) ) : array();
+	return $items;
 }
 
 /**
  * Persist the guest cart in the WooCommerce session between requests.
+ *
+ * The cart is also mirrored into a long-lived cookie so it can be restored
+ * after the WooCommerce session has expired.
  *
  * @return bool Whether a snapshot was stored.
  */
@@ -986,21 +1172,25 @@ function velotok_core_wc_cart_store_guest_snapshot() {
 		return false;
 	}
 
-	$session = velotok_core_wc_cart_session();
+	$items    = velotok_core_wc_cart_items();
+	$session  = velotok_core_wc_cart_session();
+	$stored   = false;
 
-	if ( null === $session || ! method_exists( $session, 'set' ) ) {
-		return false;
+	if ( null !== $session && method_exists( $session, 'set' ) ) {
+		$session->set(
+			'velotok_guest_cart',
+			array(
+				'items'      => $items,
+				'updated_at' => time(),
+			)
+		);
+
+		$stored = true;
 	}
 
-	$session->set(
-		'velotok_guest_cart',
-		array(
-			'items'      => velotok_core_wc_cart_items(),
-			'updated_at' => time(),
-		)
-	);
+	$stored = velotok_core_wc_cart_write_guest_cookie( $items ) || $stored;
 
-	return true;
+	return $stored;
 }
 
 /**
@@ -1042,6 +1232,10 @@ function velotok_core_wc_cart_restore_guest_snapshot() {
 		}
 	}
 
+	if ( $restored ) {
+		velotok_core_wc_cart_store_guest_snapshot();
+	}
+
 	return $restored;
 }
 
@@ -1053,15 +1247,15 @@ function velotok_core_wc_cart_restore_guest_snapshot() {
 function velotok_core_wc_cart_clear_guest_snapshot() {
 	$session = velotok_core_wc_cart_session();
 
-	if ( null === $session ) {
-		return;
+	if ( null !== $session ) {
+		if ( method_exists( $session, 'delete' ) ) {
+			$session->delete( 'velotok_guest_cart' );
+		} elseif ( method_exists( $session, 'set' ) ) {
+			$session->set( 'velotok_guest_cart', array() );
+		}
 	}
 
-	if ( method_exists( $session, 'delete' ) ) {
-		$session->delete( 'velotok_guest_cart' );
-	} elseif ( method_exists( $session, 'set' ) ) {
-		$session->set( 'velotok_guest_cart', array() );
-	}
+	velotok_core_wc_cart_clear_guest_cookie();
 }
 
 /**
