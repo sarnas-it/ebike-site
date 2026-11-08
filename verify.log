@@ -1,81 +1,156 @@
-TESTEB-2: Регистрация SHALL требовать подтверждения email
+TESTEB-63: CI не дал результат (no_checks): TESTEB-1 — sarnas-it/ebike-site#62
 ================================================================
 
-Files changed for this requirement:
+Причина no_checks
+-----------------
+Застрявший коммит PR #62 `578e87b5a8587d6078aade92d26bd449448dd1d3` не
+содержал `.github/workflows` в своём дереве, а `main` на момент открытия и
+последнего push PR был пустым (`40134b5`) и тоже не содержал workflow.
+Для события `pull_request` GitHub ищет workflow в дереве PR (head + base),
+поэтому запускать было нечего: `no checks reported for the pull request`.
+GitHub не запускает workflow ретроспективно.
 
-- wp/plugins/velotok-core/includes/accounts.php
-- wp/plugins/velotok-core/includes/accounts-wordpress.php
-- wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
-- wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
-- verify.log
+Починка: `.github/workflows/ci.yml` теперь запускается на каждом
+`pull_request` (без `paths`-фильтра), на `push` в `main` и по
+`workflow_dispatch`. Гейт `.github/workflows/verify-ci-rollout.yml` на самом
+PR #65 привязывает доказательство к `TARGET_SHA` из
+`github.event.pull_request.head.sha` и публикует ссылку на штатный прогон
+`ci`, его job, стандартные check runs и состояние `mergeable` PR #65.
 
-The stub and the WordPress/WooCommerce bridge now share
-velotok_core_account_registration_options(): registration strips caller-supplied
-confirmation state (email_confirmed, email_verified, confirmed, status,
-account_status, authenticated, logged_in, session_token) before creating the
-account. A new account is therefore always persisted as pending/unconfirmed and
-cannot log in or open the personal area until the emailed token is confirmed.
+Доказательство для SHA из отклонённой сдачи
+-------------------------------------------
+SHA: `fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e`
+PR:  https://github.com/sarnas-it/ebike-site/pull/65
 
-Mandatory check command (raw output, current workspace):
+Команда (реальные данные GitHub API):
 
-$ php wp/plugins/velotok-core/tests/accounts-contract-test.php
+$ node scripts/ci/diagnose-pr-checks.mjs \
+    --repo sarnas-it/ebike-site --pr 65 \
+    --sha fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
+
+pull request: #65
+head branch:  feat/ebike-site-testeb-63
+target sha:   fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
+runs for sha: 5
+checks:       total=9 pending=0 failed=0
+workflow ci:  active (#407713517, .github/workflows/ci.yml)
+exit code: 0
+
+Штатный прогон ci именно на этом SHA:
+
+$ curl -s https://api.github.com/repos/sarnas-it/ebike-site/actions/runs/42506679632
+
+run id:      42506679632
+url:         https://github.com/sarnas-it/ebike-site/actions/runs/42506679632
+workflow:    ci (.github/workflows/ci.yml)
+event:       pull_request
+status:      completed
+conclusion:  success
+head_sha:    fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
+
+Job этого прогона (GET /actions/runs/42506679632/jobs):
+
+128810708965 php-lint            completed success
+128810708673 php-tests           completed success
+128810708806 php-plugin-tests    completed success
+128810708889 plugin-tests        completed success
+128810708807 ci-repair-tests     completed success
+
+Стандартные check runs на этом же SHA (GET /commits/fc1fe23.../check-runs):
+
+128810708965 php-lint            completed success head=fc1fe23e... suite=115141962596
+128810708673 php-tests           completed success head=fc1fe23e... suite=115141962596
+128810708806 php-plugin-tests    completed success head=fc1fe23e... suite=115141962596
+128810708889 plugin-tests        completed success head=fc1fe23e... suite=115141962596
+128810708807 ci-repair-tests     completed success head=fc1fe23e... suite=115141962596
+
+Прогон гейта для этого SHA:
+
+$ curl -s https://api.github.com/repos/sarnas-it/ebike-site/actions/runs/42506679696
+
+run id:      42506679696
+url:         https://github.com/sarnas-it/ebike-site/actions/runs/42506679696
+workflow:    verify-ci-rollout (.github/workflows/verify-ci-rollout.yml)
+event:       pull_request
+status:      completed
+conclusion:  success
+head_sha:    fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
+job:         128810708854 verify-ci-rollout completed success
+
+Опубликованное гейтом доказательство (PR #65, comment 6720902130,
+https://github.com/sarnas-it/ebike-site/pull/65#issuecomment-6720902130):
+
+- PR #65 -> main: state=open, merged=false, mergeable=true,
+  mergeable_state=unstable (конфликтов с main нет)
+- Проверяемый head-коммит: fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
+- Штатный прогон ci: #42506679632 — completed, success, event=pull_request,
+  head=fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
+- Job: php-tests=success, php-plugin-tests=success, ci-repair-tests=success,
+  plugin-tests=success, php-lint=success
+- Итог: green — CI на реальном head зелёный, PR готов к автомержу
+
+GitHub пересчитывает mergeability асинхронно и может временно вернуть
+`mergeable=null`; workflow `verify-ci-rollout` повторяет запрос, пока не
+получит определённое значение. Значение `mergeable=true` выше — то, которое
+гейт наблюдал и записал для этого SHA.
+
+Новый коммит (новая сдача) получает собственный прогон `ci` и собственные
+check runs на своём head; гейт сравнивает `head_sha` прогона, каждого check run
+и `TARGET_SHA` и не принимает запись с другого коммита. Red-green тест этого
+требования: `scripts/ci/tests/submitted-sha-evidence.test.mjs`.
+
+Локальные проверки
+------------------
+$ for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done
+exit code: 0
+
 PASS: контракт аккаунтов выполняется.
-exit code: 0
-
-New focused TESTEB-2 regression test (raw output):
-
-$ php wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
-PASS: регистрация требует подтверждения email независимо от переданных опций (TESTEB-2).
-exit code: 0
-
-PHP red-green proof. The red-green test builds two broken copies of
-includes/accounts-wordpress.php: one stores the account as already confirmed
-(status active) and one does not send the confirmation email. It then runs the
-focused test, the new registration test and the mandatory contract test against
-both broken copies (all must fail) and against the real integration (all must
-pass).
-
-$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
 PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
-exit code: 0
-
-Additional accounts checks (raw output):
-
-$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-wp-test.php
-PASS: WordPress-регистрация требует подтверждения email (TESTEB-2).
-exit code: 0
-
-$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-test.php
 PASS: регистрация требует подтверждения email (TESTEB-2).
-exit code: 0
-
-$ php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
+PASS: WordPress-регистрация требует подтверждения email (TESTEB-2).
+PASS: существующий email ведёт ко входу без дубля (TESTEB-3).
+PASS: TESTEB-3 падает без обработки существующего email и проходит с ней.
+PASS: TESTEB-5 падает без завершения сессии при выходе и проходит с ним.
+PASS: выход завершает сессию и закрывает личный кабинет (TESTEB-5).
+PASS: TESTEB-4 падает без переноса корзины при регистрации и проходит с ним.
+PASS: регистрация завершается переносом корзины и переходом к оформлению (TESTEB-4).
+PASS: регистрация требует подтверждения email независимо от переданных опций (TESTEB-2).
+PASS: TESTEB-6 падает без запрета доступа неподтверждённому пользователю и проходит с ним.
+PASS: неподтверждённый пользователь не имеет доступа к личному кабинету (TESTEB-6).
 PASS: WordPress-интеграция аккаунтов выполняется.
+PASS: оформление заказа через WooCommerce Checkout проверено.
+OK: стоимость доставки считается по тарифу и порогу бесплатной доставки.
+OK: срок получения отображается и хранится диапазоном.
+OK: вес заказа для тарифа рассчитывается однозначно.
+OK: WooCommerce предлагает СДЭК и Почту РФ из зон с тарифом, сроком и видимой ошибкой.
+OK: способы доставки из зон WooCommerce, тарифы, сроки и самовывоз на месте.
+OK: mocked-контракт гостевой корзины и регистрации на месте.
+OK: mocked-контракт данных спецификации на месте.
+OK: каталог выводит все товары, обязательное описание и дополнительные атрибуты.
+OK: каталог электровелосипедов выводит все карточки с обязательными и произвольными атрибутами.
+OK: каталог электровелосипедов выводит фото, название, описание, цену и произвольные атрибуты.
+PASS: интеграция оформления заказа с WooCommerce Checkout проверена.
+ok - нормализация товара передаёт описание в карточку
+ok - карточка содержит фото товара
+ok - карточка содержит название товара
+ok - карточка содержит описание товара
+ok - карточка содержит цену товара
+ok - если краткое описание пустое, используется полное
+ok - демо-карточка также содержит описание
+PASS: обязательные атрибуты карточки отображаются.
+
+$ for t in scripts/ci/tests/*.test.mjs; do node "$t" || exit 1; done
+exit code: 0
+(все наборы scripts/ci/tests прошли, включая новый
+scripts/ci/tests/submitted-sha-evidence.test.mjs)
+
+$ node scripts/ci/tests/submitted-sha-evidence.test.mjs
+PASS: the submitted SHA has its own green ci run, standard check runs and a mergeable PR (criteria 2 and 3)
+PASS: evidence recorded on the submitted SHA is rejected for any later submission
+PASS: criterion 3 requires mergeable=true without conflicts
+PASS: the evidence comment always pins the submitted SHA to its own run
+PASS: the task comment cites the submitted SHA and its own run instead of a different commit
 exit code: 0
 
-$ node wp/plugins/velotok-core/tests/accounts-contract.test.js
-PASS: accounts contract and PHP behavior test passed
-exit code: 0
-
-$ node wp/plugins/velotok-core/tests/accounts-redgreen.test.js
-PASS: accounts contract test fails without email confirmation and passes with it
-exit code: 0
-
-$ node wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
-PASS: WordPress accounts integration is persistent and the test fails without email confirmation or customer persistence
-exit code: 0
-
-$ node wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen.test.js
-PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
-exit code: 0
-
-PHP syntax checks:
-
-$ php -l wp/plugins/velotok-core/includes/accounts.php
-No syntax errors detected in wp/plugins/velotok-core/includes/accounts.php
-$ php -l wp/plugins/velotok-core/includes/accounts-wordpress.php
-No syntax errors detected in wp/plugins/velotok-core/includes/accounts-wordpress.php
-$ php -l wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
-No syntax errors detected in wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
-$ php -l wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
-No syntax errors detected in wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
+PHP-файлы продуктовых пакетов в этой правке не менялись: изменены только
+документация, verify.log и тесты/фикстура CI-инструментов.

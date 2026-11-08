@@ -39,6 +39,31 @@ GitHub не запускает workflow задним числом: появле�
 * в дереве `578e87b` нет `.github/workflows`;
 * в `main` на тот момент workflow тоже не было.
 
+### Фактические данные API для SHA отклонённой сдачи (TESTEB-63)
+
+Отклонённая сдача указывала SHA `fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e`.
+К текущей проверке для этого коммита уже есть собственные данные GitHub API:
+
+* `ci` — [#42506679632](https://github.com/sarnas-it/ebike-site/actions/runs/42506679632),
+  `completed/success`, `event=pull_request`, `head_sha=fc1fe23e...`;
+  job `php-lint`, `php-tests`, `php-plugin-tests`, `plugin-tests`,
+  `ci-repair-tests` — все `success`;
+* штатные check runs на `fc1fe23e...` принадлежат check suite `115141962596`
+  этого прогона и имеют `head_sha=fc1fe23e...`;
+* `verify-ci-rollout` — [#42506679696](https://github.com/sarnas-it/ebike-site/actions/runs/42506679696),
+  `completed/success`, зафиксировал `mergeable=true` и отсутствие конфликтов
+  с `main`;
+* опубликованный гейтом комментарий:
+  [#issuecomment-6720902130](https://github.com/sarnas-it/ebike-site/pull/65#issuecomment-6720902130).
+
+Это доказательство относится к конкретному SHA из отклонённой сдачи. Для нового
+коммита `verify-ci-rollout` берёт `TARGET_SHA` из
+`github.event.pull_request.head.sha` и публикует ссылку на прогон и `mergeable`
+уже для нового head; запись выше не может подтвердить другой коммит, потому что
+гейт сравнивает `head_sha` прогона и каждого check run. Пока GitHub
+пересчитывает mergeability, `mergeable` может быть `null`; workflow повторяет
+запрос, пока не получит определённое значение.
+
 ### Почему это не противоречит «ci active» и зелёным соседним PR
 
 Workflow `ci` действительно активен, а соседние PR получают зелёные прогоны,
