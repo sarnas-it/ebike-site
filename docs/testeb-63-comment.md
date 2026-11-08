@@ -22,6 +22,14 @@ allow-list интеграции содержит `sarnas-it/ebike-site`.
 Исправление: PR [#65](https://github.com/sarnas-it/ebike-site/pull/65) добавляет
 `.github/workflows/ci.yml` в базовую ветку, поэтому новые PR получают реальные
 прогоны на каждом `pull_request`, `push` в `main` и по `workflow_dispatch`.
+CI на коммите починки `7052bf2` уже прошёл успешно:
+[run #42467339807](https://github.com/sarnas-it/ebike-site/actions/runs/42467339807),
+все job (`php-lint`, `php-tests`, `plugin-tests`, `ci-repair-tests`) зелёные.
+Факт мержа PR #65 в `main` и успешный прогон CI именно на коммите починки
+проверяются red-green гейтом `scripts/ci/verify-rollout.mjs`, который запускает
+workflow `verify-ci-rollout` на каждый `push` в `main`: гейт возвращает код 1,
+пока PR не смержен, workflow отсутствует в `main` или прогон CI на head-коммите
+починки не зелёный.
 Recovery-workflow `Recover PR #62 checks`
 (`.github/workflows/recover-pr62.yml`) выкачивает ровно коммит
 `578e87b5a8587d6078aade92d26bd449448dd1d3` (`git rev-parse HEAD` сверяется с

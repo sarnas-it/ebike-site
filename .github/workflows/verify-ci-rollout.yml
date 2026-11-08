@@ -1,0 +1,43 @@
+name: verify-ci-rollout
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: read
+
+concurrency:
+  group: verify-ci-rollout-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify-ci-rollout
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify the fix PR is merged and CI passed on the fix commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          attempt=1
+          until node scripts/ci/verify-rollout.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr 65; do
+            if [ "$attempt" -ge 6 ]; then
+              echo "rollout verification stayed red after ${attempt} attempts" >&2
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep 20
+          done

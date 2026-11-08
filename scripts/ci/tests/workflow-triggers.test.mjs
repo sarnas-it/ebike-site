@@ -5,6 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { WORKFLOW_PATH } from '../lib.mjs';
+import { EXPECTED_CI_JOBS } from '../rollout.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
@@ -91,6 +92,8 @@ function main() {
   testBrokenRecoveryWorkflowIsRed();
   testRecoveryWorkflowIsGreen();
   testSharedCheckRunnerCoversAllGroups();
+  testRolloutVerificationWorkflowIsWired();
+  testCiWorkflowKeepsTheVerifiedJobSet();
 }
 
 try {
@@ -256,4 +259,42 @@ function testSharedCheckRunnerCoversAllGroups() {
     assert.ok(runner.includes(group), `run-checks.sh must keep the ${group} check`);
   }
   console.log('PASS: the shared runner keeps the full check set');
+}
+
+function testRolloutVerificationWorkflowIsWired() {
+  const text = readFileSync(
+    path.join(repoRoot, '.github/workflows/verify-ci-rollout.yml'),
+    'utf8',
+  );
+  const analysis = analyzeWorkflow(text);
+  assert.ok(analysis.triggers.includes('push'), 'rollout verification must run on push');
+  assert.ok(
+    analysis.triggers.includes('workflow_dispatch'),
+    'rollout verification must be manually dispatchable',
+  );
+  assert.strictEqual(
+    analysis.hasPathsFilter,
+    false,
+    'the rollout gate must not skip pushes that do not touch the workflow itself',
+  );
+  assert.ok(
+    /branches:\s*\[\s*main\s*\]/.test(text),
+    'rollout verification must run on the base branch',
+  );
+  assert.ok(
+    text.includes('scripts/ci/verify-rollout.mjs'),
+    'rollout verification must call the red-green gate',
+  );
+  console.log('PASS: rollout verification runs on push to main and manually');
+}
+
+function testCiWorkflowKeepsTheVerifiedJobSet() {
+  const text = readFileSync(workflowPath, 'utf8');
+  for (const job of EXPECTED_CI_JOBS) {
+    assert.ok(
+      new RegExp(`^  ${job}:\\s*$`, 'm').test(text),
+      `ci.yml must keep the ${job} job that verify-rollout checks`,
+    );
+  }
+  console.log('PASS: ci keeps every job that the rollout gate verifies');
 }

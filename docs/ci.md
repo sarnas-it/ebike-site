@@ -53,7 +53,12 @@ PR #62 — и есть причина.
 | Merge commit | `efe1bc4dac551dc870cec68aff16a973e095dd4f` |
 | Recovery workflow run | [#42445204104](https://github.com/sarnas-it/ebike-site/actions/runs/42445204104) — job `recover` завершился успешно |
 | Проверки на `578e87b` | `php-lint=success`, `php-tests=success`, `plugin-tests=success` (3 check runs + commit status `ci/recover=success`) |
-| CI на коммите починки `e4b76df` | [#42445208871](https://github.com/sarnas-it/ebike-site/actions/runs/42445208871) — все job (`php-lint`, `php-tests`, `plugin-tests`, `ci-repair-tests`) успешны |
+| CI на сданном коммите починки `7052bf2` | [#42467339807](https://github.com/sarnas-it/ebike-site/actions/runs/42467339807) — head `7052bf2`, все job (`php-lint`, `php-tests`, `plugin-tests`, `ci-repair-tests`) успешны |
+| CI на более раннем промежуточном коммите `e4b76df` | [#42445208871](https://github.com/sarnas-it/ebike-site/actions/runs/42445208871) — все job успешны |
+
+Прогон `#42467339807` относится именно к коммиту починки `7052bf2`, а не к
+промежуточному `e4b76df`: это видно из `head_sha` прогона и из его `run-name`.
+Поэтому успех CI на починке подтверждён на том же коммите, который сдавался.
 
 Нативного `actions/runs` у старого SHA по-прежнему `0`: GitHub не создаёт
 прогоны ретроспективно. Поэтому проверки на `578e87b` опубликованы
@@ -74,8 +79,23 @@ recovery-workflow, который реально выкачал этот SHA и 
 * вручную через `workflow_dispatch`.
 
 Проверки: `php-lint`, `php-tests`, `plugin-tests`, `ci-repair-tests`. Набор
-проверок только расширен, ни одна проверка не отключена. После мержа PR #65
-файл попадает в `main`, поэтому новые PR больше не останутся без прогонов.
+проверок только расширен, ни одна проверка не отключена.
+
+Мерж починки в базовую ветку и успешный прогон CI именно на её коммите
+проверяются red-green гейтом `scripts/ci/verify-rollout.mjs`. Гейт возвращает
+код 1, пока не выполнено хотя бы одно условие:
+
+* PR [#65](https://github.com/sarnas-it/ebike-site/pull/65) смержен в `main`;
+* `.github/workflows/ci.yml` присутствует в `main`;
+* последний прогон `ci` на head-коммите PR #65 завершился успешно;
+* в прогоне присутствуют все job: `php-lint`, `php-tests`, `plugin-tests`,
+  `ci-repair-tests`, и каждая завершилась успешно.
+
+`.github/workflows/verify-ci-rollout.yml` запускает этот гейт на каждый `push`
+в `main` и вручную. Поэтому критерии «починка влита в базовую ветку» и «прогон
+CI на коммите починки успешен» подтверждаются автоматически, а не текстом в
+документации. Если PR ещё не смержен или workflow отсутствует в `main`, гейт
+красный и не даёт выдать починку за готовую.
 
 ### 2. Recovery для уже застрявшего PR #62
 
@@ -116,11 +136,21 @@ node scripts/ci/verify-recovery.mjs \
   --repo sarnas-it/ebike-site --pr 62 \
   --sha 578e87b5a8587d6078aade92d26bd449448dd1d3 \
   --run-id 42445204104
+
+# критерии 2 и 3: PR #65 смержен в main и CI на коммите починки успешен (green)
+node scripts/ci/verify-rollout.mjs \
+  --repo sarnas-it/ebike-site --pr 65
 ```
 
 `verify-recovery.mjs` возвращает код 1, пока нет завершившегося успешного
 recovery-прогона, у коммита нет зелёных check runs или отсутствует merge
-commit. Это red-green гейт для критериев 2 и 3.
+commit. Это red-green гейт для восстановления PR #62.
+
+`verify-rollout.mjs` возвращает код 1, пока PR #65 не смержен в `main`, файла
+`.github/workflows/ci.yml` нет в `main`, последний прогон `ci` на коммите
+починки не успешен или в нём нет полного набора job. Это red-green гейт
+именно для критериев «починка влита в базовую ветку» и «прогон CI на коммите
+починки завершился успешно».
 
 Ручной запуск recovery (если нужно повторить):
 
@@ -175,3 +205,9 @@ bash scripts/ci/run-checks.sh .
   recovery не может «позеленить» сломанный коммит.
 * `scripts/ci/tests/repair-pr-checks.test.mjs` — починка целится в head PR, а
   не в отдельную задачную ветку.
+* `scripts/ci/tests/rollout.test.mjs` — незамерженный PR #65, неверная базовая
+  ветка, отсутствие `ci.yml` в `main`, прогон на чужом коммите или от чужого
+  workflow, упавший/незавершённый прогон и отсутствующий/упавший job дают red;
+  смерженный PR с полным зелёным прогоном `ci` на коммите починки даёт green.
+  Проверяется и выбор последнего прогона: новый упавший прогон не маскируется
+  старым успешным.

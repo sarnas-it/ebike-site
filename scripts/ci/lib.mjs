@@ -202,6 +202,24 @@ export async function getWorkflowRun({
   );
 }
 
+export async function getWorkflowRunJobs({
+  owner,
+  repo,
+  runId,
+  token,
+  fetchImpl = globalThis.fetch,
+}) {
+  return requestJson(
+    fetchImpl,
+    apiUrl(
+      owner,
+      repo,
+      `/actions/runs/${encodeURIComponent(runId)}/jobs?per_page=100`,
+    ),
+    { headers: headers(token) },
+  );
+}
+
 export async function getCheckRuns({
   owner,
   repo,
