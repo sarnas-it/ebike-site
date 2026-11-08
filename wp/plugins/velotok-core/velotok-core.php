@@ -24,6 +24,8 @@ define( 'VELOTOK_CORE_URL', plugin_dir_url( __FILE__ ) );
 
 require_once VELOTOK_CORE_PATH . 'includes/checkout-order.php';
 require_once VELOTOK_CORE_PATH . 'includes/spec-data.php';
+require_once VELOTOK_CORE_PATH . 'includes/product-attributes.php';
+require_once VELOTOK_CORE_PATH . 'includes/payment-gateway.php';
 require_once VELOTOK_CORE_PATH . 'includes/catalog.php';
 require_once VELOTOK_CORE_PATH . 'includes/cart.php';
 require_once VELOTOK_CORE_PATH . 'includes/guest-cart-registration.php';

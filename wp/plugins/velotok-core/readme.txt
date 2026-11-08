@@ -47,6 +47,14 @@ php wp/plugins/velotok-core/tests/spec-data-contract-test.php
 node wp/plugins/velotok-core/tests/spec-data-contract.test.js
 ```
 
+= Оплата WooCommerce и ЮKassa =
+
+Платёжный шлюз `Velotok_Yookassa_Gateway` расширяет `WC_Payment_Gateway` и подключается через фильтр `woocommerce_payment_gateways`. Платёж создаётся через ЮKassa API v3 (`POST /payments`), для запросов используется `Idempotence-Key`.
+
+Webhook принимает события ЮKassa на `POST /wp-json/velotok/v1/yookassa/webhook`, проверяет HMAC-SHA256 подпись из заголовка `X-Velotok-Signature` и повторно не применяет уже обработанный `event.id`. Статусы оплаты фиксированы: `pending`, `waiting_for_capture`, `succeeded`, `canceled`, `refunded`; они синхронизируются со статусами заказа WooCommerce. Полный возврат через `POST /refunds` переводит оплату и заказ в `refunded`.
+
+Секреты не хранятся в коде: `VELOTOK_YOOKASSA_SHOP_ID`, `VELOTOK_YOOKASSA_SECRET_KEY` и `VELOTOK_YOOKASSA_WEBHOOK_SECRET` читаются из окружения или настроек WordPress.
+
 = Аккаунты: регистрация по email, подтверждение и вход =
 
 Единая точка доступа — `velotok_core_accounts_contract()` в `includes/accounts.php`. Контракт ссылается на спеку `accounts` и требование `TESTEB-1` и объявляет постоянное хранение пользователей (`persistent => true`, `source => 'wordpress'`).

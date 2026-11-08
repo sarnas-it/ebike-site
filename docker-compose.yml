@@ -1,0 +1,100 @@
+name: velotok
+
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-wordpress}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-velotok-root}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u root -p$$MARIADB_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  wordpress:
+    image: wordpress:php8.2-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress}
+      WORDPRESS_DEBUG: "1"
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
+      - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
+      - ./scripts:/var/www/html/scripts:ro
+      - ./content:/var/www/html/content:ro
+      - ./assets:/var/www/html/assets:ro
+
+  wpcli:
+    image: wordpress:cli-php8.2
+    depends_on:
+      db:
+        condition: service_healthy
+      wordpress:
+        condition: service_started
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress}
+    working_dir: /var/www/html
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
+      - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
+      - ./scripts:/var/www/html/scripts:ro
+      - ./content:/var/www/html/content:ro
+      - ./assets:/var/www/html/assets:ro
+    command:
+      - |
+        until wp core is-installed --allow-root >/dev/null 2>&1; do
+          wp core install \
+            --url="http://localhost:8080" \
+            --title="Велоток" \
+            --admin_user="admin" \
+            --admin_password="${WP_ADMIN_PASSWORD:-velotok-admin}" \
+            --admin_email="admin@example.test" \
+            --skip-email \
+            --allow-root >/dev/null 2>&1 && break
+          sleep 3
+        done
+        wp plugin install woocommerce --activate --allow-root >/dev/null 2>&1 || true
+        wp plugin activate velotok-core --allow-root >/dev/null 2>&1 || true
+        wp theme activate velotok --allow-root >/dev/null 2>&1 || true
+        if wp plugin is-active woocommerce --allow-root >/dev/null 2>&1; then
+          echo "Seeding demo catalog:"
+          wp eval-file /var/www/html/scripts/seed.php --allow-root || true
+        fi
+        echo "Running specification data contract test:"
+        wp eval-file wp-content/plugins/velotok-core/tests/spec-data-contract-test.php --allow-root
+        echo "Running product attributes contract test:"
+        wp eval-file wp-content/plugins/velotok-core/tests/product-attributes-contract-test.php --allow-root
+        echo "Running payment gateway contract test:"
+        wp eval-file wp-content/plugins/velotok-core/tests/payment-gateway-contract-test.php --allow-root
+        echo "Running product attributes card test:"
+        php wp-content/plugins/velotok-core/tests/product-attributes-card-test.php
+        echo "Running catalog render test:"
+        php wp-content/themes/velotok/tests/catalog-render-test.php
+        echo "Running catalog display test:"
+        php wp-content/themes/velotok/tests/catalog-display-test.php
+        echo "Running catalog all products test:"
+        php wp-content/themes/velotok/tests/catalog-all-products-test.php
+        exec tail -f /dev/null
+
+volumes:
+  db_data:
+  wordpress_data:

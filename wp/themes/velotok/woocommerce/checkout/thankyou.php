@@ -57,7 +57,7 @@ do_action( 'woocommerce_before_thankyou', $order->get_id() );
 		<li><span><?php esc_html_e( 'Почта', 'velotok' ); ?></span><strong><?php echo esc_html( $order->get_billing_email() ); ?></strong></li>
 	</ul>
 
-	<p class="cart-note"><?php esc_html_e( 'Оплата при получении. Если нужно что-то изменить в заказе, просто скажите менеджеру.', 'velotok' ); ?></p>
+	<p class="cart-note"><?php esc_html_e( 'Если нужно что-то изменить в заказе или способе оплаты, просто скажите менеджеру.', 'velotok' ); ?></p>
 
 	<div class="thankyou-actions">
 		<a class="btn btn-primary" href="<?php echo esc_url( wc_get_page_permalink( 'shop' ) ); ?>"><?php esc_html_e( 'Вернуться в каталог', 'velotok' ); ?></a>

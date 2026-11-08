@@ -31,6 +31,10 @@ docker compose run --rm wpcli plugin list
 php wp/themes/velotok/tests/catalog-render-test.php
 php wp/themes/velotok/tests/catalog-display-test.php
 php wp/themes/velotok/tests/catalog-all-products-test.php
+php wp/plugins/velotok-core/tests/product-attributes-contract-test.php
+php wp/plugins/velotok-core/tests/product-attributes-card-test.php
+php wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
+node wp/plugins/velotok-core/tests/payment-gateway-contract.test.js
 php wp/plugins/velotok-core/tests/accounts-contract-test.php
 php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
 node wp/plugins/velotok-core/tests/accounts-contract.test.js
@@ -46,8 +50,13 @@ WooCommerce → список моделей → шаблон каталога �
 каталог перестаёт выводить все товары или их обязательные и произвольные
 атрибуты. Тест `catalog-all-products-test.php` проверяет, что каталог не
 обрезается до первых семи товаров и что карточка сохраняет описание даже при
-пустых полях описания у товара. Дымовой тест дополнительно проверяет эти
-элементы на реальной главной странице.
+пустых полях описания у товара. Тесты `product-attributes-contract-test.php`
+и `product-attributes-card-test.php` проверяют mocked-контракт источника
+произвольных дополнительных атрибутов и их вывод в карточке. Тест
+`payment-gateway-contract-test.php` проверяет шлюз ЮKassa для WooCommerce:
+создание платежа, подпись и идемпотентность webhook, статусы заказа и полный
+возврат в `refunded`; секреты читаются только из окружения или настроек.
+Дымовой тест дополнительно проверяет эти элементы на реальной главной странице.
 
 Тест аккаунтов `accounts-contract-test.php` проверяет регистрацию по email и
 паролю, обязательное подтверждение email, вход существующего пользователя без
@@ -81,6 +90,9 @@ docker compose down -v    # остановить и удалить базу, ф�
 
 * `wp/themes/velotok/` — тема витрины и шаблоны WooCommerce;
 * `wp/plugins/velotok-core/` — поля характеристик электровелосипедов;
+* `wp/plugins/velotok-core/includes/product-attributes.php` — stub источника дополнительных атрибутов;
+* `wp/plugins/velotok-core/includes/payment-gateway.php` — шлюз WooCommerce и ЮKassa API v3;
+* `wp/plugins/velotok-core/tests/payment-gateway-contract-test.php` — тест оплаты, webhook и возврата;
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
 * `wp/cli/wp-entrypoint.sh` — обёртка WP-CLI для контейнера `wpcli`;
@@ -89,4 +101,6 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/themes/velotok/tests/catalog-render-test.php` — тест карточек каталога;
 * `wp/themes/velotok/tests/catalog-display-test.php` — тест вывода всего каталога;
 * `wp/themes/velotok/tests/catalog-all-products-test.php` — тест полноты каталога и описания;
+* `wp/plugins/velotok-core/tests/product-attributes-contract-test.php` — тест контракта дополнительных атрибутов;
+* `wp/plugins/velotok-core/tests/product-attributes-card-test.php` — тест вывода дополнительных атрибутов в карточке;
 * `wp/tests/smoke.sh` — дымовой тест локального запуска.
