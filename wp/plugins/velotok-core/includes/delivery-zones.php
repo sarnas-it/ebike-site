@@ -41,7 +41,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39', 'TESTEB-40', 'TESTEB-41', 'TESTEB-42' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39', 'TESTEB-40', 'TESTEB-41', 'TESTEB-42', 'TESTEB-43' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -371,8 +371,30 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'mocked'                   => false,
 			),
 			'provider_configuration'  => array(
-				'admin_visible' => true,
-				'error_code'    => 'DELIVERY_PROVIDER_CONFIGURATION_ERROR',
+				'requirement'    => 'TESTEB-43',
+				'admin_visible'  => true,
+				'visible'        => true,
+				'explicit'       => true,
+				'silent'         => false,
+				'only_admin'     => true,
+				'admin'          => true,
+				'customer_visible' => false,
+				'providers'      => array( 'cdek', 'russian_post' ),
+				'error_code'     => 'DELIVERY_PROVIDER_CONFIGURATION_ERROR',
+				'error'          => 'DELIVERY_PROVIDER_CONFIGURATION_ERROR',
+				'message'        => 'Провайдер доставки настроен некорректно.',
+				'sources'        => array( 'shipping_method_settings', 'provider_response' ),
+				'keys'           => array( 'configuration_error', 'config_error', 'provider_configuration_error' ),
+				'notice'         => 'error',
+				'notice_type'    => 'error',
+				'notice_class'   => 'notice notice-error',
+				'notice_hook'    => 'admin_notices',
+				'hooks'          => array( 'admin_notices' ),
+				'capabilities'   => array( 'manage_woocommerce', 'manage_options', 'activate_plugins' ),
+				'render'         => true,
+				'fallback_tariff'=> false,
+				'fake_tariff'    => false,
+				'never_replaced_with_tariff' => true,
 			),
 		);
 
@@ -425,6 +447,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 		$contract['provider_adapters'] = $contract['provider_parity']['adapters'];
 		$contract['provider_equality'] = $contract['provider_parity'];
 		$contract['provider_parity_explicit'] = true;
+		$contract['provider_configuration_error'] = $contract['provider_configuration'];
+		$contract['admin_provider_configuration_error'] = $contract['provider_configuration'];
+		$contract['provider_configuration_admin_visible'] = true;
 
 		return $contract;
 	}
@@ -1530,6 +1555,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 
 		$test_mode = velotok_core_delivery_test_mode_info( $method, $context, $result );
 		$error     = null;
+		$configured = null;
+		$result_code = '';
+		$is_configuration_error = false;
 
 		$is_wp_error = is_object( $result ) && (
 			'WP_Error' === get_class( $result )
@@ -1537,12 +1565,48 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 			|| ( function_exists( 'is_wp_error' ) && is_wp_error( $result ) )
 		);
 
-		if ( $is_wp_error && method_exists( $result, 'get_error_message' ) ) {
-			$error = $result->get_error_message();
-		} elseif ( is_array( $result ) && isset( $result['error'] ) && is_scalar( $result['error'] ) && '' !== (string) $result['error'] ) {
-			$error = (string) $result['error'];
-		} elseif ( is_array( $result ) && isset( $result['code'] ) && is_scalar( $result['code'] ) && '' !== (string) $result['code'] && ! isset( $result['amount'] ) && ! isset( $result['cost'] ) ) {
-			$error = isset( $result['message'] ) && is_scalar( $result['message'] ) ? (string) $result['message'] : (string) $result['code'];
+		if ( $is_wp_error ) {
+			$result_code = method_exists( $result, 'get_error_code' ) ? (string) $result->get_error_code() : '';
+
+			if ( '' !== $result_code && ( $result_code === $contract['provider_configuration']['error_code'] || false !== stripos( $result_code, 'config' ) ) ) {
+				$is_configuration_error = true;
+			}
+
+			if ( method_exists( $result, 'get_error_message' ) ) {
+				$error = $result->get_error_message();
+			}
+		} elseif ( is_array( $result ) ) {
+			$result_code = isset( $result['code'] ) && is_scalar( $result['code'] ) ? (string) $result['code'] : '';
+
+			if ( '' === $result_code && isset( $result['error_code'] ) && is_scalar( $result['error_code'] ) ) {
+				$result_code = (string) $result['error_code'];
+			}
+
+			$configured  = array_key_exists( 'configured', $result ) ? $result['configured'] : null;
+
+			if ( false === $configured
+				|| ! empty( $result['configuration_error'] )
+				|| ! empty( $result['admin_configuration_error'] )
+				|| ( '' !== $result_code && ( $result_code === $contract['provider_configuration']['error_code'] || false !== stripos( $result_code, 'config' ) ) )
+			) {
+				$is_configuration_error = true;
+			}
+
+			if ( isset( $result['error'] ) && is_scalar( $result['error'] ) && '' !== (string) $result['error'] ) {
+				$error = (string) $result['error'];
+			} elseif ( '' !== $result_code && ! isset( $result['amount'] ) && ! isset( $result['cost'] ) ) {
+				$error = isset( $result['message'] ) && is_scalar( $result['message'] ) ? (string) $result['message'] : $result_code;
+			}
+		}
+
+		if ( $is_configuration_error ) {
+			$configuration_error          = velotok_core_delivery_provider_configuration_error( $method_id, null !== $error ? $error : '' );
+			$configuration_error['configured']         = true;
+			$configuration_error['test_mode']          = ! empty( $test_mode['enabled'] );
+			$configuration_error['test_mode_explicit'] = true;
+			$configuration_error['test_mode_info']     = $test_mode;
+
+			return $configuration_error;
 		}
 
 		if ( null !== $error ) {
@@ -3341,20 +3405,314 @@ if ( ! function_exists( 'velotok_core_delivery_provider_configuration_error' ) )
 	 *
 	 * @param string $provider Provider identifier.
 	 * @param string $message  Error message.
+	 * @param array  $context  Optional context.
 	 * @return array<string,mixed>
 	 */
-	function velotok_core_delivery_provider_configuration_error( $provider = '', $message = '' ) {
+	function velotok_core_delivery_provider_configuration_error( $provider = '', $message = '', $context = array() ) {
 		$contract = velotok_core_delivery_zones_contract();
+		$section  = isset( $contract['provider_configuration'] ) ? $contract['provider_configuration'] : array();
+		$provider = velotok_core_delivery_zones_scalar( $provider );
+		$adapter  = '' !== $provider ? velotok_core_delivery_provider_contract( $provider ) : array();
+		$label    = isset( $adapter['label'] ) && '' !== (string) $adapter['label'] ? (string) $adapter['label'] : $provider;
+		$message  = trim( (string) $message );
+		$default  = isset( $section['message'] ) ? (string) $section['message'] : 'Провайдер доставки настроен некорректно.';
+
+		if ( '' === $message ) {
+			$message = '' !== $provider ? $label . ': ' . $default : $default;
+		}
 
 		return array(
-			'ok'      => false,
-			'code'    => $contract['provider_configuration']['error_code'],
-			'provider'=> $provider,
-			'message' => '' !== $message ? $message : 'Провайдер доставки настроен некорректно.',
-			'visible' => true,
-			'admin'   => true,
+			'ok'                => false,
+			'code'              => isset( $section['error_code'] ) ? $section['error_code'] : 'DELIVERY_PROVIDER_CONFIGURATION_ERROR',
+			'error'             => $message,
+			'provider'          => $provider,
+			'provider_id'       => $provider,
+			'provider_label'    => $label,
+			'message'           => $message,
+			'visible'           => true,
+			'explicit'          => true,
+			'admin'             => true,
+			'admin_visible'     => true,
+			'customer_visible'  => false,
+			'requirement'       => isset( $section['requirement'] ) ? $section['requirement'] : 'TESTEB-43',
+			'notice'            => 'error',
+			'notice_type'       => 'error',
+			'notice_class'      => isset( $section['notice_class'] ) ? $section['notice_class'] : 'notice notice-error',
+			'context'           => is_array( $context ) ? $context : array(),
+			'fallback_tariff'   => false,
+			'fake_tariff'       => false,
 		);
 	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_configuration_methods' ) ) {
+	/**
+	 * Normalize zones (or a single method) into a list of shipping methods.
+	 *
+	 * @param mixed $zones Zone list, single zone or single method.
+	 * @return array<int,mixed>
+	 */
+	function velotok_core_delivery_provider_configuration_methods( $zones = null ) {
+		if ( null === $zones ) {
+			$zones = velotok_core_delivery_zones_data();
+		}
+
+		if ( ! is_array( $zones ) ) {
+			return array();
+		}
+
+		$is_method = isset( $zones['method_id'] )
+			|| isset( $zones['instance_id'] )
+			|| isset( $zones['rate_provider'] )
+			|| ( isset( $zones['settings'] ) && ! isset( $zones['shipping_methods'] ) && ! isset( $zones['zone_locations'] ) );
+
+		if ( $is_method ) {
+			return array( $zones );
+		}
+
+		$is_zone = isset( $zones['shipping_methods'] )
+			|| isset( $zones['zone_id'] )
+			|| isset( $zones['zone_locations'] )
+			|| isset( $zones['zone_name'] );
+
+		if ( $is_zone ) {
+			$zones = array( $zones );
+		}
+
+		$methods = array();
+
+		foreach ( $zones as $zone ) {
+			if ( ! is_array( $zone ) && ! is_object( $zone ) ) {
+				continue;
+			}
+
+			$zone_methods = velotok_core_delivery_zones_zone_methods( $zone );
+
+			if ( ! empty( $zone_methods ) ) {
+				foreach ( $zone_methods as $method ) {
+					$methods[] = $method;
+				}
+
+				continue;
+			}
+
+			if ( '' !== velotok_core_delivery_zones_method_id( $zone ) ) {
+				$methods[] = $zone;
+			}
+		}
+
+		return $methods;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_configuration_method_error' ) ) {
+	/**
+	 * Detect a configuration error of one delivery method.
+	 *
+	 * A provider configuration error is never a provider outage: it comes from
+	 * invalid or missing provider settings, from an unconfigured adapter, or
+	 * from a provider response that explicitly reports a configuration error.
+	 *
+	 * @param mixed $method  Method data.
+	 * @param array $context Delivery context.
+	 * @return array<string,mixed>|null
+	 */
+	function velotok_core_delivery_provider_configuration_method_error( $method, $context = array() ) {
+		$contract  = velotok_core_delivery_zones_contract();
+		$section   = isset( $contract['provider_configuration'] ) ? $contract['provider_configuration'] : array();
+		$method_id = velotok_core_delivery_zones_method_id( $method );
+
+		if ( '' === $method_id ) {
+			return null;
+		}
+
+		$providers = isset( $contract['supported_providers'] ) ? $contract['supported_providers'] : array();
+
+		if ( ! empty( $providers ) && ! in_array( $method_id, $providers, true ) ) {
+			return null;
+		}
+
+		if ( ! velotok_core_delivery_zones_method_enabled( $method ) ) {
+			return null;
+		}
+
+		$settings = velotok_core_delivery_zones_settings( $method );
+		$keys     = isset( $section['keys'] ) ? (array) $section['keys'] : array( 'configuration_error', 'config_error', 'provider_configuration_error' );
+		$keys[]   = 'configuration_error';
+
+		foreach ( array_unique( $keys ) as $key ) {
+			$value = velotok_core_delivery_zones_value( $method, array( $key ), null );
+
+			if ( null === $value || '' === $value ) {
+				$value = isset( $settings[ $key ] ) ? $settings[ $key ] : null;
+			}
+
+			if ( null === $value || '' === $value || false === $value || 0 === $value || '0' === $value ) {
+				continue;
+			}
+
+			if ( is_string( $value ) && in_array( strtolower( trim( $value ) ), array( 'no', 'false', 'off', 'none' ), true ) ) {
+				continue;
+			}
+
+			$message = '';
+
+			if ( is_string( $value ) && ! in_array( strtolower( trim( $value ) ), array( '1', 'yes', 'true', 'on' ), true ) ) {
+				$message = $value;
+			} elseif ( is_array( $value ) && isset( $value['message'] ) && is_scalar( $value['message'] ) ) {
+				$message = (string) $value['message'];
+			}
+
+			return velotok_core_delivery_provider_configuration_error( $method_id, $message, $context );
+		}
+
+		$order = isset( $context['order'] ) ? $context['order'] : array();
+		$rate  = velotok_core_delivery_zones_provider_rate( $method, $order, $context );
+
+		if ( is_array( $rate ) && empty( $rate['ok'] ) ) {
+			$code       = isset( $rate['code'] ) ? (string) $rate['code'] : '';
+			$configured = array_key_exists( 'configured', $rate ) ? $rate['configured'] : true;
+			$is_config  = false === $configured
+				|| ( '' !== $code && isset( $section['error_code'] ) && $code === $section['error_code'] )
+				|| ! empty( $rate['configuration_error'] )
+				|| ! empty( $rate['admin_configuration_error'] );
+
+			if ( $is_config ) {
+				$message = isset( $rate['error'] ) && is_scalar( $rate['error'] ) ? (string) $rate['error'] : '';
+
+				return velotok_core_delivery_provider_configuration_error( $method_id, $message, $context );
+			}
+		}
+
+		return null;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_configuration_errors' ) ) {
+	/**
+	 * Return all admin-visible provider configuration errors.
+	 *
+	 * @param mixed $zones   Zone list, single zone or single method.
+	 * @param array $context Delivery context.
+	 * @return array<int,array<string,mixed>>
+	 */
+	function velotok_core_delivery_provider_configuration_errors( $zones = null, $context = array() ) {
+		$errors  = array();
+		$methods = velotok_core_delivery_provider_configuration_methods( $zones );
+
+		foreach ( $methods as $method ) {
+			$error = velotok_core_delivery_provider_configuration_method_error( $method, $context );
+
+			if ( is_array( $error ) ) {
+				$errors[] = $error;
+			}
+		}
+
+		return $errors;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_configuration_admin_visible' ) ) {
+	/**
+	 * Whether the current user may see a provider configuration error.
+	 *
+	 * @return bool
+	 */
+	function velotok_core_delivery_provider_configuration_admin_visible() {
+		$contract = velotok_core_delivery_zones_contract();
+		$section  = isset( $contract['provider_configuration'] ) ? $contract['provider_configuration'] : array();
+		$caps     = isset( $section['capabilities'] ) ? (array) $section['capabilities'] : array( 'manage_woocommerce', 'manage_options', 'activate_plugins' );
+
+		if ( ! function_exists( 'current_user_can' ) ) {
+			return true;
+		}
+
+		foreach ( $caps as $capability ) {
+			if ( current_user_can( $capability ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_configuration_notice_html' ) ) {
+	/**
+	 * Render one admin notice for a provider configuration error.
+	 *
+	 * @param mixed $error Error data.
+	 * @return string
+	 */
+	function velotok_core_delivery_provider_configuration_notice_html( $error ) {
+		if ( ! is_array( $error ) ) {
+			return '';
+		}
+
+		$contract = velotok_core_delivery_zones_contract();
+		$section  = isset( $contract['provider_configuration'] ) ? $contract['provider_configuration'] : array();
+		$escape   = function ( $value ) {
+			return function_exists( 'esc_html' ) ? esc_html( (string) $value ) : htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
+		};
+		$provider = isset( $error['provider'] ) ? (string) $error['provider'] : '';
+		$label    = isset( $error['provider_label'] ) && '' !== (string) $error['provider_label'] ? (string) $error['provider_label'] : $provider;
+		$code     = isset( $error['code'] ) ? (string) $error['code'] : '';
+		$message  = isset( $error['message'] ) ? (string) $error['message'] : '';
+		$class    = isset( $section['notice_class'] ) ? (string) $section['notice_class'] : 'notice notice-error';
+		$title    = '' !== $label ? 'Ошибка конфигурации провайдера доставки (' . $label . ')' : 'Ошибка конфигурации провайдера доставки';
+
+		return '<div class="' . $escape( $class ) . ' velotok-delivery-provider-configuration" role="alert" data-provider="' . $escape( $provider ) . '" data-code="' . $escape( $code ) . '" data-admin-visible="true">'
+			. '<p><strong>' . $escape( $title ) . ':</strong> ' . $escape( $message ) . '</p>'
+			. '</div>';
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_configuration_admin_notice' ) ) {
+	/**
+	 * Render admin notices for provider configuration errors.
+	 *
+	 * @param mixed $zones   Zone list, single zone or single method.
+	 * @param array $context Delivery context.
+	 * @return string Rendered HTML.
+	 */
+	function velotok_core_delivery_provider_configuration_admin_notice( $zones = null, $context = array() ) {
+		if ( ! velotok_core_delivery_provider_configuration_admin_visible() ) {
+			return '';
+		}
+
+		$html = '';
+
+		foreach ( velotok_core_delivery_provider_configuration_errors( $zones, $context ) as $error ) {
+			$html .= velotok_core_delivery_provider_configuration_notice_html( $error );
+		}
+
+		if ( '' !== $html ) {
+			if ( function_exists( 'wp_kses_post' ) ) {
+				echo wp_kses_post( $html );
+			} else {
+				echo $html;
+			}
+		}
+
+		return $html;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_configuration_admin_errors' ) ) {
+	/**
+	 * Alias for the admin-visible provider configuration errors.
+	 *
+	 * @param mixed $zones   Zone list, single zone or single method.
+	 * @param array $context Delivery context.
+	 * @return array<int,array<string,mixed>>
+	 */
+	function velotok_core_delivery_provider_configuration_admin_errors( $zones = null, $context = array() ) {
+		return velotok_core_delivery_provider_configuration_errors( $zones, $context );
+	}
+}
+
+if ( function_exists( 'add_action' ) ) {
+	add_action( 'admin_notices', 'velotok_core_delivery_provider_configuration_admin_notice' );
 }
 
 if ( ! function_exists( 'velotok_core_delivery_test_mode_normalize' ) ) {
