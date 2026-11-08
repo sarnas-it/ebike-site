@@ -210,6 +210,8 @@ function velotok_core_cart_contract() {
 			'guest_storage' => 'woocommerce_session',
 			'user_storage'  => 'woocommerce_persistent_cart',
 			'guest_persistent' => true,
+			'guest_cookie'  => 'velotok_guest_cart',
+			'guest_cookie_lifetime' => 2592000,
 			'user_persistent'  => true,
 			'merge_by'    => 'product_id',
 			'clear_after_checkout' => true,
