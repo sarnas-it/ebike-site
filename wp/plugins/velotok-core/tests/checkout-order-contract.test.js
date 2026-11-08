@@ -22,6 +22,7 @@ function includes(fragment, message) {
 includes('TESTEB-23', 'Contract must reference requirement TESTEB-23');
 includes('TESTEB-25', 'Contract must reference requirement TESTEB-25');
 includes('TESTEB-26', 'Contract must reference requirement TESTEB-26');
+includes('TESTEB-27', 'Contract must reference requirement TESTEB-27');
 includes("'requirement'       => 'TESTEB-25'", 'Order section must own the TESTEB-25 persistence requirement');
 includes("'requirement'       => 'TESTEB-26'", 'Idempotency section must own the TESTEB-26 duplicate requirement');
 includes("'spec'            => 'checkout'", 'Contract must reference the checkout spec');
@@ -34,6 +35,7 @@ includes('CHECKOUT_AUTH_REQUIRED', 'Authorization error code is missing');
 includes('CHECKOUT_INVALID_NONCE', 'Nonce error code is missing');
 includes('CHECKOUT_INVALID_FORM', 'Form validation error code is missing');
 includes('CHECKOUT_EMPTY_CART', 'Empty cart error code is missing');
+includes("'requirement' => 'TESTEB-27'", 'Empty cart section must own the TESTEB-27 requirement');
 includes('CHECKOUT_DUPLICATE', 'Duplicate order error code is missing');
 includes('prevents_duplicate', 'Duplicate prevention must be declared');
 includes('_velotok_checkout_key', 'Idempotency order meta key is missing');

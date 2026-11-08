@@ -22,6 +22,44 @@ if ( ! is_user_logged_in() ) {
 	echo '</div>';
 	return;
 }
+
+$velotok_checkout_cart        = null;
+$velotok_checkout_cart_empty  = false;
+
+if ( function_exists( 'WC' ) ) {
+	$velotok_woocommerce = WC();
+
+	if ( is_object( $velotok_woocommerce ) && isset( $velotok_woocommerce->cart ) ) {
+		$velotok_checkout_cart = $velotok_woocommerce->cart;
+	}
+}
+
+if ( is_object( $velotok_checkout_cart ) ) {
+	if ( function_exists( 'velotok_core_checkout_cart_is_empty' ) ) {
+		$velotok_checkout_cart_empty = velotok_core_checkout_cart_is_empty( array( 'cart' => $velotok_checkout_cart ) );
+	} elseif ( method_exists( $velotok_checkout_cart, 'is_empty' ) ) {
+		$velotok_checkout_cart_empty = (bool) $velotok_checkout_cart->is_empty();
+	} elseif ( method_exists( $velotok_checkout_cart, 'get_cart_contents_count' ) ) {
+		$velotok_checkout_cart_empty = 0 === (int) $velotok_checkout_cart->get_cart_contents_count();
+	}
+}
+
+if ( $velotok_checkout_cart_empty ) {
+	$velotok_checkout_empty_message = 'Нельзя оформить заказ с пустой корзиной.';
+
+	if ( function_exists( 'velotok_core_checkout_order_contract' ) ) {
+		$velotok_checkout_empty_contract = velotok_core_checkout_order_contract();
+		$velotok_checkout_empty_message  = $velotok_checkout_empty_contract['cart']['message'];
+	}
+
+	$velotok_checkout_cart_url = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/' );
+
+	echo '<div class="woocommerce-info">';
+	echo esc_html( $velotok_checkout_empty_message );
+	echo ' <a href="' . esc_url( $velotok_checkout_cart_url ) . '">' . esc_html__( 'Перейти в корзину', 'velotok' ) . '</a>';
+	echo '</div>';
+	return;
+}
 ?>
 <form name="checkout" method="post" class="checkout woocommerce-checkout" action="<?php echo esc_url( wc_get_checkout_url() ); ?>" enctype="multipart/form-data">
 	<div class="checkout-layout">
