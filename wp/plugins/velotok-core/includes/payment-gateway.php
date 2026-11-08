@@ -550,6 +550,7 @@ function velotok_core_payment_apply_order_status( $order, $status, $note = '' ) 
 
 	velotok_core_payment_update_order_meta( $order, '_velotok_payment_status', $key );
 	velotok_core_payment_update_order_meta( $order, '_yookassa_payment_status', $key );
+	velotok_core_payment_update_order_meta( $order, '_payment_status', $key );
 	velotok_core_payment_update_order_meta( $order, '_velotok_payment_order_status', $order_status );
 	velotok_core_payment_update_order_meta( $order, '_velotok_payment_updated_at', gmdate( 'c' ) );
 
@@ -1831,6 +1832,21 @@ if ( ! function_exists( 'velotok_core_yookassa_process_refund' ) ) {
 if ( ! function_exists( 'velotok_core_yookassa_order_status' ) ) {
 	function velotok_core_yookassa_order_status( $status ) {
 		return velotok_core_payment_order_status( $status );
+	}
+}
+if ( ! function_exists( 'velotok_payment_order_status' ) ) {
+	function velotok_payment_order_status( $status ) {
+		return velotok_core_payment_order_status( $status );
+	}
+}
+if ( ! function_exists( 'velotok_payment_apply_order_status' ) ) {
+	function velotok_payment_apply_order_status( $order, $status, $note = '' ) {
+		return velotok_core_payment_apply_order_status( $order, $status, $note );
+	}
+}
+if ( ! function_exists( 'velotok_core_payment_sync_order_status' ) ) {
+	function velotok_core_payment_sync_order_status( $order, $status, $note = '' ) {
+		return velotok_core_payment_apply_order_status( $order, $status, $note );
 	}
 }
 
