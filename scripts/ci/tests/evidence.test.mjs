@@ -6,6 +6,7 @@ import {
   EVIDENCE_START,
   RECOVERY_WORKFLOW_PATH,
   collectRecoveryEvidence,
+  recoveryWorkflowForPullRequest,
   findRecoveryRunLink,
   publishRecoveryEvidence,
   renderEvidenceComment,
@@ -522,6 +523,35 @@ async function testPublishRefusesWhenEvidenceIsRed() {
   console.log('PASS: red evidence is not published');
 }
 
+function testRecoveryWorkflowsResolvePerPullRequest() {
+  assert.strictEqual(
+    recoveryWorkflowForPullRequest(62),
+    '.github/workflows/recover-pr62.yml',
+    'PR #62 must use its own recovery workflow',
+  );
+  assert.strictEqual(
+    recoveryWorkflowForPullRequest(68),
+    '.github/workflows/recover-pr68.yml',
+    'PR #68 must use its own recovery workflow',
+  );
+  assert.strictEqual(
+    recoveryWorkflowForPullRequest(73),
+    '.github/workflows/recover-pr73.yml',
+    'PR #73 must use its own recovery workflow',
+  );
+  assert.strictEqual(
+    recoveryWorkflowForPullRequest(78),
+    '.github/workflows/recover-pr78.yml',
+    'PR #78 must use its own recovery workflow',
+  );
+  assert.strictEqual(
+    recoveryWorkflowForPullRequest(999),
+    '.github/workflows/recover-pr.yml',
+    'an unknown pull request falls back to the generic recovery workflow',
+  );
+  console.log('PASS: each pull request keeps its own recovery workflow');
+}
+
 async function main() {
   testGreenEvidenceIsReady();
   testSyntheticChecksWithoutRunAreRed();
@@ -531,6 +561,7 @@ async function main() {
   testGreenEvidenceWithoutLinkedStatusIsRed();
   testEvidenceForUnlinkedRunIsRed();
   await testCollectUsesRunLinkedFromCommitStatus();
+  testRecoveryWorkflowsResolvePerPullRequest();
   await testCollectUsesPr68RecoveryWorkflow();
   testRenderedCommentContainsRealEvidence();
   testRenderedCommentReplacesStaleEvidence();

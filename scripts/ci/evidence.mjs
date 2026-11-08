@@ -9,24 +9,25 @@ import {
 } from './lib.mjs';
 
 export const RECOVERY_WORKFLOW_PATH = '.github/workflows/recover-pr73.yml';
+export const RECOVERY_WORKFLOW_PATHS = {
+  62: '.github/workflows/recover-pr62.yml',
+  68: '.github/workflows/recover-pr68.yml',
+  73: '.github/workflows/recover-pr73.yml',
+  78: '.github/workflows/recover-pr78.yml',
+};
+
 export const RECOVERY_STATUS_CONTEXT = 'ci/recover';
 
 // Recovery used to be hard-coded to a single PR. Keeping the workflow mapping
 // explicit lets existing evidence stay verifiable while new pull requests use
 // their own recovery workflow (or the generic one).
-export function recoveryWorkflowForPullRequest(pullNumber) {
-  const number = Number(pullNumber);
-  if (number === 68) {
-    return '.github/workflows/recover-pr68.yml';
-  }
-  if (number === 73) {
-    return '.github/workflows/recover-pr73.yml';
-  }
-  if (number === 78) {
-    return '.github/workflows/recover-pr78.yml';
-  }
-  return '.github/workflows/recover-pr.yml';
+export function recoveryWorkflowForPullRequest(
+  pullNumber,
+  fallback = '.github/workflows/recover-pr.yml',
+) {
+  return RECOVERY_WORKFLOW_PATHS[Number(pullNumber)] || fallback;
 }
+
 export const EVIDENCE_START = '<!-- testeb-67-evidence:start -->';
 export const EVIDENCE_END = '<!-- testeb-67-evidence:end -->';
 

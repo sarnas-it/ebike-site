@@ -1,0 +1,114 @@
+name: Recover PR #62 checks
+run-name: Recover PR #62 checks for 578e87b5a8587d6078aade92d26bd449448dd1d3
+
+# The pull request #62 head commit 578e87b predates any workflow file, so GitHub
+# never created a run for it and will not do so retroactively. This workflow
+# checks that exact commit out, runs the same checks as the normal CI, publishes
+# the results as check runs/status on that commit, and completes the deferred
+# merge of the pull request.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  checks: write
+  statuses: write
+  pull-requests: write
+  issues: write
+  actions: read
+
+concurrency:
+  group: recover-pr-62
+  cancel-in-progress: false
+
+env:
+  TARGET_PR: '62'
+  TARGET_SHA: '578e87b5a8587d6078aade92d26bd449448dd1d3'
+  CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  recover:
+    name: Recover PR #62 checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out CI tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+          persist-credentials: false
+
+      - name: Check out stale commit under test
+        uses: actions/checkout@v4
+        with:
+          ref: 578e87b5a8587d6078aade92d26bd449448dd1d3
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Record checked commit
+        run: |
+          set -euo pipefail
+          checked="$(git -C target rev-parse HEAD)"
+          test "$checked" = "$TARGET_SHA"
+          echo "Checked commit: $checked" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Run repository checks against stale commit
+        run: |
+          bash tooling/scripts/ci/run-checks.sh target "$RUNNER_TEMP/checks.json" || true
+          cat "$RUNNER_TEMP/checks.json"
+
+      - name: Publish checks and complete deferred merge
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tooling/scripts/ci/recover-pr.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$TARGET_PR" \
+            --sha "$TARGET_SHA" \
+            --results "$RUNNER_TEMP/checks.json" \
+            --details-url "$CI_RUN_URL" \
+            --summary "Recovered checks for PR #${TARGET_PR} at ${TARGET_SHA}"
+
+      - name: Publish evidence comment with this run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tooling/scripts/ci/publish-evidence.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$TARGET_PR" \
+            --sha "$TARGET_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --workflow .github/workflows/recover-pr62.yml \
+            --comment-file tooling/docs/testeb-63-comment.md \
+            --comment-marker '<!-- testeb-63-recovery -->' \
+            --allow-running
+
+      - name: Verify recorded recovery evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tooling/scripts/ci/publish-evidence.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$TARGET_PR" \
+            --sha "$TARGET_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --workflow .github/workflows/recover-pr62.yml \
+            --allow-running \
+            --dry-run

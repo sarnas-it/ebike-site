@@ -21,11 +21,11 @@ recovery workflow run that executed them.
 
 Options:
   --repo <owner/name>  Repository (default: $GITHUB_REPOSITORY or sarnas-it/ebike-site)
-  --pr <number>        Pull request number (default: 73)
+  --pr <number>        Pull request number (default: 62)
   --sha <sha>          Pin the commit under test (default: the current PR head,
                        so a moved head is verified instead of the stale incident SHA)
   --run-id <id>        Recovery workflow run to verify (default: latest successful)
-  --workflow <path>    Recovery workflow path (default: the workflow for the PR)
+  --workflow <path>    Recovery workflow path (default: per pull request, ${RECOVERY_WORKFLOW_PATH} otherwise)
   -h, --help           Show this help
 
 Authentication: set GITHUB_TOKEN (never printed); reading a public repository
@@ -35,7 +35,7 @@ works without one.
 function parseArgs(argv) {
   const options = {
     repo: process.env.GITHUB_REPOSITORY || 'sarnas-it/ebike-site',
-    pr: 73,
+    pr: 62,
     sha: null,
     runId: null,
     workflow: null,
@@ -72,8 +72,7 @@ async function main() {
     throw new Error(`invalid --repo value: ${options.repo}`);
   }
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
-  const workflow =
-    options.workflow || recoveryWorkflowForPullRequest(options.pr);
+  const workflow = options.workflow || recoveryWorkflowForPullRequest(options.pr);
   let targetSha = options.sha;
   if (!targetSha) {
     const pr = await getPullRequest({

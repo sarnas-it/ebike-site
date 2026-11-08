@@ -1,5 +1,15 @@
 # CI
 
+## Причина `no_checks` по PR #62 (TESTEB-63)
+
+Застрявший коммит `578e87b5a8587d6078aade92d26bd449448dd1d3` (head ветки
+`feat/ebike-site-testeb-1`) не содержит `.github/workflows` в своём дереве. В
+момент открытия и последнего push этого PR базовая ветка `main` тоже была
+пустой (`40134b5`, `chore: empty repository`) и workflow в ней не было. Для
+события `pull_request` GitHub ищет workflow-файл в дереве PR (merge-дерево:
+head + base). Ни в head, ни в base файла не было, поэтому запускать было
+нечего — отсюда `no checks reported for the pull request`.
+
 ## Причина `no_checks` по PR #68 (TESTEB-65)
 
 Застрявший коммит `766eade4e49a86d4c14791da8d33e735948cfadb` (head ветки
@@ -76,7 +86,64 @@ patch PR #73 меняет файлы внутри `wp/**` и добавляет 
 GitHub не запускает workflow задним числом: появление файла в другой ветке или
 позже в `main` не создаёт прогон для уже существующего неизменённого head PR.
 Нужен либо новый коммит в head (новое событие `pull_request`/`synchronize`),
-либо отдельный прогон, который явно проверит актуальный head PR.
+либо отдельный прогон, который явно проверит застрявший или актуальный коммит.
+
+### PR #62 (TESTEB-63)
+
+Это подтверждается данными API на момент разбора:
+
+* `GET /repos/sarnas-it/ebike-site/commits/578e87b.../actions/runs` —
+  `total_count: 0` (нативного прогона у старого SHA нет и не будет);
+* в дереве `578e87b` нет `.github/workflows`;
+* в `main` на тот момент workflow тоже не было.
+
+### Фактические данные API для SHA отклонённой сдачи (TESTEB-63)
+
+Отклонённая сдача указывала SHA `fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e`.
+К текущей проверке для этого коммита уже есть собственные данные GitHub API:
+
+* `ci` — [#42506679632](https://github.com/sarnas-it/ebike-site/actions/runs/42506679632),
+  `completed/success`, `event=pull_request`, `head_sha=fc1fe23e...`;
+  job `php-lint`, `php-tests`, `php-plugin-tests`, `plugin-tests`,
+  `ci-repair-tests` — все `success`;
+* штатные check runs на `fc1fe23e...` принадлежат check suite `115141962596`
+  этого прогона и имеют `head_sha=fc1fe23e...`;
+* `verify-ci-rollout` — [#42506679696](https://github.com/sarnas-it/ebike-site/actions/runs/42506679696),
+  `completed/success`, зафиксировал `mergeable=true` и отсутствие конфликтов
+  с `main`;
+* опубликованный гейтом комментарий:
+  [#issuecomment-6720902130](https://github.com/sarnas-it/ebike-site/pull/65#issuecomment-6720902130).
+
+Это доказательство относится к конкретному SHA из отклонённой сдачи. Для нового
+коммита `verify-ci-rollout` берёт `TARGET_SHA` из
+`github.event.pull_request.head.sha` и публикует ссылку на прогон и `mergeable`
+уже для нового head; запись выше не может подтвердить другой коммит, потому что
+гейт сравнивает `head_sha` прогона и каждого check run. Пока GitHub
+пересчитывает mergeability, `mergeable` может быть `null`; workflow повторяет
+запрос, пока не получит определённое значение.
+
+### Почему это не противоречит «ci active» и зелёным соседним PR
+
+Workflow `ci` действительно активен, а соседние PR получают зелёные прогоны,
+но не потому, что workflow уже был в `main`. Ветки соседних задач
+(`feat/ebike-site-testeb-15`, `...-44`, `...-50`) сами добавляют
+`.github/workflows/ci.yml` в своё дерево, поэтому в их PR-дереве workflow есть.
+Ветка PR #62 такого файла не добавляла, а `main` в тот момент был пустым. То
+есть «ci active» относится к версиям файла в ветках соседних PR, а не к дереву
+застрявшего коммита. Противоречия нет: отсутствие workflow именно в дереве
+PR #62 — и есть причина.
+
+Остальные возможные причины исключены:
+
+* GitHub Actions в репозитории включены (workflow в соседних ветках
+  запускаются);
+* фильтров по путям и веткам в CI нет: триггер `pull_request` широкий;
+* очередь раннеров и лимит минут не при чём: job на `ubuntu-latest`
+  завершается за секунды, как видно по успешным прогонам;
+* allow-list интеграции содержит `sarnas-it/ebike-site`: PR создавался через
+  интеграцию, и её токен открывает PR в этом репозитории.
+
+### PR #73 (TESTEB-67)
 
 Проверенные данные:
 
@@ -105,6 +172,76 @@ GitHub не запускает workflow задним числом: появле�
 * allow-list интеграции содержит `sarnas-it/ebike-site`, иначе PR #73 не был
   бы создан.
 
+## Фактический результат восстановления PR #62
+
+Постоянные доказательства, снятые с GitHub после recovery-прогона:
+
+| Что | Значение |
+| --- | --- |
+| PR #62 | `closed`, `merged: true`, `merged_at: 2026-11-08T04:03:25Z` |
+| Merge commit | `efe1bc4dac551dc870cec68aff16a973e095dd4f` |
+| Recovery workflow run | [#42445204104](https://github.com/sarnas-it/ebike-site/actions/runs/42445204104) — job `recover` завершился успешно |
+| Проверки на `578e87b` | `php-lint=success`, `php-tests=success`, `plugin-tests=success` (3 check runs + commit status `ci/recover=success`) |
+
+### Как подтверждаются критерии 2 и 3 (PR #65)
+
+Трекер мержит PR #65 только после ACCEPT, поэтому требовать состояние
+`merged: true` до приёмки нельзя: такой гейт был бы красным по определению и
+ничего не доказывал. Доказательством служит не «будущий» мерж, а штатный
+прогон `ci` на **коммите, который сдаётся** — актуальном head PR #65 до мержа
+(обычный workflow run и его check runs, а не синтетические Check Runs API).
+Поэтому:
+
+* `verify-ci-rollout` запускается на самом PR #65 (`pull_request`), а не только
+  на `push` в `main`;
+* workflow фиксирует проверяемый коммит в `TARGET_SHA` из события:
+  `github.event.pull_request.head.sha` для `pull_request` (ровно тот head,
+  который сдаётся). Оба шага — `verify-rollout.mjs` и
+  `publish-rollout-evidence.mjs` — получают этот SHA через `--sha`, а не берут
+  «какой-нибудь текущий head». Для `push` в `main` `TARGET_SHA` пустой, и гейт
+  сам выбирает коммит, который реально лёг в базовую ветку: merge commit PR #65
+  после мержа (до мержа — head PR #65), поэтому более поздний push в `main` не
+  ломает уже зафиксированное доказательство;
+* гейт `scripts/ci/verify-rollout.mjs` зелёный, когда PR #65 открыт,
+  `mergeable=true` и нет конфликтов с `main`, а прогон `ci` на этом
+  зафиксированном коммите завершился успешно со всеми job; после мержа тот же
+  гейт проверяет **merge commit** и требует успешный прогон `ci` уже на нём;
+* успешный прогон на другом (например, более старом) коммите не принимается:
+  `head_sha` прогона, `head_sha` каждого check run и `TARGET_SHA` должны
+  совпадать, поэтому зелёный прогон прошлой сдачи или recovery-прогон PR #62 не
+  может подтвердить сдаваемый head PR #65; check run без `head_sha` тоже
+  отвергается — без явного коммита он не
+  доказывает ни один сдаваемый SHA и не может подменить запись с другого
+  коммита;
+* штатный check run должен принадлежать именно check suite проверяемого
+  прогона `ci` (сравниваются `check_suite_id` прогона и check run). Совпадение
+  ссылки `details_url` на run без совпадения suite доказательством не является;
+* workflow `.github/workflows/ci.yml` читается из дерева head PR #65 до мержа и
+  из `main` после него — именно оттуда GitHub берёт его для прогона.
+
+Единственный надёжный момент, когда прогон `ci` на сдаваемом коммите уже
+существует, — это сам PR #65: любой новый push создаёт событие
+`pull_request`/`synchronize`, а значит и новый прогон на новом head. После
+мержа очередь трекера создаёт `push` в `main`, поэтому появляется прогон уже на
+merge commit. Ссылка на run, его `head_sha`, список job, штатные check runs и
+состояние PR (`mergeable`, `mergeable_state`, `merged`, merge commit)
+фиксируются в выводе гейта, в `$GITHUB_STEP_SUMMARY`, в обычном check run
+`verify-ci-rollout` и в комментарии `<!-- testeb-63-rollout -->`. Поэтому
+приёмка всегда сверяется с фактическим проверяемым коммитом (head до мержа,
+merge commit после), а не с захардкоженным SHA из документации. До ACCEPT
+состояние `merged` в комментарии — `false`, а `Merge commit` — `none`; это
+ожидаемо, потому что мерж выполняет очередь трекера. После мержа workflow на
+`push` в `main` обновляет тот же комментарий, и в нём появляются
+`merged=true` и фактический merge commit.
+
+Нативного `actions/runs` у старого SHA по-прежнему `0`: GitHub не создаёт
+прогоны ретроспективно. Поэтому проверки на `578e87b` опубликованы
+recovery-workflow, который реально выкачал этот SHA и прогнал на нём
+`scripts/ci/run-checks.sh`. Чтобы такие check runs не принимались «на веру»,
+добавлен строгий evidence-гейт: зелёные check runs считаются доказательством
+только вместе с завершившимся успехом recovery-workflow run, который их
+породил.
+
 ## Что исправлено
 
 ### 1. Обычный CI для будущих PR
@@ -127,7 +264,102 @@ GitHub не запускает workflow задним числом: появле�
 После мержа этой починки в `main` файл `.github/workflows/ci.yml` окажется в
 базовой ветке, и новые PR будут получать реальные прогоны.
 
-### 2. Recovery для уже застрявшего PR #73
+Готовность починки (критерии 2 и 3) и успешный прогон CI именно на реальном
+head-коммите PR #65 проверяются red-green гейтом
+`scripts/ci/verify-rollout.mjs`. Гейт возвращает код 1, пока не выполнено хотя
+бы одно условие:
+
+* PR [#65](https://github.com/sarnas-it/ebike-site/pull/65) нацелен в `main` и
+  либо открыт с `mergeable=true` без конфликтов, либо уже смержен (тогда есть
+  merge commit);
+* `.github/workflows/ci.yml` присутствует в дереве head PR #65 (до мержа) или в
+  `main` (после мержа);
+* прогон `ci` на **сдаваемом коммите** (`TARGET_SHA`: head PR #65 до мержа,
+  merge commit после) завершился успешно, а не прогон на каком-то другом,
+  более старом SHA;
+* в прогоне присутствуют все job: `php-lint`, `php-tests`,
+  `php-plugin-tests`, `plugin-tests`, `ci-repair-tests`, и каждая завершилась
+  успешно;
+* на этом же проверяемом коммите есть **штатные check runs** этих job,
+  привязанные к check suite проверяемого прогона `ci`, и их `head_sha` равен
+  `TARGET_SHA`. Зелёные check runs, созданные через Checks API в обход
+  workflow (например, recovery-скриптом), принадлежащие другому check suite
+  или не содержащие `head_sha`, гейт не принимает: они не доказывают, что
+  workflow отработал на этом коммите.
+
+`.github/workflows/verify-ci-rollout.yml` запускает этот гейт на самом PR #65
+(`pull_request`), на каждый `push` в `main` и вручную. Прогон на `pull_request`
+и есть штатное доказательство критерия 2: он прикрепляет обычный check run
+`verify-ci-rollout` к сдаваемому head PR #65 и проверяет прогон `ci` на этом
+же SHA. Мерж до ACCEPT не требуется, потому что его выполняет очередь трекера;
+после мержа гейт остаётся зелёным и дополнительно подтверждает прогон `ci` и
+штатные check runs уже на merge commit.
+Успешный прогон на другом (старом) SHA гейт не принимает, поэтому, например,
+зелёный прогон на любом предыдущем коммите PR #65 или recovery-прогон PR #62 не
+может подтвердить сдаваемый head PR #65. SHA берётся из события запуска
+(`TARGET_SHA`) и передаётся `--sha`, поэтому доказательство всегда относится
+именно к тому коммиту, который сдаётся, а не к предыдущей сдаче.
+
+#### Доказательство привязано к сдаваемому коммиту
+
+В репозитории намеренно нет захардкоженного прогона или SHA PR #65 в роли
+доказательства: такой SHA устаревает при следующем push. Единственный источник
+истины — комментарий `<!-- testeb-63-rollout -->` на PR #65 и артефакт
+`rollout-evidence`, которые workflow `verify-ci-rollout` заново формирует для
+`TARGET_SHA` из события. Поэтому в отчёте о сдаче нужно ссылаться на прогон
+`ci` и этот комментарий для того же SHA, что указан в сдаче.
+
+Запись отклонённого head, на которой работают red-green тесты, лежит в
+`scripts/ci/tests/fixtures/pr65-rejected-head-recording.json`. Это только вход
+тестов: ни документация, ни тесты не выдают её за доказательство текущей
+сдачи.
+
+Источник истины для критериев 2 и 3 — не захардкоженный SHA в документации, а
+штатный прогон `verify-ci-rollout` на событии `pull_request` для **актуального**
+head. Он берёт `TARGET_SHA` из `github.event.pull_request.head.sha`, передаёт
+его в `verify-rollout.mjs`/`publish-rollout-evidence.mjs`, сравнивает с ним
+`head_sha` прогона `ci` и каждого check run и только при совпадении публикует
+комментарий `<!-- testeb-63-rollout -->` и артефакт `rollout-evidence`. Любой
+следующий push сдвигает head и заново прогоняет этот гейт, поэтому любой
+зафиксированный ранее коммит (включая запись отклонённого head) не может
+подтвердить другой, более новый сдаваемый коммит: гейт отвергает прогон и check
+runs на чужом SHA.
+
+После зелёного гейта шаг `publish-rollout-evidence.mjs` создаёт или обновляет
+один идемпотентный комментарий на PR #65 (`<!-- testeb-63-rollout -->`) со
+ссылкой на штатный run, его `head_sha`, списком job, штатными check runs,
+состоянием `mergeable`/конфликтов и merge commit (если PR уже смержен).
+Комментарий привязан к фактическому head на момент прогона и не публикуется,
+пока доказательства красные. Тот же текст сохраняется как артефакт workflow
+`rollout-evidence`, поэтому состояние `merged`/merge commit и ссылка на run
+зафиксированы не только в редактируемом комментарии. До ACCEPT PR #65 ещё не
+смержен, поэтому `merge commit` в нём `none`; после мержа тот же workflow
+перезапускается на `main`, гейт читает workflow из базовой ветки и записывает
+фактический merge commit.
+
+### 2. Recovery для уже застрявшего PR #62
+
+`.github/workflows/recover-pr62.yml` запускается на `push` и вручную и:
+
+1. выкачивает **ровно коммит**
+   `578e87b5a8587d6078aade92d26bd449448dd1d3` (`git rev-parse HEAD`
+   сверяется с `TARGET_SHA`);
+2. прогоняет на нём те же проверки через общий
+   `scripts/ci/run-checks.sh` (`php-lint`, `php-tests`, `plugin-tests`);
+3. публикует результаты как check runs с именами `php-lint`, `php-tests`,
+   `plugin-tests` и commit status `ci/recover` **на этот же SHA**;
+4. завершает отложенный мерж PR #62 (если он ещё открыт и head всё ещё равен
+   проверенному коммиту);
+5. запускает `scripts/ci/publish-evidence.mjs`, который проверяет реальный
+   успешный workflow run, зелёные проверки на целевом SHA и наличие merge
+   commit, после чего создаёт **или обновляет** один идемпотентный комментарий
+   к PR #62 с фактическими ссылками на run, проверки и merge commit. Черновик
+   больше не публикуется «как есть»: текст дополняется данными из API.
+
+`run-name` recovery-прогона содержит целевой SHA, поэтому прогон можно
+однозначно сопоставить с проверяемым коммитом.
+
+### 3. Recovery для уже застрявшего PR #73
 
 `.github/workflows/recover-pr73.yml` запускается на `push` и вручную и:
 
@@ -229,18 +461,34 @@ GitHub не запускает workflow задним числом: появле�
 `verify-recovery.mjs` из раздела ниже, а опубликованный текст комментария
 хранится в `docs/testeb-67-task-comment.md`.
 
+
 ## Как проверить
 
 ```bash
 # диагностика: код 1, пока у коммита нет успешных проверок (red)
 node scripts/ci/diagnose-pr-checks.mjs \
+  --repo sarnas-it/ebike-site --pr 62 \
+  --sha 578e87b5a8587d6078aade92d26bd449448dd1d3
+
+# после recovery: реальный успешный run + зелёные проверки + merge (green)
+node scripts/ci/verify-recovery.mjs \
+  --repo sarnas-it/ebike-site --pr 62 \
+  --sha 578e87b5a8587d6078aade92d26bd449448dd1d3 \
+  --run-id 42445204104
+
+# критерии 2 и 3: CI на сдаваемом коммите PR #65 успешен, PR готов к автомержу
+# (green). Workflow передаёт сюда TARGET_SHA события; вручную можно проверить
+# конкретный коммит:
+node scripts/ci/verify-rollout.mjs \
+  --repo sarnas-it/ebike-site --pr 65 \
+  --sha <сдаваемый head-коммит PR #65>
+
+# диагностика PR #73 и проверка recovery. Без --sha проверяется актуальный
+# head PR #73, поэтому уехавший head не подменяется старым SHA из инцидента.
+# Без --run-id точный recovery-прогон берётся из commit status ci/recover.
+node scripts/ci/diagnose-pr-checks.mjs \
   --repo sarnas-it/ebike-site --pr 73 \
   --sha 525b0d4803e03858cdb0bfce9cb90837bdf0473e
-
-# после recovery: реальный успешный run + зелёные проверки + merge (green).
-# Без --sha проверяется актуальный head PR #73, поэтому уехавший head не
-# подменяется старым SHA из инцидента. Без --run-id точный recovery-прогон
-# берётся из commit status ci/recover на проверяемом коммите.
 node scripts/ci/verify-recovery.mjs \
   --repo sarnas-it/ebike-site --pr 73
 # фактический результат для PR #73:
@@ -251,14 +499,36 @@ node scripts/ci/verify-recovery.mjs \
 `verify-recovery.mjs` возвращает код 1, пока нет завершившегося успешного
 recovery-прогона, у коммита нет зелёных check runs, нет `ci/recover`-статуса
 со ссылкой на этот прогон или отсутствует merge commit. Это red-green гейт для
-восстановления PR #73. Без `--sha` гейт сам берёт актуальный head PR, а `--sha`
-позволяет явно закрепить коммит.
+восстановления PR #62 и PR #73. Без `--sha` гейт сам берёт актуальный head PR,
+а `--sha` позволяет явно закрепить коммит.
 
-Ручной запуск recovery (если нужно повторить). Сначала разрешите актуальный
-head, затем проверьте и смержите именно его:
+`verify-rollout.mjs` возвращает код 1, пока PR #65 не нацелен в `main`, не
+готов к автомержу (открыт с конфликтами или закрыт без мержа), файла
+`.github/workflows/ci.yml` нет в дереве head (или в `main` после мержа),
+прогон `ci` на проверяемом коммите (`--sha`/`TARGET_SHA`) не успешен, в нём
+нет полного набора job, он относится к другому SHA, а также если штатные
+check runs этого прогона привязаны к другому коммиту или другому check suite.
+Это red-green гейт именно для критериев «починка в PR #65 и CI на её
+сдаваемом head успешен» и «PR готов к автомержу».
+
+Ручной запуск recovery (если нужно повторить):
 
 ```bash
 export GITHUB_TOKEN=<токен с правами contents:write, checks:write, statuses:write, pull-requests:write>
+node scripts/ci/recover-pr.mjs \
+  --repo sarnas-it/ebike-site --pr 62 \
+  --sha 578e87b5a8587d6078aade92d26bd449448dd1d3 \
+  --results <checks.json> --details-url <url запуска>
+
+# обновить комментарий фактическими доказательствами (PR #62)
+node scripts/ci/publish-evidence.mjs \
+  --repo sarnas-it/ebike-site --pr 62 \
+  --sha 578e87b5a8587d6078aade92d26bd449448dd1d3 \
+  --run-id <id recovery-прогона> \
+  --comment-file docs/testeb-63-comment.md \
+  --comment-marker '<!-- testeb-63-recovery -->'
+
+# PR #73: сначала разрешите актуальный head, затем проверьте и смержите именно его
 node scripts/ci/resolve-pr-target.mjs \
   --repo sarnas-it/ebike-site --pr 73 \
   --expected-sha 525b0d4803e03858cdb0bfce9cb90837bdf0473e
@@ -267,7 +537,7 @@ node scripts/ci/recover-pr.mjs \
   --sha <resolved head sha> \
   --results <checks.json> --details-url <url запуска>
 
-# обновить комментарий фактическими доказательствами
+# обновить комментарий фактическими доказательствами (PR #73)
 node scripts/ci/publish-evidence.mjs \
   --repo sarnas-it/ebike-site --pr 73 \
   --sha <resolved head sha> \
@@ -295,7 +565,9 @@ bash scripts/ci/run-checks.sh .
   доказательствах комментарий обновляется (PATCH), а не дублируется, и
   содержит ссылку на run/id, список проверок и merge commit; старый блок
   доказательств заменяется, а не дублируется; при red доказательствах ничего
-  не публикуется.
+  не публикуется. Зелёные check runs без `ci/recover`-статуса со ссылкой на
+  recovery-прогон считаются red, а прогон, не связанный с этим статусом, не
+  принимается.
 * `scripts/ci/tests/resolve-pr-target.test.mjs` — red-green тест: recovery
   берёт актуальный head PR, даже если SHA из инцидента уже уехал, и помечает
   дрейф; PR без head SHA отклоняется.
@@ -306,15 +578,18 @@ bash scripts/ci/run-checks.sh .
   старый in-progress блок доказательств финальным `completed/success` с
   ссылкой на run и merge commit.
 * `scripts/ci/tests/workflow-triggers.test.mjs` — фикстура без
-  `pull_request` детектируется как сломанная; фикстура recovery без `push`,
-  нужных write-прав, checkout актуального head и `run-name` с целевым PR
-  детектируется как сломанная; реальные `ci.yml`, `recover-pr73.yml` и
-  `finalize-pr73-evidence.yml` проходят. Дополнительно проверяется отсутствие
-  `paths`-фильтра, динамическое разрешение head вместо зашитого SHA, отказ
-  recovery от хрупкого `workflow_dispatch` финализатора, отказ публиковать
-  `in_progress`, кавычки вокруг `name`/`run-name` с `#73`, push-триггер и
-  поиск recovery-прогона по SHA в финализаторе, исполнение PHP-контрактов
-  плагина в CI и полный набор проверок в `run-checks.sh`.
+  `pull_request` детектируется как сломанная; фикстуры recovery без `push`,
+  нужных write-прав, точного checkout по `TARGET_SHA`/актуального head и
+  `run-name` детектируются как сломанные; реальные `ci.yml`,
+  `recover-pr62.yml`, `recover-pr73.yml` и `finalize-pr73-evidence.yml`
+  проходят. Дополнительно проверяется отсутствие `paths`-фильтра,
+  динамическое разрешение head вместо зашитого SHA, отказ recovery от
+  хрупкого `workflow_dispatch` финализатора, отказ публиковать `in_progress`,
+  кавычки вокруг `name`/`run-name` с `#73`, push-триггер и поиск
+  recovery-прогона по SHA в финализаторе, исполнение PHP-контрактов плагина в
+  CI, запуск rollout-гейта на PR #65 с `TARGET_SHA`, передача `--sha` в
+  verify/publish, артефакт evidence и полный набор проверок в
+  `run-checks.sh`.
 * `scripts/ci/tests/recover-pr.test.mjs` — пустой/упавший набор проверок не
   даёт мержа, успешный даёт; проверяется, что check runs публикуются именно на
   целевой SHA, что recovery мержит разрешённый актуальный head после дрейфа,
@@ -330,6 +605,37 @@ bash scripts/ci/run-checks.sh .
   приёмочная PHP-команда действительно исполняется.
 * `scripts/ci/tests/repair-pr-checks.test.mjs` — починка целится в head PR, а
   не в отдельную задачную ветку.
+* `scripts/ci/tests/rollout.test.mjs` — открытый PR #65 с
+  `mergeable=true` без конфликтов и полным зелёным прогоном `ci` на реальном
+  head даёт green (готов к автомержу, мерж до ACCEPT не требуется); тот же PR
+  после мержа тоже green. Конфликты/`mergeable=false`, закрытый без мержа PR,
+  неверная базовая ветка, отсутствие `ci.yml` в дереве head, прогон на старом
+  коммите (при другом текущем head) или от чужого workflow,
+  упавший/незавершённый прогон и отсутствующий/упавший job дают red.
+  Отдельно проверяется стандартность check runs: зелёные check runs с теми же
+  именами, но из чужого check suite/другого run (синтетические через Checks
+  API), отсутствующий или упавший штатный check run дают red. Отдельные
+  red-green тесты закрывают замечание ревьюера: check run из другого check
+  suite не принимается, даже если его `details_url` ссылается на проверяемый
+  прогон `ci` (до исправления он проходил по ссылке), а check run, привязанный
+  к другому коммиту (например, к отклонённому head вместо нового сдаваемого
+  head), даёт red. Отдельный red-green тест
+  запрещает подмену: check run без `head_sha` не имеет привязки к коммиту и
+  раньше принимался, а теперь даёт red, поэтому запись с другого коммита нельзя
+  выдать за доказательство сдаваемого SHA. Ещё один red-green тест
+  воспроизводит именно замечание ревьюера: запись прогона/check runs, снятая
+  на отклонённом коммите, не принимается для более нового сдаваемого head.
+  Проверяется и выбор последнего прогона: новый упавший прогон не маскируется
+  старым успешным. Evidence-комментарий привязан к реальному head, обновляется
+  идемпотентно, содержит штатные check runs и merge commit и не публикуется при
+  красных доказательствах или старом SHA.
+* `scripts/ci/tests/workflow-triggers.test.mjs` дополнительно требует, чтобы
+  `verify-ci-rollout` запускался на самом PR #65 (`pull_request`), фиксировал
+  `TARGET_SHA` из `pull_request.head.sha` и передавал его через `--sha` и в
+  `verify-rollout.mjs`, и в `publish-rollout-evidence.mjs`, а не проверял
+  «какой-нибудь» текущий head. Для `push` коммит выбирается автоматически
+  (merge commit после мержа), чтобы последующие push в `main` не превращали
+  доказательство в красное.
 
 ## Причина `unknown` по PR #78 (TESTEB-68)
 
