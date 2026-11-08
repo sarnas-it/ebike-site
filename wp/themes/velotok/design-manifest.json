@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "default": "classic",
+  "variants": {
+    "classic": {
+      "label": "Классический",
+      "description": "Базовая палитра «Велоток»: тёплый фон, тёмно-зелёный текст и лаймовый акцент.",
+      "stylesheet": ""
+    },
+    "contrast": {
+      "label": "Высокий контраст",
+      "description": "Усиленный контраст текста, границ и фокуса для покупателей со слабым зрением.",
+      "stylesheet": "assets/css/variants/contrast.css"
+    },
+    "warm": {
+      "label": "Тёплая",
+      "description": "Более мягкая песочная палитра с медным акцентом для сезонных витрин.",
+      "stylesheet": "assets/css/variants/warm.css"
+    }
+  }
+}
