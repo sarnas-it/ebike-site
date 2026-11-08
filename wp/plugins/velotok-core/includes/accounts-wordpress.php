@@ -210,6 +210,47 @@ function velotok_core_wp_is_existing_email_error( $error ) {
 }
 
 /**
+ * Build the registration result for an already registered email.
+ *
+ * No new account is created. The visitor is routed to the existing login flow
+ * with a generic message that does not confirm whether the account exists.
+ *
+ * @param array       $result   Base registration result.
+ * @param object|null $user     Existing user when known.
+ * @param array       $contract Accounts contract.
+ * @return array<string,mixed>
+ */
+function velotok_core_wp_existing_email_result( $result, $user, $contract ) {
+	$login_url = velotok_core_wp_login_url();
+	$user_id   = velotok_core_wp_user_id( $user );
+	$status    = null;
+
+	if ( $user_id > 0 ) {
+		$status = velotok_core_wp_user_confirmed( $user_id ) ? 'active' : 'pending';
+	}
+
+	return array_merge(
+		$result,
+		array(
+			'valid'                 => true,
+			'registered'            => false,
+			'existing_user'         => true,
+			'login_required'        => true,
+			'confirmation_required' => false,
+			'email_sent'            => true,
+			'next_step'             => 'login',
+			'login_url'             => $login_url,
+			'redirect_url'          => $login_url,
+			'redirected'            => false,
+			'existing_email_strategy' => 'login',
+			'message'               => $contract['privacy']['generic_registration_message'],
+			'user_id'               => $user_id,
+			'status'                => $status,
+		)
+	);
+}
+
+/**
  * Mark whether the plugin is creating a customer in its own registration flow.
  *
  * WooCommerce fires `woocommerce_created_customer` for every customer created
@@ -352,6 +393,10 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		'status'                => null,
 		'confirmation_token'    => null,
 		'next_step'             => null,
+		'login_url'             => '',
+		'redirect_url'          => '',
+		'redirected'            => false,
+		'existing_email_strategy' => 'login',
 		'code'                  => null,
 		'error'                 => null,
 		'message'               => '',
@@ -367,17 +412,7 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 	$existing = velotok_core_wp_find_user_by_email( $email );
 
 	if ( null !== $existing ) {
-		return array_merge(
-			$result,
-			array(
-				'valid'          => true,
-				'existing_user'  => true,
-				'login_required' => true,
-				'email_sent'     => true,
-				'next_step'      => 'login',
-				'message'        => $contract['privacy']['generic_registration_message'],
-			)
-		);
+		return velotok_core_wp_existing_email_result( $result, $existing, $contract );
 	}
 
 	$previous_suppress = velotok_core_wp_suppress_customer_created_hook( true );
@@ -388,17 +423,7 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		$existing = velotok_core_wp_find_user_by_email( $email );
 
 		if ( null !== $existing || velotok_core_wp_is_existing_email_error( $user_id ) ) {
-			return array_merge(
-				$result,
-				array(
-					'valid'          => true,
-					'existing_user'  => true,
-					'login_required' => true,
-					'email_sent'     => true,
-					'next_step'      => 'login',
-					'message'        => $contract['privacy']['generic_registration_message'],
-				)
-			);
+			return velotok_core_wp_existing_email_result( $result, $existing, $contract );
 		}
 
 		return array_merge(
@@ -571,6 +596,21 @@ function velotok_core_wp_account_url() {
 	}
 
 	return function_exists( 'home_url' ) ? home_url( '/account/' ) : '/account/';
+}
+
+/**
+ * Return the login URL used when an existing email is submitted at registration.
+ *
+ * @return string
+ */
+function velotok_core_wp_login_url() {
+	$url = velotok_core_wp_account_url();
+
+	if ( '' === (string) $url ) {
+		return '/account/login/';
+	}
+
+	return $url;
 }
 
 /**
