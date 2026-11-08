@@ -1,0 +1,81 @@
+TESTEB-2: Регистрация SHALL требовать подтверждения email
+================================================================
+
+Files changed for this requirement:
+
+- wp/plugins/velotok-core/includes/accounts.php
+- wp/plugins/velotok-core/includes/accounts-wordpress.php
+- wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
+- wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
+- verify.log
+
+The stub and the WordPress/WooCommerce bridge now share
+velotok_core_account_registration_options(): registration strips caller-supplied
+confirmation state (email_confirmed, email_verified, confirmed, status,
+account_status, authenticated, logged_in, session_token) before creating the
+account. A new account is therefore always persisted as pending/unconfirmed and
+cannot log in or open the personal area until the emailed token is confirmed.
+
+Mandatory check command (raw output, current workspace):
+
+$ php wp/plugins/velotok-core/tests/accounts-contract-test.php
+PASS: контракт аккаунтов выполняется.
+exit code: 0
+
+New focused TESTEB-2 regression test (raw output):
+
+$ php wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
+PASS: регистрация требует подтверждения email независимо от переданных опций (TESTEB-2).
+exit code: 0
+
+PHP red-green proof. The red-green test builds two broken copies of
+includes/accounts-wordpress.php: one stores the account as already confirmed
+(status active) and one does not send the confirmation email. It then runs the
+focused test, the new registration test and the mandatory contract test against
+both broken copies (all must fail) and against the real integration (all must
+pass).
+
+$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
+PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
+exit code: 0
+
+Additional accounts checks (raw output):
+
+$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-wp-test.php
+PASS: WordPress-регистрация требует подтверждения email (TESTEB-2).
+exit code: 0
+
+$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-test.php
+PASS: регистрация требует подтверждения email (TESTEB-2).
+exit code: 0
+
+$ php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
+PASS: WordPress-интеграция аккаунтов выполняется.
+exit code: 0
+
+$ node wp/plugins/velotok-core/tests/accounts-contract.test.js
+PASS: accounts contract and PHP behavior test passed
+exit code: 0
+
+$ node wp/plugins/velotok-core/tests/accounts-redgreen.test.js
+PASS: accounts contract test fails without email confirmation and passes with it
+exit code: 0
+
+$ node wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
+PASS: WordPress accounts integration is persistent and the test fails without email confirmation or customer persistence
+exit code: 0
+
+$ node wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen.test.js
+PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
+exit code: 0
+
+PHP syntax checks:
+
+$ php -l wp/plugins/velotok-core/includes/accounts.php
+No syntax errors detected in wp/plugins/velotok-core/includes/accounts.php
+$ php -l wp/plugins/velotok-core/includes/accounts-wordpress.php
+No syntax errors detected in wp/plugins/velotok-core/includes/accounts-wordpress.php
+$ php -l wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
+No syntax errors detected in wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
+$ php -l wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
+No syntax errors detected in wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
