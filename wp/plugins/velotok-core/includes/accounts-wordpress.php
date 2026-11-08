@@ -40,6 +40,10 @@ if ( ! defined( 'VELOTOK_ACCOUNT_TOKEN_META' ) ) {
 	define( 'VELOTOK_ACCOUNT_TOKEN_META', '_velotok_confirmation_token' );
 }
 
+if ( ! defined( 'VELOTOK_ACCOUNT_PENDING_CART_META' ) ) {
+	define( 'VELOTOK_ACCOUNT_PENDING_CART_META', '_velotok_pending_guest_cart' );
+}
+
 /**
  * Whether the runtime exposes a persistent user storage API.
  *
@@ -210,6 +214,47 @@ function velotok_core_wp_is_existing_email_error( $error ) {
 }
 
 /**
+ * Build the registration result for an already registered email.
+ *
+ * No new account is created. The visitor is routed to the existing login flow
+ * with a generic message that does not confirm whether the account exists.
+ *
+ * @param array       $result   Base registration result.
+ * @param object|null $user     Existing user when known.
+ * @param array       $contract Accounts contract.
+ * @return array<string,mixed>
+ */
+function velotok_core_wp_existing_email_result( $result, $user, $contract ) {
+	$login_url = velotok_core_wp_login_url();
+	$user_id   = velotok_core_wp_user_id( $user );
+	$status    = null;
+
+	if ( $user_id > 0 ) {
+		$status = velotok_core_wp_user_confirmed( $user_id ) ? 'active' : 'pending';
+	}
+
+	return array_merge(
+		$result,
+		array(
+			'valid'                 => true,
+			'registered'            => false,
+			'existing_user'         => true,
+			'login_required'        => true,
+			'confirmation_required' => false,
+			'email_sent'            => true,
+			'next_step'             => 'login',
+			'login_url'             => $login_url,
+			'redirect_url'          => $login_url,
+			'redirected'            => false,
+			'existing_email_strategy' => 'login',
+			'message'               => $contract['privacy']['generic_registration_message'],
+			'user_id'               => $user_id,
+			'status'                => $status,
+		)
+	);
+}
+
+/**
  * Mark whether the plugin is creating a customer in its own registration flow.
  *
  * WooCommerce fires `woocommerce_created_customer` for every customer created
@@ -332,11 +377,21 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		$email    = isset( $request['email'] ) ? $request['email'] : '';
 		$password = isset( $request['password'] ) ? $request['password'] : '';
 		$options  = isset( $request['options'] ) && is_array( $request['options'] ) ? $request['options'] : $options;
+
+		if ( ! is_array( $options ) ) {
+			$options = array();
+		}
+
+		if ( isset( $request['guest_cart'] ) ) {
+			$options['guest_cart'] = $request['guest_cart'];
+		}
+
+		if ( isset( $request['user_cart'] ) ) {
+			$options['user_cart'] = $request['user_cart'];
+		}
 	}
 
-	if ( ! is_array( $options ) ) {
-		$options = array();
-	}
+	$options = velotok_core_account_registration_options( $options );
 
 	$email = velotok_core_wp_normalize_email( $email );
 
@@ -354,6 +409,10 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		'status'                => null,
 		'confirmation_token'    => null,
 		'next_step'             => null,
+		'login_url'             => '',
+		'redirect_url'          => '',
+		'redirected'            => false,
+		'existing_email_strategy' => 'login',
 		'code'                  => null,
 		'error'                 => null,
 		'message'               => '',
@@ -369,17 +428,7 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 	$existing = velotok_core_wp_find_user_by_email( $email );
 
 	if ( null !== $existing ) {
-		return array_merge(
-			$result,
-			array(
-				'valid'          => true,
-				'existing_user'  => true,
-				'login_required' => true,
-				'email_sent'     => true,
-				'next_step'      => 'login',
-				'message'        => $contract['privacy']['generic_registration_message'],
-			)
-		);
+		return velotok_core_wp_existing_email_result( $result, $existing, $contract );
 	}
 
 	$previous_suppress = velotok_core_wp_suppress_customer_created_hook( true );
@@ -390,17 +439,7 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		$existing = velotok_core_wp_find_user_by_email( $email );
 
 		if ( null !== $existing || velotok_core_wp_is_existing_email_error( $user_id ) ) {
-			return array_merge(
-				$result,
-				array(
-					'valid'          => true,
-					'existing_user'  => true,
-					'login_required' => true,
-					'email_sent'     => true,
-					'next_step'      => 'login',
-					'message'        => $contract['privacy']['generic_registration_message'],
-				)
-			);
+			return velotok_core_wp_existing_email_result( $result, $existing, $contract );
 		}
 
 		return array_merge(
@@ -423,6 +462,10 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		update_user_meta( $user_id, VELOTOK_ACCOUNT_CONFIRMED_META, '0' );
 		update_user_meta( $user_id, VELOTOK_ACCOUNT_STATUS_META, 'pending' );
 		update_user_meta( $user_id, VELOTOK_ACCOUNT_TOKEN_META, $token );
+
+		if ( isset( $options['guest_cart'] ) && is_array( $options['guest_cart'] ) ) {
+			update_user_meta( $user_id, VELOTOK_ACCOUNT_PENDING_CART_META, $options['guest_cart'] );
+		}
 	}
 
 	$sent = velotok_core_wp_send_confirmation_email( $email, $token, $user_id );
@@ -576,6 +619,21 @@ function velotok_core_wp_account_url() {
 }
 
 /**
+ * Return the login URL used when an existing email is submitted at registration.
+ *
+ * @return string
+ */
+function velotok_core_wp_login_url() {
+	$url = velotok_core_wp_account_url();
+
+	if ( '' === (string) $url ) {
+		return '/account/login/';
+	}
+
+	return $url;
+}
+
+/**
  * Return the registration page URL.
  *
  * @param array $args Optional query arguments.
@@ -635,6 +693,19 @@ function velotok_core_wp_confirm_email( $token_or_email = '', $token = '', $opti
 		delete_user_meta( $user_id, VELOTOK_ACCOUNT_TOKEN_META );
 	}
 
+	/*
+	 * A guest cart captured at registration is carried through the mandatory
+	 * email confirmation step. The cart is merged and the visitor is sent to
+	 * checkout once the account is confirmed.
+	 */
+	if ( empty( $options['guest_cart'] ) && function_exists( 'get_user_meta' ) ) {
+		$pending_cart = get_user_meta( $user_id, VELOTOK_ACCOUNT_PENDING_CART_META, true );
+
+		if ( is_array( $pending_cart ) && ! empty( $pending_cart ) ) {
+			$options['guest_cart'] = $pending_cart;
+		}
+	}
+
 	if ( function_exists( 'wp_set_current_user' ) ) {
 		wp_set_current_user( $user_id );
 	}
@@ -645,6 +716,10 @@ function velotok_core_wp_confirm_email( $token_or_email = '', $token = '', $opti
 
 	$transfer = velotok_core_wp_transfer_guest_cart( $options );
 	$redirect = velotok_core_wp_checkout_redirect( $transfer, $user_id, $options );
+
+	if ( function_exists( 'delete_user_meta' ) ) {
+		delete_user_meta( $user_id, VELOTOK_ACCOUNT_PENDING_CART_META );
+	}
 
 	$result = array(
 		'valid'           => true,
