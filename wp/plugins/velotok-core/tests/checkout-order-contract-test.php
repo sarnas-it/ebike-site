@@ -124,6 +124,8 @@ velotok_checkout_assert( isset( $contract['nonce']['server_side'] ) && true === 
 velotok_checkout_assert( isset( $contract['auth']['required'] ) && true === $contract['auth']['required'], 'Оформление должно требовать авторизации.' );
 velotok_checkout_assert( isset( $contract['auth']['guest_checkout'] ) && false === $contract['auth']['guest_checkout'], 'Гостевое оформление должно быть запрещено.' );
 velotok_checkout_assert( isset( $contract['cart']['empty_code'] ) && 'CHECKOUT_EMPTY_CART' === $contract['cart']['empty_code'], 'Пустая корзина должна блокировать оформление.' );
+velotok_checkout_assert( isset( $contract['cart']['requirement'] ) && 'TESTEB-27' === $contract['cart']['requirement'], 'Раздел корзины должен ссылаться на TESTEB-27.' );
+velotok_checkout_assert( isset( $contract['requirement_ids'] ) && in_array( 'TESTEB-27', $contract['requirement_ids'], true ), 'Контракт должен ссылаться на TESTEB-27.' );
 velotok_checkout_assert( isset( $contract['requirement_ids'] ) && in_array( 'TESTEB-26', $contract['requirement_ids'], true ), 'Контракт должен ссылаться на TESTEB-26.' );
 velotok_checkout_assert( isset( $contract['idempotency']['requirement'] ) && 'TESTEB-26' === $contract['idempotency']['requirement'], 'Раздел идемпотентности должен ссылаться на TESTEB-26.' );
 velotok_checkout_assert( isset( $contract['idempotency']['prevents_duplicate'] ) && true === $contract['idempotency']['prevents_duplicate'], 'Повторная отправка не должна создавать дубль.' );

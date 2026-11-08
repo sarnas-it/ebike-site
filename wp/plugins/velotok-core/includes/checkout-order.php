@@ -17,7 +17,7 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 			'parent_spec'     => 'ecommerce-store',
 			'requirement'     => 'TESTEB-23',
 			'task'            => 'TESTEB-23',
-			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-26' ),
+			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-26', 'TESTEB-27' ),
 			'provider'        => 'woocommerce',
 			'provider_label'  => 'WooCommerce',
 			'checkout_class'  => 'WC_Checkout',
@@ -41,9 +41,10 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 				'message'        => 'Оформление заказа доступно только авторизованным покупателям.',
 			),
 			'cart'            => array(
-				'required'   => true,
-				'empty_code' => 'CHECKOUT_EMPTY_CART',
-				'message'    => 'Нельзя оформить заказ с пустой корзиной.',
+				'requirement' => 'TESTEB-27',
+				'required'    => true,
+				'empty_code'  => 'CHECKOUT_EMPTY_CART',
+				'message'     => 'Нельзя оформить заказ с пустой корзиной.',
 			),
 			'validation'      => array(
 				'server_side'    => true,
@@ -267,6 +268,26 @@ if ( ! function_exists( 'velotok_core_checkout_cart_is_empty' ) ) {
 	function velotok_core_checkout_cart_is_empty( $context = array() ) {
 		if ( array_key_exists( 'cart_empty', $context ) ) {
 			return velotok_core_checkout_bool( $context['cart_empty'], true );
+		}
+
+		$cart = velotok_core_checkout_value( $context, array( 'cart_items', 'line_items', 'cart' ), null );
+
+		if ( null === $cart && function_exists( 'WC' ) ) {
+			$woocommerce = WC();
+
+			if ( is_object( $woocommerce ) && isset( $woocommerce->cart ) ) {
+				$cart = $woocommerce->cart;
+			}
+		}
+
+		if ( is_object( $cart ) ) {
+			if ( method_exists( $cart, 'is_empty' ) ) {
+				return (bool) $cart->is_empty();
+			}
+
+			if ( method_exists( $cart, 'get_cart_contents_count' ) ) {
+				return 0 === (int) $cart->get_cart_contents_count();
+			}
 		}
 
 		return empty( velotok_core_checkout_cart_items( $context ) );
