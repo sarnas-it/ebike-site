@@ -170,6 +170,33 @@ velotok_accounts_email_confirmation_assert(
 	'Неподтверждённый пользователь не должен иметь доступа к кабинету.'
 );
 
+velotok_accounts_email_confirmation_assert(
+	null === velotok_core_account_current_user( 'pending-session' ),
+	'До подтверждения email не должно существовать активной сессии.'
+);
+
+$invalid_confirmation = velotok_core_account_confirm_email( 'not-a-real-token' );
+
+velotok_accounts_email_confirmation_assert(
+	false === velotok_accounts_email_confirmation_value( $invalid_confirmation, 'confirmed' ),
+	'Неверный токен не должен подтверждать email.'
+);
+velotok_accounts_email_confirmation_assert(
+	'ACCOUNT_CONFIRMATION_INVALID' === velotok_accounts_email_confirmation_value( $invalid_confirmation, 'code' ),
+	'Неверный токен должен возвращать ACCOUNT_CONFIRMATION_INVALID.'
+);
+
+$still_pending = velotok_core_account_login( $email, $password );
+
+velotok_accounts_email_confirmation_assert(
+	false === velotok_accounts_email_confirmation_value( $still_pending, 'authenticated' ),
+	'После неудачного подтверждения вход должен оставаться заблокированным.'
+);
+velotok_accounts_email_confirmation_assert(
+	'ACCOUNT_EMAIL_NOT_CONFIRMED' === velotok_accounts_email_confirmation_value( $still_pending, 'code' ),
+	'После неудачного подтверждения вход должен возвращать ACCOUNT_EMAIL_NOT_CONFIRMED.'
+);
+
 $confirmed = velotok_core_account_confirm_email( $token );
 
 velotok_accounts_email_confirmation_assert(
@@ -186,6 +213,67 @@ $login = velotok_core_account_login( $email, $password );
 velotok_accounts_email_confirmation_assert(
 	true === velotok_accounts_email_confirmation_value( $login, 'authenticated' ),
 	'Подтверждённый пользователь должен входить по email и паролю.'
+);
+
+$reused_confirmation = velotok_core_account_confirm_email( $token );
+
+velotok_accounts_email_confirmation_assert(
+	false === velotok_accounts_email_confirmation_value( $reused_confirmation, 'confirmed' ),
+	'Использованный токен не должен повторно подтверждать email.'
+);
+velotok_accounts_email_confirmation_assert(
+	'ACCOUNT_CONFIRMATION_INVALID' === velotok_accounts_email_confirmation_value( $reused_confirmation, 'code' ),
+	'Повторное подтверждение должно отклоняться как недействительное.'
+);
+
+velotok_core_accounts_reset();
+
+$bypass_email = 'bypass@example.com';
+$bypass_token = 'testeb-2-bypass-token';
+$bypass       = velotok_core_account_register(
+	$bypass_email,
+	'SecretPass2',
+	array(
+		'confirmation_token' => $bypass_token,
+		'email_confirmed'    => true,
+		'status'             => 'active',
+		'authenticated'      => true,
+	)
+);
+
+velotok_accounts_email_confirmation_assert(
+	true === velotok_accounts_email_confirmation_value( $bypass, 'registered' ),
+	'Новый пользователь должен регистрироваться.'
+);
+velotok_accounts_email_confirmation_assert(
+	true === velotok_accounts_email_confirmation_value( $bypass, 'confirmation_required' ),
+	'Переданное вызывающим кодом состояние не должно отменять обязательное подтверждение email.'
+);
+velotok_accounts_email_confirmation_assert(
+	false === velotok_accounts_email_confirmation_value( $bypass, 'authenticated' ),
+	'Регистрация не должна авторизовывать пользователя до подтверждения email.'
+);
+velotok_accounts_email_confirmation_assert(
+	'pending' === velotok_accounts_email_confirmation_value( $bypass, 'status' ),
+	'Пользователь должен оставаться в статусе pending, даже если вызывающий код передал active.'
+);
+
+$bypass_login = velotok_core_account_login( $bypass_email, 'SecretPass2' );
+
+velotok_accounts_email_confirmation_assert(
+	false === velotok_accounts_email_confirmation_value( $bypass_login, 'authenticated' ),
+	'Вход должен быть заблокирован, пока email не подтверждён по токену.'
+);
+velotok_accounts_email_confirmation_assert(
+	'ACCOUNT_EMAIL_NOT_CONFIRMED' === velotok_accounts_email_confirmation_value( $bypass_login, 'code' ),
+	'Вход до подтверждения должен возвращать ACCOUNT_EMAIL_NOT_CONFIRMED.'
+);
+
+$bypass_confirm = velotok_core_account_confirm_email( $bypass_token );
+
+velotok_accounts_email_confirmation_assert(
+	true === velotok_accounts_email_confirmation_value( $bypass_confirm, 'confirmed' ),
+	'Только переход по токену должен подтверждать email.'
 );
 
 if ( array() !== $failures ) {

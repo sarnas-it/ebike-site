@@ -501,6 +501,8 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		$options = array();
 	}
 
+	unset( $options['email_confirmed'], $options['status'], $options['authenticated'] );
+
 	$email    = is_scalar( $email ) ? trim( (string) $email ) : '';
 	$password = is_scalar( $password ) ? (string) $password : '';
 	$key      = velotok_core_account_normalize_key( $email );

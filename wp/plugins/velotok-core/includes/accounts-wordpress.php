@@ -338,6 +338,8 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		$options = array();
 	}
 
+	unset( $options['email_confirmed'], $options['status'], $options['authenticated'] );
+
 	$email = velotok_core_wp_normalize_email( $email );
 
 	$result = array(

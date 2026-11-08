@@ -1,0 +1,18 @@
+TESTEB-2: Регистрация SHALL требовать подтверждения email
+================================================================
+
+Обязательная команда проверки:
+
+$ php wp/plugins/velotok-core/tests/accounts-contract-test.php
+PASS: контракт аккаунтов выполняется.
+
+Фокусный тест требования:
+
+$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-test.php
+PASS: регистрация требует подтверждения email (TESTEB-2).
+
+Red-green проверка фокусного теста (без обязательного подтверждения email
+тест падает):
+
+$ node wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen.test.js
+PASS: TESTEB-2 test fails without email confirmation and passes with it
