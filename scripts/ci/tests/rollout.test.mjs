@@ -18,6 +18,7 @@ const STALE_SHA = '7052bf282923dfaa016b483789346b1e6f0193e8';
 const MERGE_SHA = 'efe1bc4dac551dc870cec68aff16a973e095dd4f';
 const RUN_ID = 42467339807;
 const RUN_URL = `https://github.com/${OWNER}/${REPO}/actions/runs/${RUN_ID}`;
+const CHECK_SUITE_ID = 1900000001;
 const BASE_BRANCH = 'main';
 const MARKER = '<!-- testeb-63-rollout -->';
 
@@ -27,6 +28,17 @@ const GREEN_JOBS = [
   { id: 3, name: 'plugin-tests', status: 'completed', conclusion: 'success' },
   { id: 4, name: 'ci-repair-tests', status: 'completed', conclusion: 'success' },
 ];
+
+const STANDARD_CHECK_RUNS = GREEN_JOBS.map((job) => ({
+  id: 9000 + job.id,
+  name: job.name,
+  status: 'completed',
+  conclusion: 'success',
+  head_sha: HEAD_SHA,
+  details_url: `${RUN_URL}/job/${7000 + job.id}`,
+  check_suite: { id: CHECK_SUITE_ID },
+  app: { slug: 'github-actions' },
+}));
 
 // The tracker merges PR #65 only after acceptance, so the normal state before
 // acceptance is an open, mergeable pull request with green CI on its real head.
@@ -68,9 +80,35 @@ const SUCCESS_RUN = {
   conclusion: 'success',
   head_sha: HEAD_SHA,
   head_branch: 'feat/ebike-site-testeb-63',
+  check_suite_id: CHECK_SUITE_ID,
   created_at: '2026-11-08T08:30:00Z',
   updated_at: '2026-11-08T08:35:00Z',
 };
+
+const MERGED_RUN_ID = 42467339999;
+const MERGED_RUN_URL = `https://github.com/${OWNER}/${REPO}/actions/runs/${MERGED_RUN_ID}`;
+const MERGED_CHECK_SUITE_ID = CHECK_SUITE_ID + 10;
+
+const MERGED_RUN = {
+  ...SUCCESS_RUN,
+  id: MERGED_RUN_ID,
+  html_url: MERGED_RUN_URL,
+  event: 'push',
+  head_sha: MERGE_SHA,
+  head_branch: BASE_BRANCH,
+  check_suite_id: MERGED_CHECK_SUITE_ID,
+};
+
+const MERGED_STANDARD_CHECK_RUNS = GREEN_JOBS.map((job) => ({
+  id: 9500 + job.id,
+  name: job.name,
+  status: 'completed',
+  conclusion: 'success',
+  head_sha: MERGE_SHA,
+  details_url: `${MERGED_RUN_URL}/job/${7500 + job.id}`,
+  check_suite: { id: MERGED_CHECK_SUITE_ID },
+  app: { slug: 'github-actions' },
+}));
 
 function greenEvidence(overrides = {}) {
   return summarizeRolloutEvidence({
@@ -114,6 +152,11 @@ function baseHandler({
   run = SUCCESS_RUN,
   runs = [SUCCESS_RUN],
   jobs = GREEN_JOBS,
+  checkRuns = STANDARD_CHECK_RUNS,
+  mergedRun = MERGED_RUN,
+  mergedRuns = [MERGED_RUN],
+  mergedJobs = GREEN_JOBS,
+  mergedCheckRuns = MERGED_STANDARD_CHECK_RUNS,
   workflow = WORKFLOW_CONTENT,
   comments = [],
 } = {}) {
@@ -135,14 +178,35 @@ function baseHandler({
       }
       return response(200, workflow);
     }
+    if (url.includes(`/commits/${HEAD_SHA}/check-runs`) && method === 'GET') {
+      return response(200, { total_count: checkRuns.length, check_runs: checkRuns });
+    }
+    if (url.includes(`/commits/${MERGE_SHA}/check-runs`) && method === 'GET') {
+      return response(200, {
+        total_count: mergedCheckRuns.length,
+        check_runs: mergedCheckRuns,
+      });
+    }
     if (url.includes(`/actions/runs/${RUN_ID}/jobs`) && method === 'GET') {
       return response(200, { total_count: jobs.length, jobs });
+    }
+    if (url.includes(`/actions/runs/${MERGED_RUN_ID}/jobs`) && method === 'GET') {
+      return response(200, { total_count: mergedJobs.length, jobs: mergedJobs });
     }
     if (url.includes(`/actions/runs/${RUN_ID}`) && method === 'GET') {
       return response(200, run);
     }
+    if (url.includes(`/actions/runs/${MERGED_RUN_ID}`) && method === 'GET') {
+      return response(200, mergedRun);
+    }
     if (url.includes('/actions/runs?') && url.includes(`head_sha=${HEAD_SHA}`)) {
       return response(200, { total_count: runs.length, workflow_runs: runs });
+    }
+    if (url.includes('/actions/runs?') && url.includes(`head_sha=${MERGE_SHA}`)) {
+      return response(200, {
+        total_count: mergedRuns.length,
+        workflow_runs: mergedRuns,
+      });
     }
     if (url.includes(`/issues/${FIX_PR}/comments`) && method === 'GET') {
       return response(200, comments);
@@ -179,12 +243,37 @@ function testGreenOpenFixIsReadyForAutomerge() {
 function testMergedFixIsAlsoReady() {
   const evidence = greenEvidence({
     pr: MERGED_PR,
+    run: MERGED_RUN,
+    checkRuns: MERGED_STANDARD_CHECK_RUNS,
+    targetSha: MERGE_SHA,
     workflowRef: BASE_BRANCH,
   });
   assert.strictEqual(evidence.ready, true, evidence.problems.join('; '));
   assert.strictEqual(evidence.pullRequest.merged, true);
   assert.strictEqual(evidence.pullRequest.mergeCommitSha, MERGE_SHA);
+  assert.strictEqual(evidence.targetSha, MERGE_SHA);
+  const body = renderRolloutComment(evidence, MARKER);
+  assert.ok(
+    body.includes(`Merge commit: \`${MERGE_SHA}\``),
+    'the evidence comment must record the merge commit once it exists',
+  );
   console.log('PASS: the same fix stays green once the tracker has merged it');
+}
+
+function testMergedFixCannotBeProvenByOldHead() {
+  const evidence = greenEvidence({
+    pr: MERGED_PR,
+    targetSha: HEAD_SHA,
+    workflowRef: BASE_BRANCH,
+  });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some((problem) =>
+      problem.includes('is not the merge commit'),
+    ),
+    'after a merge only the commit that landed on the base branch counts',
+  );
+  console.log('PASS: a merged fix cannot be proven by the old pull request head');
 }
 
 function testConflictingFixIsRed() {
@@ -300,6 +389,59 @@ function testWrongWorkflowPathIsRed() {
   console.log('PASS: a run from another workflow is not accepted as CI evidence');
 }
 
+function testStandardCheckRunsFromTheCiRunAreRequired() {
+  const green = greenEvidence({ checkRuns: STANDARD_CHECK_RUNS });
+  assert.strictEqual(green.ready, true, green.problems.join('; '));
+  assert.deepStrictEqual(
+    green.checkRuns.map((check) => check.name),
+    GREEN_JOBS.map((job) => job.name),
+  );
+
+  const missing = greenEvidence({
+    checkRuns: STANDARD_CHECK_RUNS.filter((check) => check.name !== 'php-tests'),
+  });
+  assert.strictEqual(missing.ready, false);
+  assert.ok(
+    missing.problems.some((problem) =>
+      problem.includes('standard check run php-tests is missing'),
+    ),
+    'every ci job must expose its standard check run on the real head',
+  );
+  console.log('PASS: the gate requires the standard check runs of the verified ci run');
+}
+
+function testSyntheticCheckRunsAreRejected() {
+  const synthetic = STANDARD_CHECK_RUNS.map((check) => ({
+    ...check,
+    details_url: `https://github.com/${OWNER}/${REPO}/actions/runs/999999999`,
+    check_suite: { id: CHECK_SUITE_ID + 1 },
+  }));
+  const evidence = greenEvidence({ checkRuns: synthetic });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some((problem) =>
+      problem.includes('synthetic Checks API evidence is not accepted'),
+    ),
+    'green check runs created outside the verified ci run must not count',
+  );
+  console.log('PASS: synthetic green check runs are not accepted as CI evidence');
+}
+
+function testFailedStandardCheckRunIsRed() {
+  const failed = greenEvidence({
+    checkRuns: STANDARD_CHECK_RUNS.map((check) =>
+      check.name === 'php-lint' ? { ...check, conclusion: 'failure' } : check,
+    ),
+  });
+  assert.strictEqual(failed.ready, false);
+  assert.ok(
+    failed.problems.some((problem) =>
+      problem.includes('standard check run php-lint is failure'),
+    ),
+  );
+  console.log('PASS: a failed standard check run makes the rollout red');
+}
+
 function testLatestRunWins() {
   const olderSuccess = { ...SUCCESS_RUN, id: 1, updated_at: '2026-11-08T08:00:00Z' };
   const newerFailure = {
@@ -333,6 +475,24 @@ async function testCollectsFromApiByRunId() {
   console.log('PASS: rollout evidence is collected from the repository, PR, workflow and run');
 }
 
+async function testCollectsStandardCheckRunsForHead() {
+  const { fetchImpl, calls } = makeFetch(baseHandler());
+  const evidence = await collectRolloutEvidence({
+    owner: OWNER,
+    repo: REPO,
+    fixPr: FIX_PR,
+    token: 'test-token',
+    fetchImpl,
+  });
+  assert.strictEqual(evidence.ready, true, evidence.problems.join('; '));
+  assert.ok(
+    calls.some((call) => call.url.includes(`/commits/${HEAD_SHA}/check-runs`)),
+    'the gate must read the standard check runs attached to the real head',
+  );
+  assert.strictEqual(evidence.checkRuns.length, GREEN_JOBS.length);
+  console.log('PASS: standard check runs are read from the real head commit');
+}
+
 async function testCollectsLatestRunForHead() {
   const { fetchImpl } = makeFetch(baseHandler());
   const evidence = await collectRolloutEvidence({
@@ -358,11 +518,21 @@ async function testCollectMergedFixReadsWorkflowFromBase() {
     fetchImpl,
   });
   assert.strictEqual(evidence.ready, true, evidence.problems.join('; '));
+  assert.strictEqual(
+    evidence.targetSha,
+    MERGE_SHA,
+    'after the merge the verified commit must be the merge commit, not the old PR head',
+  );
+  assert.strictEqual(evidence.run.id, MERGED_RUN_ID);
   assert.ok(
     calls.some((call) => call.url.includes('/contents/') && call.url.includes(`ref=${BASE_BRANCH}`)),
     'after the merge the workflow is read from the base branch',
   );
-  console.log('PASS: a merged fix is verified against the base branch');
+  assert.ok(
+    calls.some((call) => call.url.includes(`/commits/${MERGE_SHA}/check-runs`)),
+    'after the merge the standard check runs are read from the merge commit',
+  );
+  console.log('PASS: a merged fix is verified against the merge commit on the base branch');
 }
 
 async function testCollectFailsWhenWorkflowMissingOnHead() {
@@ -387,6 +557,8 @@ function testRenderedRolloutCommentPinsRealHead() {
   assert.ok(body.includes(RUN_URL), 'the comment must link the real ci run');
   assert.ok(body.includes('php-lint=success'));
   assert.ok(body.includes('mergeable=true'));
+  assert.ok(body.includes('Стандартные check runs ci на head'));
+  assert.ok(body.includes('Merge commit: `none`'));
   assert.ok(body.includes('green'));
   assert.ok(
     !body.includes(STALE_SHA),
@@ -466,9 +638,35 @@ async function testPublishRolloutEvidenceRefusesStaleRun() {
   console.log('PASS: a stale green run is not published as evidence for the head');
 }
 
+async function testPublishRolloutEvidenceRefusesSyntheticChecks() {
+  const synthetic = STANDARD_CHECK_RUNS.map((check) => ({
+    ...check,
+    details_url: `https://github.com/${OWNER}/${REPO}/actions/runs/999999999`,
+    check_suite: { id: CHECK_SUITE_ID + 1 },
+  }));
+  const { fetchImpl, calls } = makeFetch(baseHandler({ checkRuns: synthetic }));
+  const result = await publishRolloutEvidence({
+    owner: OWNER,
+    repo: REPO,
+    fixPr: FIX_PR,
+    marker: MARKER,
+    token: 'test-token',
+    fetchImpl,
+  });
+  assert.strictEqual(result.evidence.ready, false);
+  assert.strictEqual(result.comment, null);
+  assert.strictEqual(
+    calls.filter((call) => call.method === 'POST' || call.method === 'PATCH').length,
+    0,
+    'synthetic green checks must never be published as proof',
+  );
+  console.log('PASS: synthetic check runs are not published as rollout evidence');
+}
+
 async function main() {
   testGreenOpenFixIsReadyForAutomerge();
   testMergedFixIsAlsoReady();
+  testMergedFixCannotBeProvenByOldHead();
   testConflictingFixIsRed();
   testClosedUnmergedFixIsRed();
   testWrongBaseBranchIsRed();
@@ -477,8 +675,12 @@ async function main() {
   testFailedOrIncompleteRunIsRed();
   testMissingOrFailedJobIsRed();
   testWrongWorkflowPathIsRed();
+  testStandardCheckRunsFromTheCiRunAreRequired();
+  testSyntheticCheckRunsAreRejected();
+  testFailedStandardCheckRunIsRed();
   testLatestRunWins();
   await testCollectsFromApiByRunId();
+  await testCollectsStandardCheckRunsForHead();
   await testCollectsLatestRunForHead();
   await testCollectMergedFixReadsWorkflowFromBase();
   await testCollectFailsWhenWorkflowMissingOnHead();
@@ -486,6 +688,7 @@ async function main() {
   await testPublishRolloutEvidenceCreatesComment();
   await testPublishRolloutEvidenceUpdatesExistingComment();
   await testPublishRolloutEvidenceRefusesStaleRun();
+  await testPublishRolloutEvidenceRefusesSyntheticChecks();
 }
 
 main().catch((error) => {

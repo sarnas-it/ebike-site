@@ -1,5 +1,6 @@
 import {
   WORKFLOW_PATH,
+  getCheckRuns,
   getContentAtRef,
   getPullRequest,
   getRepository,
@@ -46,6 +47,45 @@ function normalizeJob(job) {
   };
 }
 
+function normalizeCheckRun(check) {
+  return {
+    id: check?.id ?? null,
+    name: check?.name ?? null,
+    status: check?.status ?? null,
+    conclusion: check?.conclusion ?? null,
+    headSha: check?.head_sha ?? null,
+    checkSuiteId: check?.check_suite?.id ?? check?.check_suite_id ?? null,
+    detailsUrl: check?.details_url ?? null,
+    appSlug: check?.app?.slug ?? null,
+  };
+}
+
+// The CI workflow jobs publish normal check runs that belong to the workflow
+// run's check suite. The recovery tooling can also publish check runs with the
+// same names through the Checks API; those must never satisfy this gate. Tie
+// every accepted check run to the exact ci run that is being verified.
+function checkRunBelongsToRun(check, run) {
+  if (!run?.id) {
+    return true;
+  }
+  const runSuiteId = run?.checkSuiteId ?? null;
+  if (
+    runSuiteId != null &&
+    check.checkSuiteId != null &&
+    String(check.checkSuiteId) === String(runSuiteId)
+  ) {
+    return true;
+  }
+  if (check.detailsUrl) {
+    return check.detailsUrl.includes(`/actions/runs/${run.id}`);
+  }
+  if (runSuiteId == null && check.checkSuiteId == null) {
+    // Legacy fixtures without provenance metadata are left to the job check.
+    return true;
+  }
+  return false;
+}
+
 function runTimestamp(run) {
   return Date.parse(run?.updated_at || run?.created_at || 0) || 0;
 }
@@ -74,6 +114,7 @@ export function summarizeRolloutEvidence({
   workflow,
   run,
   jobs = [],
+  checkRuns = null,
   targetSha = null,
   fixPr = FIX_PR_NUMBER,
   baseBranch = BASE_BRANCH,
@@ -84,6 +125,9 @@ export function summarizeRolloutEvidence({
   const problems = [];
   const normalizedRun = normalizeRun(run);
   const jobList = (Array.isArray(jobs) ? jobs : []).map(normalizeJob);
+  const checkRunList = Array.isArray(checkRuns)
+    ? checkRuns.map(normalizeCheckRun)
+    : null;
 
   const prNumber = pr?.number ?? null;
   const merged = Boolean(pr?.merged);
@@ -136,11 +180,18 @@ export function summarizeRolloutEvidence({
       }
     }
     if (targetSha) {
-      const allowed = [headSha, mergeCommitSha].filter(Boolean);
-      if (allowed.length > 0 && !allowed.includes(targetSha)) {
+      if (merged) {
+        if (mergeCommitSha && targetSha !== mergeCommitSha) {
+          problems.push(
+            `target commit ${targetSha} is not the merge commit ` +
+              `${mergeCommitSha}; a merged fix must be verified on the commit ` +
+              'that actually landed on the base branch',
+          );
+        }
+      } else if (headSha && targetSha !== headSha) {
         problems.push(
-          `target commit ${targetSha} is neither the pull request head ` +
-            `${headSha ?? 'unknown'} nor the merge commit ${mergeCommitSha ?? 'unknown'}`,
+          `target commit ${targetSha} is not the pull request head ` +
+            `${headSha}`,
         );
       }
     }
@@ -211,6 +262,37 @@ export function summarizeRolloutEvidence({
     }
   }
 
+  if (checkRunList) {
+    for (const name of expectedJobs) {
+      const named = checkRunList.filter((check) => check.name === name);
+      if (named.length === 0) {
+        problems.push(
+          `standard check run ${name} is missing for CI run ` +
+            `${normalizedRun?.id ?? 'unknown'}`,
+        );
+        continue;
+      }
+      const standard = named.filter((check) =>
+        checkRunBelongsToRun(check, normalizedRun),
+      );
+      if (standard.length === 0) {
+        problems.push(
+          `check run ${name} is not a standard check run from CI run ` +
+            `${normalizedRun?.id ?? 'unknown'}; synthetic Checks API evidence ` +
+            'is not accepted',
+        );
+        continue;
+      }
+      if (!standard.some((check) => check.conclusion === 'success')) {
+        problems.push(
+          `standard check run ${name} is ` +
+            `${standard[0].conclusion ?? standard[0].status ?? 'unknown'}, ` +
+            'expected success',
+        );
+      }
+    }
+  }
+
   return {
     fixPr,
     baseBranch,
@@ -220,6 +302,7 @@ export function summarizeRolloutEvidence({
     workflowPresent,
     run: normalizedRun,
     jobs: jobList,
+    checkRuns: checkRunList ?? [],
     pullRequest: {
       number: prNumber,
       state,
@@ -268,7 +351,12 @@ export async function collectRolloutEvidence({
     fetchImpl,
   });
 
-  const resolvedSha = targetSha || pr?.head?.sha || null;
+  // Before the merge the real evidence is the ci run on the pull request head.
+  // Once the tracker has merged the fix, the commit that lands on the base
+  // branch is the merge commit, so that is the commit whose ci run must be
+  // verified (the push to main creates a run on exactly that commit).
+  const mergedSha = pr?.merged ? pr?.merge_commit_sha || null : null;
+  const resolvedSha = targetSha || mergedSha || pr?.head?.sha || null;
   let run = null;
   if (runId) {
     run = await getWorkflowRun({ owner, repo, runId, token, fetchImpl });
@@ -284,15 +372,26 @@ export async function collectRolloutEvidence({
   }
 
   let jobs = [];
+  let checkRuns = null;
   if (run?.id) {
-    const response = await getWorkflowRunJobs({
-      owner,
-      repo,
-      runId: run.id,
-      token,
-      fetchImpl,
-    });
-    jobs = response?.jobs ?? [];
+    const [jobResponse, checkResponse] = await Promise.all([
+      getWorkflowRunJobs({
+        owner,
+        repo,
+        runId: run.id,
+        token,
+        fetchImpl,
+      }),
+      getCheckRuns({
+        owner,
+        repo,
+        ref: resolvedSha,
+        token,
+        fetchImpl,
+      }),
+    ]);
+    jobs = jobResponse?.jobs ?? [];
+    checkRuns = checkResponse?.check_runs ?? [];
   }
 
   return summarizeRolloutEvidence({
@@ -301,6 +400,7 @@ export async function collectRolloutEvidence({
     workflow: workflowContent,
     run,
     jobs,
+    checkRuns,
     targetSha: resolvedSha,
     fixPr,
     baseBranch,
@@ -344,6 +444,19 @@ export function renderRolloutComment(evidence, marker = '<!-- testeb-63-rollout 
         .map((job) => `\`${job.name}=${job.conclusion ?? job.status ?? 'unknown'}\``)
         .join(', ') || 'нет'
     }`,
+  );
+  lines.push(
+    `- Стандартные check runs ci на head: ${
+      (evidence.checkRuns || [])
+        .map(
+          (check) =>
+            `\`${check.name}=${check.conclusion ?? check.status ?? 'unknown'}\``,
+        )
+        .join(', ') || 'нет'
+    }`,
+  );
+  lines.push(
+    `- Merge commit: \`${evidence.pullRequest.mergeCommitSha ?? 'none'}\``,
   );
   lines.push(
     `- Итог: ${evidence.ready ? 'green — CI на реальном head зелёный, PR готов к автомержу' : 'red — доказательств недостаточно'}`,
