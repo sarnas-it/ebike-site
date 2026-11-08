@@ -6,10 +6,17 @@ run-name: "Recover pull request checks from ${{ github.sha }}"
 # Branch protection then waits forever even though the job log finished green.
 # This workflow runs after the regular ci workflow completes, detects that
 # symptom and republishes completed checks on the actual pull request head.
+#
+# It also runs on pull_request events so the no_checks class is not left without
+# a result: when a commit has no ci run at all, no workflow_run event will ever
+# fire. The decision step only recovers in that case; if a ci run exists (even
+# queued) the regular workflow owns the result and recovery stays out of the way.
 on:
   workflow_run:
     workflows: ["ci"]
     types: [completed]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       pr:
@@ -28,7 +35,7 @@ permissions:
   statuses: write
 
 concurrency:
-  group: recover-pr-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr || github.event.workflow_run.head_sha || github.sha }}
+  group: recover-pr-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr || github.event.pull_request.number || github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -48,8 +55,11 @@ jobs:
         id: need
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
           INPUT_PR: ${{ github.event.inputs.pr }}
           INPUT_SHA: ${{ github.event.inputs.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
@@ -57,12 +67,20 @@ jobs:
           args=(--repo "$GITHUB_REPOSITORY" --github-output "$GITHUB_OUTPUT")
           if [ -n "$INPUT_PR" ]; then
             args+=(--pr "$INPUT_PR")
+          elif [ -n "$PR_NUMBER" ]; then
+            args+=(--pr "$PR_NUMBER")
           elif [ -n "$RUN_PR" ]; then
             args+=(--pr "$RUN_PR")
           elif [ -n "$INPUT_SHA" ]; then
             args+=(--sha "$INPUT_SHA")
+          elif [ -n "$PR_HEAD_SHA" ]; then
+            args+=(--sha "$PR_HEAD_SHA")
           else
             args+=(--sha "$RUN_HEAD_SHA")
+          fi
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # Only take over when GitHub never started ci for this commit.
+            args+=(--require-missing-ci-run --workflow .github/workflows/ci.yml)
           fi
           node tooling/scripts/ci/should-recover.mjs "${args[@]}"
 

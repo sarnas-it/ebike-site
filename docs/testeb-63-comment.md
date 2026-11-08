@@ -23,6 +23,15 @@ allow-list интеграции содержит `sarnas-it/ebike-site`.
 `.github/workflows/ci.yml`, поэтому новые PR получают реальные прогоны на
 каждом `pull_request`, `push` в `main` и по `workflow_dispatch`.
 
+Дополнительно общий `.github/workflows/recover-pr.yml` теперь запускается и на
+`pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`), а не
+только после завершения `ci`. Это закрывает сам класс `no_checks`: у коммита
+без прогона `ci` никогда не появится событие `workflow_run`, поэтому recovery
+сам прогоняет проверки на head и публикует результат. Флаг
+`--require-missing-ci-run` включает recovery только при полном отсутствии
+прогона `ci` на коммите; если прогон уже есть (даже `queued` или упавший),
+результат остаётся за штатным workflow, и recovery не маскирует его.
+
 ## Доказательство привязано к сдаваемому коммиту
 
 В репозитории намеренно нет захардкоженного прогона или SHA PR #65 в роли
