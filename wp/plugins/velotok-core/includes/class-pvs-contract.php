@@ -2,8 +2,9 @@
 /**
  * Pickup point (ПВЗ) contract.
  *
- * Spec: delivery. Requirement TESTEB-32: pickup points are selected by the
- * radius from the delivery address.
+ * Spec: delivery. Requirements TESTEB-32 and TESTEB-33: pickup points are
+ * selected by the radius from the delivery address and a broken list fails
+ * explicitly.
  *
  * @package Velotok_Core
  */
@@ -64,6 +65,17 @@ if ( ! class_exists( 'Velotok_PVS_Contract' ) ) {
 		}
 
 		/**
+		 * Return the requirement identifier for pickup point failures.
+		 *
+		 * @return string
+		 */
+		public static function failure_requirement() {
+			$contract = self::contract();
+
+			return isset( $contract['failure_requirement'] ) ? $contract['failure_requirement'] : 'TESTEB-33';
+		}
+
+		/**
 		 * Return the supported providers.
 		 *
 		 * @return array<int,string>
@@ -110,6 +122,7 @@ if ( ! class_exists( 'Velotok_PVS_Contract' ) ) {
 				'no_address'     => isset( $contract['no_address_code'] ) ? $contract['no_address_code'] : 'DELIVERY_PICKUP_POINTS_ADDRESS_AMBIGUOUS',
 				'no_coordinates' => isset( $contract['no_coordinates_code'] ) ? $contract['no_coordinates_code'] : 'DELIVERY_PICKUP_POINTS_NO_COORDINATES',
 				'empty'          => isset( $contract['empty_code'] ) ? $contract['empty_code'] : 'DELIVERY_PICKUP_POINTS_EMPTY',
+				'outside_radius' => isset( $contract['outside_radius_code'] ) ? $contract['outside_radius_code'] : 'DELIVERY_PICKUP_POINTS_OUTSIDE_RADIUS',
 			);
 		}
 	}
