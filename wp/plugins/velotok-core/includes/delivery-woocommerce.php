@@ -428,10 +428,14 @@ if ( ! function_exists( 'velotok_core_delivery_checkout_test_mode_banner' ) ) {
 	/**
 	 * Render the explicit test-mode banner at checkout.
 	 *
+	 * The banner is shown when the shop is in test mode or when any offered or
+	 * selected shipping rate belongs to a provider running in test mode. A
+	 * test tariff is therefore never presented to the buyer as a live one.
+	 *
 	 * @return void
 	 */
 	function velotok_core_delivery_checkout_test_mode_banner() {
-		if ( ! velotok_core_delivery_test_mode_enabled() ) {
+		if ( ! velotok_core_delivery_test_mode_banner_visible() ) {
 			return;
 		}
 
@@ -440,6 +444,76 @@ if ( ! function_exists( 'velotok_core_delivery_checkout_test_mode_banner' ) ) {
 }
 if ( function_exists( 'add_action' ) ) {
 	add_action( 'woocommerce_review_order_after_shipping', 'velotok_core_delivery_checkout_test_mode_banner' );
+}
+
+if ( ! function_exists( 'velotok_core_delivery_cart_test_mode_banner' ) ) {
+	/**
+	 * Render the explicit test-mode banner on the cart page.
+	 *
+	 * @return void
+	 */
+	function velotok_core_delivery_cart_test_mode_banner() {
+		if ( ! velotok_core_delivery_test_mode_banner_visible() ) {
+			return;
+		}
+
+		echo velotok_core_delivery_test_mode_banner( true );
+	}
+}
+if ( function_exists( 'add_action' ) ) {
+	add_action( 'woocommerce_before_cart', 'velotok_core_delivery_cart_test_mode_banner' );
+}
+
+if ( ! function_exists( 'velotok_core_delivery_order_test_mode_banner' ) ) {
+	/**
+	 * Render the test-mode banner on the buyer's order details screen.
+	 *
+	 * @param mixed $order Order object or identifier.
+	 * @return void
+	 */
+	function velotok_core_delivery_order_test_mode_banner( $order = null ) {
+		if ( ! is_object( $order ) ) {
+			$order_id = is_numeric( $order ) ? (int) $order : 0;
+
+			if ( $order_id > 0 && function_exists( 'wc_get_order' ) ) {
+				$order = wc_get_order( $order_id );
+			}
+		}
+
+		$test_mode = false;
+
+		if ( is_object( $order ) && method_exists( $order, 'get_meta' ) ) {
+			$enabled = velotok_core_delivery_test_mode_normalize( $order->get_meta( '_velotok_test_mode', true ) );
+
+			$test_mode = true === $enabled;
+		}
+
+		if ( ! $test_mode && is_object( $order ) && method_exists( $order, 'get_shipping_methods' ) ) {
+			foreach ( (array) $order->get_shipping_methods() as $shipping ) {
+				$info = velotok_core_delivery_test_mode_rate_info( $shipping );
+
+				if ( ! empty( $info['enabled'] ) ) {
+					$test_mode = true;
+					break;
+				}
+			}
+		}
+
+		if ( ! $test_mode && is_numeric( $order ) && function_exists( 'get_post_meta' ) ) {
+			$enabled = velotok_core_delivery_test_mode_normalize( get_post_meta( (int) $order, '_velotok_test_mode', true ) );
+
+			$test_mode = true === $enabled;
+		}
+
+		if ( ! $test_mode ) {
+			return;
+		}
+
+		echo velotok_core_delivery_test_mode_banner( true );
+	}
+}
+if ( function_exists( 'add_action' ) ) {
+	add_action( 'woocommerce_order_details_after_order_table', 'velotok_core_delivery_order_test_mode_banner' );
 }
 
 if ( ! function_exists( 'velotok_core_delivery_order_eta_range' ) ) {

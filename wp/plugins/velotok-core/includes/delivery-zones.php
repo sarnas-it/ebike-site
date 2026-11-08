@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39', 'TESTEB-40' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -210,6 +210,13 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'admin_visible'  => true,
 				'banner'         => true,
 				'banner_text'    => 'Тестовый режим доставки',
+				'requirements'   => array( 'TESTEB-39', 'TESTEB-40' ),
+				'banner_requirement' => 'TESTEB-40',
+				'banner_visible' => true,
+				'banner_buyer_visible' => true,
+				'banner_customer_visible' => true,
+				'banner_only_when_test_mode' => true,
+				'banner_hooks'   => array( 'woocommerce_before_cart', 'woocommerce_review_order_after_shipping', 'woocommerce_order_details_after_order_table' ),
 				'label'          => 'Тестовый режим',
 				'option'         => 'velotok_core_delivery_test_mode',
 				'meta'           => '_velotok_test_mode',
@@ -222,6 +229,37 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'fake_tariff'    => false,
 				'silent'         => false,
 				'values'         => array( 'test', 'sandbox', 'demo' ),
+			),
+			'test_mode_banner'        => array(
+				'requirement'        => 'TESTEB-40',
+				'parent_requirement' => 'TESTEB-39',
+				'type'               => 'banner',
+				'element'            => 'div',
+				'explicit'           => true,
+				'visible'            => true,
+				'buyer_visible'      => true,
+				'customer_visible'   => true,
+				'visible_to'         => 'buyer',
+				'admin_visible'      => true,
+				'test_mode_only'     => true,
+				'only_when_test_mode'=> true,
+				'show_when'          => 'test_mode',
+				'cart'               => true,
+				'checkout'           => true,
+				'order'              => true,
+				'locations'          => array( 'cart', 'checkout', 'order' ),
+				'hooks'              => array( 'woocommerce_before_cart', 'woocommerce_review_order_after_shipping', 'woocommerce_order_details_after_order_table' ),
+				'class'              => 'velotok-delivery-test-mode',
+				'attribute'          => array( 'data-test-mode' => 'true' ),
+				'role'               => 'status',
+				'aria_live'          => 'polite',
+				'html'               => true,
+				'text'               => 'Тестовый режим доставки',
+				'banner_text'        => 'Тестовый режим доставки',
+				'label'              => 'Тестовый режим',
+				'fallback'           => false,
+				'silent'             => false,
+				'fake_tariff'        => false,
 			),
 			'order'                   => array(
 				'requirement'    => 'TESTEB-37',
@@ -309,6 +347,15 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 		$contract['provider_test_mode']['providers'] = $contract['supported_providers'];
 		$contract['test_mode_explicit']      = true;
 		$contract['provider_test_mode_explicit'] = true;
+		$contract['test_mode']['banner_info'] = $contract['test_mode_banner'];
+		$contract['test_mode']['banner_contract'] = $contract['test_mode_banner'];
+		$contract['test_mode']['test_mode_banner'] = $contract['test_mode_banner'];
+		$contract['provider_test_mode']['banner_info'] = $contract['test_mode_banner'];
+		$contract['buyer_test_mode_banner']  = $contract['test_mode_banner'];
+		$contract['customer_test_mode_banner'] = $contract['test_mode_banner'];
+		$contract['buyer_banner'] = $contract['test_mode_banner'];
+		$contract['test_mode_banner_visible'] = true;
+		$contract['test_mode_banner_buyer_visible'] = true;
 
 		return $contract;
 	}
@@ -3173,6 +3220,9 @@ if ( ! function_exists( 'velotok_core_delivery_test_mode_info' ) ) {
 			'admin_visible'     => true,
 			'banner'            => $enabled && ! empty( $config['banner'] ),
 			'banner_text'       => $config['banner_text'],
+			'banner_requirement'=> isset( $config['banner_requirement'] ) ? $config['banner_requirement'] : 'TESTEB-40',
+			'banner_visible'    => $enabled && ! empty( $config['banner'] ),
+			'banner_buyer_visible' => $enabled && ! empty( $config['banner'] ),
 			'label'             => $config['label'],
 			'meta'              => $config['meta'],
 			'mode'              => $enabled ? 'test' : 'live',
@@ -3201,25 +3251,502 @@ if ( ! function_exists( 'velotok_core_delivery_method_test_mode' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_test_mode_rate_meta' ) ) {
+	/**
+	 * Flatten WooCommerce rate meta into a key-value map.
+	 *
+	 * WooCommerce returns meta as a list of objects with key/value fields.
+	 *
+	 * @param mixed $rate Shipping rate data.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_test_mode_rate_meta( $rate ) {
+		$meta = velotok_core_delivery_zones_value( $rate, array( 'meta_data', 'meta' ), array() );
+
+		if ( is_object( $meta ) && method_exists( $meta, 'get_data' ) ) {
+			$meta = $meta->get_data();
+		}
+
+		$flat = array();
+
+		if ( is_object( $rate ) && method_exists( $rate, 'get_meta' ) ) {
+			foreach ( array( '_velotok_test_mode', '_velotok_test_mode_info', 'test_mode' ) as $meta_key ) {
+				$meta_value = $rate->get_meta( $meta_key, true );
+
+				if ( null !== $meta_value && '' !== $meta_value ) {
+					$flat[ $meta_key ] = $meta_value;
+				}
+			}
+		}
+
+		if ( is_array( $meta ) ) {
+			foreach ( $meta as $key => $value ) {
+				if ( is_object( $value ) || ( is_array( $value ) && ( isset( $value['key'] ) || isset( $value['id'] ) ) ) ) {
+					$meta_key = velotok_core_delivery_zones_value( $value, array( 'key', 'id' ), null );
+
+					if ( is_scalar( $meta_key ) && '' !== (string) $meta_key ) {
+						$flat[ (string) $meta_key ] = velotok_core_delivery_zones_value( $value, array( 'value' ), null );
+					}
+
+					continue;
+				}
+
+				if ( is_string( $key ) ) {
+					$flat[ $key ] = $value;
+				}
+			}
+		}
+
+		return $flat;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_rate_info' ) ) {
+	/**
+	 * Resolve the test mode carried by a WooCommerce shipping rate.
+	 *
+	 * @param mixed $rate Shipping rate data.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_test_mode_rate_info( $rate ) {
+		$meta    = velotok_core_delivery_test_mode_rate_meta( $rate );
+		$context = array();
+		$method  = array(
+			'method_id'   => velotok_core_delivery_zones_method_id( $rate ),
+			'instance_id' => velotok_core_delivery_zones_value( $rate, array( 'instance_id', 'id' ), '' ),
+		);
+
+		foreach ( array( 'test_mode', '_velotok_test_mode', 'sandbox', 'is_test' ) as $key ) {
+			if ( isset( $meta[ $key ] ) ) {
+				$context['test_mode'] = $meta[ $key ];
+
+				return velotok_core_delivery_test_mode_info( $method, $context );
+			}
+		}
+
+		if ( isset( $meta['_velotok_test_mode_info'] ) && is_array( $meta['_velotok_test_mode_info'] ) ) {
+			$info = $meta['_velotok_test_mode_info'];
+
+			if ( array_key_exists( 'enabled', $info ) ) {
+				$info['test_mode'] = $info['enabled'];
+			}
+
+			return velotok_core_delivery_test_mode_info( $method, $info );
+		}
+
+		return velotok_core_delivery_test_mode_info( $rate );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_shipping_method' ) ) {
+	/**
+	 * Resolve a shipping method instance from a chosen rate id such as cdek:5.
+	 *
+	 * @param mixed $shipping_id Chosen shipping method id.
+	 * @return mixed
+	 */
+	function velotok_core_delivery_test_mode_shipping_method( $shipping_id ) {
+		$shipping_id = trim( (string) $shipping_id );
+
+		if ( '' === $shipping_id ) {
+			return null;
+		}
+
+		$parts       = explode( ':', $shipping_id );
+		$method_id   = isset( $parts[0] ) ? $parts[0] : '';
+		$instance_id = isset( $parts[1] ) ? (int) $parts[1] : 0;
+		$candidates  = array();
+
+		if ( function_exists( 'WC' ) ) {
+			$wc = WC();
+
+			if ( is_object( $wc ) && isset( $wc->shipping ) && is_object( $wc->shipping ) ) {
+				if ( method_exists( $wc->shipping, 'get_shipping_methods' ) ) {
+					$candidates = $wc->shipping->get_shipping_methods();
+				} elseif ( isset( $wc->shipping->shipping_methods ) ) {
+					$candidates = $wc->shipping->shipping_methods;
+				}
+			}
+		}
+
+		if ( is_array( $candidates ) ) {
+			foreach ( array( $shipping_id, $instance_id, $method_id ) as $key ) {
+				if ( isset( $candidates[ $key ] ) ) {
+					return $candidates[ $key ];
+				}
+			}
+		}
+
+		if ( class_exists( 'WC_Shipping_Zones' ) && method_exists( 'WC_Shipping_Zones', 'get_shipping_method' ) ) {
+			$method = WC_Shipping_Zones::get_shipping_method( $instance_id );
+
+			if ( null !== $method && false !== $method ) {
+				return $method;
+			}
+		}
+
+		return array(
+			'method_id'   => $method_id,
+			'instance_id' => $instance_id,
+			'id'          => $method_id,
+		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_woocommerce_info' ) ) {
+	/**
+	 * Resolve the test mode of the shipping methods offered or chosen in WooCommerce.
+	 *
+	 * The checkout banner must remain visible for a provider that runs in test
+	 * mode even when the shop-wide option was left disabled, so every offered
+	 * and every chosen rate is inspected.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_test_mode_woocommerce_info() {
+		$empty = velotok_core_delivery_test_mode_info();
+
+		if ( ! function_exists( 'WC' ) ) {
+			return $empty;
+		}
+
+		$wc = WC();
+
+		if ( ! is_object( $wc ) ) {
+			return $empty;
+		}
+
+		$chosen   = array();
+		$packages = array();
+		$session  = isset( $wc->session ) ? $wc->session : null;
+
+		if ( is_object( $session ) || is_array( $session ) ) {
+			foreach ( array( 'chosen_shipping_methods', 'chosen_shipping_method' ) as $key ) {
+				if ( is_array( $session ) ) {
+					$value = isset( $session[ $key ] ) ? $session[ $key ] : null;
+				} else {
+					$value = method_exists( $session, 'get' )
+						? $session->get( $key )
+						: ( isset( $session->$key ) ? $session->$key : null );
+				}
+
+				if ( is_array( $value ) ) {
+					$chosen = array_merge( $chosen, array_values( array_filter( $value, 'is_scalar' ) ) );
+				} elseif ( is_scalar( $value ) && '' !== (string) $value ) {
+					$chosen[] = (string) $value;
+				}
+			}
+
+			for ( $index = 0; $index < 10; $index++ ) {
+				$key = 'shipping_for_package_' . $index;
+
+				if ( is_array( $session ) ) {
+					$value = isset( $session[ $key ] ) ? $session[ $key ] : null;
+				} else {
+					$value = method_exists( $session, 'get' )
+						? $session->get( $key )
+						: ( isset( $session->$key ) ? $session->$key : null );
+				}
+
+				if ( is_array( $value ) && isset( $value['rates'] ) ) {
+					$packages[] = $value;
+				}
+			}
+		}
+
+		$shipping = isset( $wc->shipping ) ? $wc->shipping : null;
+
+		if ( is_object( $shipping ) && method_exists( $shipping, 'get_packages' ) ) {
+			$value = $shipping->get_packages();
+
+			if ( is_array( $value ) ) {
+				$packages = array_merge( $packages, array_values( $value ) );
+			}
+		} elseif ( is_object( $shipping ) && isset( $shipping->packages ) && is_array( $shipping->packages ) ) {
+			$packages = array_merge( $packages, array_values( $shipping->packages ) );
+		}
+
+		$cart = isset( $wc->cart ) ? $wc->cart : null;
+
+		if ( is_object( $cart ) && method_exists( $cart, 'get_shipping_packages' ) ) {
+			$value = $cart->get_shipping_packages();
+
+			if ( is_array( $value ) ) {
+				$packages = array_merge( $packages, array_values( $value ) );
+			}
+		} elseif ( is_object( $cart ) && isset( $cart->shipping_packages ) && is_array( $cart->shipping_packages ) ) {
+			$packages = array_merge( $packages, array_values( $cart->shipping_packages ) );
+		}
+
+		$all      = array();
+		$selected = array();
+
+		foreach ( $packages as $package ) {
+			if ( is_object( $package ) ) {
+				$package = get_object_vars( $package );
+			}
+
+			if ( ! is_array( $package ) || empty( $package['rates'] ) || ! is_array( $package['rates'] ) ) {
+				continue;
+			}
+
+			foreach ( $package['rates'] as $key => $rate ) {
+				$id = velotok_core_delivery_zones_scalar(
+					velotok_core_delivery_zones_value( $rate, array( 'id' ), $key )
+				);
+
+				if ( '' === $id ) {
+					$id = (string) $key;
+				}
+
+				$all[ $id ] = $rate;
+
+				if ( in_array( $id, $chosen, true ) || in_array( (string) $key, $chosen, true ) ) {
+					$selected[ $id ] = $rate;
+				}
+			}
+		}
+
+		$candidates = ! empty( $chosen ) ? $selected : $all;
+
+		foreach ( $candidates as $rate ) {
+			$info = velotok_core_delivery_test_mode_rate_info( $rate );
+
+			if ( ! empty( $info['enabled'] ) ) {
+				$info['source'] = 'woocommerce_rate';
+
+				return $info;
+			}
+		}
+
+		foreach ( $chosen as $shipping_id ) {
+			$method = velotok_core_delivery_test_mode_shipping_method( $shipping_id );
+			$info   = velotok_core_delivery_test_mode_info( $method );
+
+			if ( ! empty( $info['enabled'] ) ) {
+				$info['source'] = 'woocommerce_method';
+
+				return $info;
+			}
+		}
+
+		return $empty;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_banner_visible' ) ) {
+	/**
+	 * Whether the buyer must see the test-mode banner.
+	 *
+	 * @param mixed $method  Optional shipping method data.
+	 * @param mixed $context Optional delivery context.
+	 * @return bool
+	 */
+	function velotok_core_delivery_test_mode_banner_visible( $method = null, $context = array() ) {
+		if ( is_array( $method ) || is_object( $method ) ) {
+			$context = $method;
+			$method  = null;
+		}
+
+		$info = velotok_core_delivery_test_mode_info( $method, $context );
+
+		if ( ! empty( $info['enabled'] ) ) {
+			return true;
+		}
+
+		if ( null !== $method ) {
+			return false;
+		}
+
+		if ( ! empty( $context ) ) {
+			return false;
+		}
+
+		if ( function_exists( 'velotok_core_delivery_test_mode_enabled' ) && velotok_core_delivery_test_mode_enabled() ) {
+			return true;
+		}
+
+		$enabled = function_exists( 'get_option' ) ? get_option( 'velotok_core_delivery_test_mode', 'no' ) : 'no';
+		$enabled = velotok_core_delivery_test_mode_normalize( $enabled );
+
+		if ( true === $enabled ) {
+			return true;
+		}
+
+		if ( function_exists( 'apply_filters' ) ) {
+			$enabled = (bool) apply_filters( 'velotok_core_delivery_test_mode_banner_visible', false );
+		}
+
+		if ( $enabled ) {
+			return true;
+		}
+
+		$shipping_info = velotok_core_delivery_test_mode_woocommerce_info();
+
+		return ! empty( $shipping_info['enabled'] );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_buyer_test_mode_visible' ) ) {
+	/**
+	 * Alias for the buyer-visible test-mode condition.
+	 *
+	 * @param mixed $method  Optional shipping method data.
+	 * @param mixed $context Optional delivery context.
+	 * @return bool
+	 */
+	function velotok_core_delivery_buyer_test_mode_visible( $method = null, $context = array() ) {
+		return velotok_core_delivery_test_mode_banner_visible( $method, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_visible_to_buyer' ) ) {
+	/**
+	 * Alias for the buyer-visible test-mode condition.
+	 *
+	 * @param mixed $method  Optional shipping method data.
+	 * @param mixed $context Optional delivery context.
+	 * @return bool
+	 */
+	function velotok_core_delivery_test_mode_visible_to_buyer( $method = null, $context = array() ) {
+		return velotok_core_delivery_test_mode_banner_visible( $method, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_banner_contract' ) ) {
+	/**
+	 * Return the buyer-visible test-mode banner contract.
+	 *
+	 * Spec: delivery, requirement TESTEB-40.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_test_mode_banner_contract() {
+		$contract = velotok_core_delivery_zones_contract();
+
+		return isset( $contract['test_mode_banner'] ) && is_array( $contract['test_mode_banner'] )
+			? $contract['test_mode_banner']
+			: array();
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_test_mode_banner' ) ) {
 	/**
 	 * Render the explicit test-mode banner for the customer.
 	 *
-	 * @param bool $test_mode Test mode flag.
+	 * The banner is part of requirement TESTEB-40: whenever the provider runs
+	 * in test mode the buyer must be able to see that fact instead of seeing a
+	 * test tariff presented as a live one.
+	 *
+	 * @param bool  $test_mode Test mode flag.
+	 * @param mixed $context   Optional delivery context or method data.
 	 * @return string
 	 */
-	function velotok_core_delivery_test_mode_banner( $test_mode = false ) {
+	function velotok_core_delivery_test_mode_banner( $test_mode = null, $context = array() ) {
+		if ( is_array( $test_mode ) || is_object( $test_mode ) ) {
+			$context   = $test_mode;
+			$test_mode = null;
+		}
+
+		if ( null === $test_mode && ! empty( $context ) ) {
+			$info      = velotok_core_delivery_test_mode_info( null, $context );
+			$test_mode = ! empty( $info['enabled'] );
+		}
+
+		if ( null === $test_mode ) {
+			$test_mode = velotok_core_delivery_test_mode_banner_visible();
+		}
+
 		if ( ! $test_mode ) {
 			return '';
 		}
 
 		$contract = velotok_core_delivery_zones_contract();
-		$text     = $contract['test_mode']['banner_text'];
+		$banner   = $contract['test_mode_banner'];
+		$text     = ! empty( $banner['text'] ) ? $banner['text'] : $contract['test_mode']['banner_text'];
 		$escape   = function ( $value ) {
 			return function_exists( 'esc_html' ) ? esc_html( $value ) : htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
 		};
 
-		return '<div class="velotok-delivery-test-mode" data-test-mode="true" role="status">' . $escape( $text ) . '</div>';
+		return '<div class="velotok-delivery-test-mode" data-test-mode="true" data-test-mode-banner="true" data-buyer-visible="true" data-requirement="TESTEB-40" role="status" aria-live="polite">' . $escape( $text ) . '</div>';
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_buyer_test_mode_banner' ) ) {
+	/**
+	 * Return the test-mode banner string intended for the buyer.
+	 *
+	 * @param bool  $test_mode Test mode flag.
+	 * @param mixed $context   Optional delivery context or method data.
+	 * @return string
+	 */
+	function velotok_core_delivery_buyer_test_mode_banner( $test_mode = null, $context = array() ) {
+		return velotok_core_delivery_test_mode_banner( $test_mode, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_customer_test_mode_banner' ) ) {
+	/**
+	 * Alias for the buyer-visible test-mode banner.
+	 *
+	 * @param bool  $test_mode Test mode flag.
+	 * @param mixed $context   Optional delivery context.
+	 * @return string
+	 */
+	function velotok_core_delivery_customer_test_mode_banner( $test_mode = null, $context = array() ) {
+		return velotok_core_delivery_test_mode_banner( $test_mode, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_banner_html' ) ) {
+	/**
+	 * Alias for the test-mode banner HTML.
+	 *
+	 * @param bool  $test_mode Test mode flag.
+	 * @param mixed $context   Optional delivery context.
+	 * @return string
+	 */
+	function velotok_core_delivery_test_mode_banner_html( $test_mode = null, $context = array() ) {
+		return velotok_core_delivery_test_mode_banner( $test_mode, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_banner_for_buyer' ) ) {
+	/**
+	 * Alias for the buyer-visible test-mode banner.
+	 *
+	 * @param bool  $test_mode Test mode flag.
+	 * @param mixed $context   Optional delivery context.
+	 * @return string
+	 */
+	function velotok_core_delivery_test_mode_banner_for_buyer( $test_mode = null, $context = array() ) {
+		return velotok_core_delivery_test_mode_banner( $test_mode, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_banner_buyer' ) ) {
+	/**
+	 * Alias for the buyer-visible test-mode banner.
+	 *
+	 * @param bool  $test_mode Test mode flag.
+	 * @param mixed $context   Optional delivery context.
+	 * @return string
+	 */
+	function velotok_core_delivery_test_mode_banner_buyer( $test_mode = null, $context = array() ) {
+		return velotok_core_delivery_test_mode_banner( $test_mode, $context );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_buyer_banner' ) ) {
+	/**
+	 * Alias for the buyer-visible test-mode banner.
+	 *
+	 * @param bool  $test_mode Test mode flag.
+	 * @param mixed $context   Optional delivery context.
+	 * @return string
+	 */
+	function velotok_core_delivery_test_mode_buyer_banner( $test_mode = null, $context = array() ) {
+		return velotok_core_delivery_test_mode_banner( $test_mode, $context );
 	}
 }
 
