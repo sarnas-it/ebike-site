@@ -32,6 +32,7 @@ includes('woocommerce_created_customer', 'WooCommerce registration must be marke
 includes('woocommerce_after_customer_login_form', 'The registration form must be reachable from My Account');
 includes('add_shortcode', 'A registration form shortcode must be registered');
 includes('[velotok_register]', 'The registration form must be documented as a shortcode');
+includes('velotok_core_wp_suppress_customer_created_hook', 'Registration must suppress the duplicate WooCommerce hook');
 
 const php = spawnSync('php', ['-v'], { encoding: 'utf8' });
 
@@ -50,25 +51,42 @@ assert.strictEqual(
 
 const confirmedLine = "update_user_meta( $user_id, VELOTOK_ACCOUNT_CONFIRMED_META, '0' );";
 const pendingLine = "update_user_meta( $user_id, VELOTOK_ACCOUNT_STATUS_META, 'pending' );";
+const persistLine = "return wc_create_new_customer( $email, $username, $password, $customer_data );";
 
-const broken = source
+const unconfirmed = source
   .replace(confirmedLine, "update_user_meta( $user_id, VELOTOK_ACCOUNT_CONFIRMED_META, '1' );")
   .replace(pendingLine, "update_user_meta( $user_id, VELOTOK_ACCOUNT_STATUS_META, 'active' );");
 
-assert.notStrictEqual(broken, source, 'Failed to build the broken WordPress accounts integration');
+assert.notStrictEqual(unconfirmed, source, 'Failed to build the broken WordPress accounts integration');
+
+const unpersisted = source.replace(persistLine, 'return 0;');
+
+assert.notStrictEqual(unpersisted, source, 'Failed to remove customer persistence from the integration');
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'velotok-accounts-wp-'));
-const brokenPath = path.join(tmpDir, 'accounts-wordpress.php');
-fs.writeFileSync(brokenPath, broken);
 
-const env = Object.assign({}, process.env, { VELOTOK_ACCOUNTS_WP_INTEGRATION: brokenPath });
-const brokenRun = spawnSync('php', [phpTestPath], { cwd: root, env, encoding: 'utf8' });
+const env = Object.assign({}, process.env);
+
+function runBroken(variant, filename) {
+  const brokenPath = path.join(tmpDir, filename);
+  fs.writeFileSync(brokenPath, variant);
+  const runEnv = Object.assign({}, env, { VELOTOK_ACCOUNTS_WP_INTEGRATION: brokenPath });
+  return spawnSync('php', [phpTestPath], { cwd: root, env: runEnv, encoding: 'utf8' });
+}
+
+const unconfirmedRun = runBroken(unconfirmed, 'accounts-wordpress-unconfirmed.php');
+const unpresistedRun = runBroken(unpersisted, 'accounts-wordpress-unpersisted.php');
 
 fs.rmSync(tmpDir, { recursive: true, force: true });
 
 assert.ok(
-  brokenRun.status !== 0,
+  unconfirmedRun.status !== 0,
   'Red-green proof failed: the test passed when registration marked the account confirmed immediately'
 );
 
-console.log('PASS: WordPress accounts integration is persistent and the test fails without email confirmation');
+assert.ok(
+  unpresistedRun.status !== 0,
+  'Red-green proof failed: the registration handler test passed without persisting the customer'
+);
+
+console.log('PASS: WordPress accounts integration is persistent and the test fails without email confirmation or customer persistence');

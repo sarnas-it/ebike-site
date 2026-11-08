@@ -210,6 +210,28 @@ function velotok_core_wp_is_existing_email_error( $error ) {
 }
 
 /**
+ * Mark whether the plugin is creating a customer in its own registration flow.
+ *
+ * WooCommerce fires `woocommerce_created_customer` for every customer created
+ * with wc_create_new_customer(). Without this guard the plugin would treat its
+ * own customer as an external registration, send a second confirmation email
+ * and log the visitor out before the pending account is stored. The guard
+ * lets velotok_core_wp_register_account() own the confirmation token instead.
+ *
+ * @param bool|null $suppress New value or null to read the current value.
+ * @return bool
+ */
+function velotok_core_wp_suppress_customer_created_hook( $suppress = null ) {
+	static $current = false;
+
+	if ( null !== $suppress ) {
+		$current = (bool) $suppress;
+	}
+
+	return $current;
+}
+
+/**
  * Persist a new customer through WooCommerce or WordPress.
  *
  * @param string $email    Email.
@@ -360,7 +382,9 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		);
 	}
 
-	$user_id = velotok_core_wp_create_customer( $email, $password, $options );
+	$previous_suppress = velotok_core_wp_suppress_customer_created_hook( true );
+	$user_id           = velotok_core_wp_create_customer( $email, $password, $options );
+	velotok_core_wp_suppress_customer_created_hook( $previous_suppress );
 
 	if ( is_wp_error( $user_id ) || $user_id <= 0 ) {
 		$existing = velotok_core_wp_find_user_by_email( $email );
@@ -1038,6 +1062,10 @@ function velotok_core_wp_block_unconfirmed_login( $user, $username = '', $passwo
  */
 function velotok_core_wp_on_wc_customer_created( $customer_id, $new_customer_data = array(), $password_generated = false ) {
 	unset( $new_customer_data, $password_generated );
+
+	if ( velotok_core_wp_suppress_customer_created_hook() ) {
+		return;
+	}
 
 	$customer_id = (int) $customer_id;
 

@@ -31,6 +31,8 @@ $GLOBALS['velotok_test_redirects']    = array();
 $GLOBALS['velotok_test_hooks']         = array();
 $GLOBALS['velotok_test_nonces']       = array();
 $GLOBALS['velotok_test_cart_items']   = 0;
+$GLOBALS['velotok_test_throw_redirect']       = false;
+$GLOBALS['velotok_test_fire_customer_created'] = false;
 
 if ( ! class_exists( 'WP_Error' ) ) {
 	/**
@@ -297,6 +299,10 @@ function is_ssl() {
 function wp_safe_redirect( $url ) {
 	$GLOBALS['velotok_test_redirects'][] = $url;
 
+	if ( ! empty( $GLOBALS['velotok_test_throw_redirect'] ) ) {
+		throw new RuntimeException( 'redirect:' . $url );
+	}
+
 	return true;
 }
 
@@ -308,6 +314,10 @@ function wp_safe_redirect( $url ) {
  */
 function wp_redirect( $url ) {
 	$GLOBALS['velotok_test_redirects'][] = $url;
+
+	if ( ! empty( $GLOBALS['velotok_test_throw_redirect'] ) ) {
+		throw new RuntimeException( 'redirect:' . $url );
+	}
 
 	return true;
 }
@@ -413,6 +423,12 @@ function wc_create_new_customer( $email, $username = '', $password = '', $args =
 	}
 
 	$user = velotok_test_add_user( $email, $username, $password );
+
+	// WooCommerce fires this hook after creating a customer. The registration
+	// flow must suppress the plugin's own handler so the token is not sent twice.
+	if ( ! empty( $GLOBALS['velotok_test_fire_customer_created'] ) ) {
+		velotok_core_wp_on_wc_customer_created( (int) $user->ID, array(), false );
+	}
 
 	return (int) $user->ID;
 }
@@ -736,6 +752,8 @@ function velotok_wp_reset_store() {
 	$GLOBALS['velotok_test_logout_calls'] = 0;
 	$GLOBALS['velotok_test_redirects']    = array();
 	$GLOBALS['velotok_test_cart_items']   = 0;
+	$GLOBALS['velotok_test_throw_redirect']       = false;
+	$GLOBALS['velotok_test_fire_customer_created'] = false;
 }
 
 velotok_wp_reset_store();
@@ -828,6 +846,68 @@ velotok_wp_assert( true === $logout['logged_out'], 'Выход должен за
 velotok_wp_assert( true === $logout['session_ended'], 'Выход должен помечать сессию завершённой.' );
 velotok_wp_assert( 1 === (int) $GLOBALS['velotok_test_logout_calls'], 'Выход должен вызывать wp_logout().' );
 velotok_wp_assert( false === velotok_core_account_can_access( $user_id )['allowed'], 'После выхода доступ к кабинету должен быть закрыт.' );
+
+velotok_wp_reset_store();
+$GLOBALS['velotok_test_fire_customer_created'] = true;
+$GLOBALS['velotok_test_throw_redirect']        = true;
+$_POST = array(
+	'velotok_register_nonce' => 'nonce-velotok_register',
+	'email'                  => 'handler@example.com',
+	'password'               => 'HandlerPass1',
+);
+
+$handler_exception = null;
+
+try {
+	velotok_core_wp_handle_register();
+} catch ( RuntimeException $exception ) {
+	$handler_exception = $exception;
+}
+
+$GLOBALS['velotok_test_throw_redirect']        = false;
+$GLOBALS['velotok_test_fire_customer_created'] = false;
+
+velotok_wp_assert( null !== $handler_exception, 'Форма регистрации должна завершаться redirect после создания аккаунта.' );
+velotok_wp_assert( 1 === count( $GLOBALS['velotok_test_users'] ), 'Отправка формы регистрации должна сохранять пользователя.' );
+velotok_wp_assert( in_array( 'wc_create_new_customer', $GLOBALS['velotok_test_created_via'], true ), 'Отправка формы должна создавать покупателя через WooCommerce.' );
+
+$handler_user = get_user_by( 'email', 'handler@example.com' );
+
+velotok_wp_assert( null !== $handler_user, 'Пользователь из формы должен находиться по email.' );
+velotok_wp_assert( '0' === (string) get_user_meta( (int) $handler_user->ID, VELOTOK_ACCOUNT_CONFIRMED_META, true ), 'Пользователь из формы должен ждать подтверждения.' );
+velotok_wp_assert( 'pending' === (string) get_user_meta( (int) $handler_user->ID, VELOTOK_ACCOUNT_STATUS_META, true ), 'Пользователь из формы должен быть pending.' );
+velotok_wp_assert( '' !== (string) get_user_meta( (int) $handler_user->ID, VELOTOK_ACCOUNT_TOKEN_META, true ), 'Пользователь из формы должен получить токен подтверждения.' );
+velotok_wp_assert( 1 === count( $GLOBALS['velotok_test_mail'] ), 'Письмо подтверждения должно отправляться ровно один раз.' );
+velotok_wp_assert( 0 === (int) $GLOBALS['velotok_test_logout_calls'], 'Регистрация через форму не должна разлогинивать посетителя.' );
+velotok_wp_assert( 0 === (int) $GLOBALS['velotok_test_current_user'], 'После регистрации вход должен оставаться закрытым.' );
+
+$handler_redirect = end( $GLOBALS['velotok_test_redirects'] );
+velotok_wp_assert( false !== strpos( (string) $handler_redirect, 'velotok_registered=1' ), 'После регистрации должен быть redirect с флагом регистрации.' );
+velotok_wp_assert( false !== strpos( (string) $handler_redirect, 'velotok_next=confirm_email' ), 'После регистрации должен быть redirect на подтверждение email.' );
+
+$_POST = array(
+	'velotok_register_nonce' => 'nonce-velotok_register',
+	'email'                  => 'handler@example.com',
+	'password'               => 'DifferentPass2',
+);
+
+$GLOBALS['velotok_test_throw_redirect'] = true;
+$duplicate_exception = null;
+
+try {
+	velotok_core_wp_handle_register();
+} catch ( RuntimeException $exception ) {
+	$duplicate_exception = $exception;
+}
+
+$GLOBALS['velotok_test_throw_redirect'] = false;
+$_POST = array();
+
+velotok_wp_assert( null !== $duplicate_exception, 'Повторная отправка формы должна завершаться redirect.' );
+velotok_wp_assert( 1 === count( $GLOBALS['velotok_test_users'] ), 'Повторная отправка формы не должна создавать дубль.' );
+
+$duplicate_redirect = end( $GLOBALS['velotok_test_redirects'] );
+velotok_wp_assert( false !== strpos( (string) $duplicate_redirect, 'velotok_login_required=1' ), 'Существующий email из формы должен вести ко входу.' );
 
 $form = velotok_core_wp_registration_form();
 
