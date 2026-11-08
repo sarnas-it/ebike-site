@@ -17,7 +17,7 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 			'parent_spec'     => 'ecommerce-store',
 			'requirement'     => 'TESTEB-23',
 			'task'            => 'TESTEB-23',
-			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25' ),
+			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-26' ),
 			'provider'        => 'woocommerce',
 			'provider_label'  => 'WooCommerce',
 			'checkout_class'  => 'WC_Checkout',
@@ -80,10 +80,13 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 				'visible_to'        => array( 'customer', 'owner' ),
 			),
 			'idempotency'     => array(
+				'requirement'       => 'TESTEB-26',
 				'field'             => 'velotok_checkout_key',
 				'meta'              => '_velotok_checkout_key',
 				'prevents_duplicate'=> true,
 				'reuse_existing'    => true,
+				'server_side'       => true,
+				'db_lookup'         => true,
 				'duplicate_code'    => 'CHECKOUT_DUPLICATE',
 				'message'           => 'Этот заказ уже оформлен.',
 			),
@@ -471,8 +474,28 @@ if ( ! function_exists( 'velotok_core_checkout_find_order' ) ) {
 		}
 
 		if ( function_exists( 'wc_get_orders' ) ) {
-			$contract = velotok_core_checkout_order_contract();
-			$orders   = wc_get_orders(
+			$contract   = velotok_core_checkout_order_contract();
+			$meta_query = array(
+				array(
+					'key'     => $contract['idempotency']['meta'],
+					'value'   => $key,
+					'compare' => '=',
+				),
+			);
+
+			$orders = wc_get_orders(
+				array(
+					'limit'      => 1,
+					'return'     => 'objects',
+					'meta_query' => $meta_query,
+				)
+			);
+
+			if ( ! empty( $orders ) ) {
+				return reset( $orders );
+			}
+
+			$orders = wc_get_orders(
 				array(
 					'limit'      => 1,
 					'meta_key'   => $contract['idempotency']['meta'],
