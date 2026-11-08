@@ -17,7 +17,7 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 			'parent_spec'     => 'ecommerce-store',
 			'requirement'     => 'TESTEB-23',
 			'task'            => 'TESTEB-23',
-			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24' ),
+			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25' ),
 			'provider'        => 'woocommerce',
 			'provider_label'  => 'WooCommerce',
 			'checkout_class'  => 'WC_Checkout',
@@ -66,6 +66,7 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 				'comment_field'  => 'customer_note',
 			),
 			'order'           => array(
+				'requirement'       => 'TESTEB-25',
 				'composition_field' => 'line_items',
 				'delivery_field'    => 'delivery_method',
 				'payment_field'     => 'payment_method',
@@ -597,6 +598,197 @@ if ( ! function_exists( 'velotok_core_checkout_create_order' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_checkout_first_filled' ) ) {
+	function velotok_core_checkout_first_filled( $source, $keys, $default = '' ) {
+		foreach ( (array) $keys as $key ) {
+			$value = velotok_core_checkout_value( $source, array( $key ), null );
+
+			if ( is_array( $value ) || is_object( $value ) ) {
+				continue;
+			}
+
+			if ( '' !== trim( velotok_core_checkout_scalar( $value ) ) ) {
+				return $value;
+			}
+		}
+
+		return $default;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_checkout_method_id' ) ) {
+	function velotok_core_checkout_method_id( $value, $default = '' ) {
+		if ( is_object( $value ) ) {
+			foreach ( array( 'get_method_id', 'get_id' ) as $method ) {
+				if ( method_exists( $value, $method ) ) {
+					$value = $value->$method();
+					break;
+				}
+			}
+		}
+
+		if ( is_array( $value ) ) {
+			foreach ( array( 'method_id', 'id', 'value' ) as $key ) {
+				if ( isset( $value[ $key ] ) && ! is_array( $value[ $key ] ) && ! is_object( $value[ $key ] ) ) {
+					$value = $value[ $key ];
+					break;
+				}
+			}
+
+			if ( is_array( $value ) ) {
+				$value = reset( $value );
+			}
+		}
+
+		if ( is_array( $value ) || is_object( $value ) ) {
+			return $default;
+		}
+
+		$value = trim( velotok_core_checkout_scalar( $value, $default ) );
+
+		if ( '' !== $value && false !== strpos( $value, ':' ) ) {
+			$parts = explode( ':', $value, 2 );
+			$value = trim( $parts[0] );
+		}
+
+		return '' !== $value ? $value : $default;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_checkout_order_items' ) ) {
+	function velotok_core_checkout_order_items( $order, $data = array() ) {
+		$items = null;
+
+		if ( is_object( $order ) ) {
+			foreach ( array( 'get_items', 'get_line_items' ) as $method ) {
+				if ( method_exists( $order, $method ) ) {
+					$items = $order->$method();
+					break;
+				}
+			}
+
+			if ( null === $items ) {
+				$items = velotok_core_checkout_value( $order, array( 'line_items', 'items' ), null );
+			}
+		}
+
+		if ( null === $items || ( ! is_array( $items ) && ! is_object( $items ) ) ) {
+			$items = velotok_core_checkout_value( $data, array( 'line_items', 'items' ), array() );
+		}
+
+		if ( is_object( $items ) && method_exists( $items, 'get_items' ) ) {
+			$items = $items->get_items();
+		}
+
+		return is_array( $items ) ? $items : array();
+	}
+}
+
+if ( ! function_exists( 'velotok_core_checkout_order_delivery_method' ) ) {
+	function velotok_core_checkout_order_delivery_method( $order, $data = array(), $default = '' ) {
+		$contract = velotok_core_checkout_order_contract();
+		$value    = velotok_core_checkout_order_meta( $order, $contract['order']['delivery_meta'], '' );
+		$value    = velotok_core_checkout_method_id( $value, '' );
+
+		if ( '' !== $value ) {
+			return $value;
+		}
+
+		$value = velotok_core_checkout_method_id( velotok_core_checkout_first_filled( $data, array( 'delivery_method', 'shipping_method', 'velotok_delivery_method' ), '' ), '' );
+
+		if ( '' !== $value ) {
+			return $value;
+		}
+
+		if ( is_object( $order ) && method_exists( $order, 'get_shipping_methods' ) ) {
+			foreach ( (array) $order->get_shipping_methods() as $shipping ) {
+				$value = velotok_core_checkout_method_id( $shipping, '' );
+
+				if ( '' !== $value ) {
+					return $value;
+				}
+			}
+		}
+
+		$value = velotok_core_checkout_method_id( velotok_core_checkout_value( $order, array( 'delivery_method', 'shipping_method' ), '' ), '' );
+
+		return '' !== $value ? $value : $default;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_checkout_order_payment_method' ) ) {
+	function velotok_core_checkout_order_payment_method( $order, $data = array(), $default = '' ) {
+		$contract = velotok_core_checkout_order_contract();
+		$value    = velotok_core_checkout_scalar( velotok_core_checkout_order_meta( $order, $contract['order']['payment_meta'], '' ) );
+
+		if ( '' !== trim( $value ) ) {
+			return $value;
+		}
+
+		$value = velotok_core_checkout_scalar( velotok_core_checkout_first_filled( $data, array( 'payment_method' ), '' ) );
+
+		if ( '' !== trim( $value ) ) {
+			return $value;
+		}
+
+		if ( is_object( $order ) && method_exists( $order, 'get_payment_method' ) ) {
+			$value = velotok_core_checkout_scalar( $order->get_payment_method() );
+
+			if ( '' !== trim( $value ) ) {
+				return $value;
+			}
+		}
+
+		return $default;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_checkout_order_comment' ) ) {
+	function velotok_core_checkout_order_comment( $order, $data = array(), $default = '' ) {
+		$contract = velotok_core_checkout_order_contract();
+		$value    = velotok_core_checkout_scalar( velotok_core_checkout_order_meta( $order, $contract['order']['comment_meta'], '' ) );
+
+		if ( '' !== trim( $value ) ) {
+			return $value;
+		}
+
+		$value = velotok_core_checkout_scalar( velotok_core_checkout_first_filled( $data, array( 'customer_note', 'order_comments', 'comment' ), '' ) );
+
+		if ( '' !== trim( $value ) ) {
+			return $value;
+		}
+
+		if ( is_object( $order ) ) {
+			foreach ( array( 'get_customer_note', 'get_order_comment' ) as $method ) {
+				if ( method_exists( $order, $method ) ) {
+					$value = velotok_core_checkout_scalar( $order->$method() );
+
+					if ( '' !== trim( $value ) ) {
+						return $value;
+					}
+				}
+			}
+		}
+
+		return $default;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_checkout_order_tracking_number' ) ) {
+	function velotok_core_checkout_order_tracking_number( $order, $data = array(), $default = '' ) {
+		$contract = velotok_core_checkout_order_contract();
+		$value    = velotok_core_checkout_scalar( velotok_core_checkout_order_meta( $order, $contract['order']['tracking_meta'], '' ) );
+
+		if ( '' !== trim( $value ) ) {
+			return $value;
+		}
+
+		$value = velotok_core_checkout_scalar( velotok_core_checkout_first_filled( $data, array( 'delivery_tracking_number', 'tracking_number' ), '' ) );
+
+		return '' !== trim( $value ) ? $value : $default;
+	}
+}
+
 if ( ! function_exists( 'velotok_core_checkout_build_order_data' ) ) {
 	function velotok_core_checkout_build_order_data( $data, $context = array() ) {
 		$contract   = velotok_core_checkout_order_contract();
@@ -607,18 +799,20 @@ if ( ! function_exists( 'velotok_core_checkout_build_order_data' ) ) {
 			$order_data[ $contract['order']['composition_field'] ] = $items;
 		}
 
-		$delivery = velotok_core_checkout_value( $data, array( 'delivery_method', 'shipping_method', 'velotok_delivery_method' ), velotok_core_checkout_value( $context, array( 'delivery_method' ), '' ) );
-		$payment  = velotok_core_checkout_value( $data, array( 'payment_method' ), velotok_core_checkout_value( $context, array( 'payment_method' ), '' ) );
-		$comment  = velotok_core_checkout_value( $data, array( 'customer_note', 'order_comments' ), velotok_core_checkout_value( $context, array( 'customer_note', 'comment' ), '' ) );
-		$tracking = velotok_core_checkout_value( $data, array( 'delivery_tracking_number', 'tracking_number' ), velotok_core_checkout_value( $context, array( 'delivery_tracking_number', 'tracking_number' ), '' ) );
+		$delivery = velotok_core_checkout_method_id(
+			velotok_core_checkout_first_filled( $data, array( 'delivery_method', 'shipping_method', 'velotok_delivery_method' ), '' )
+		);
+		$payment  = velotok_core_checkout_scalar( velotok_core_checkout_first_filled( $data, array( 'payment_method' ), velotok_core_checkout_first_filled( $context, array( 'payment_method' ), '' ) ) );
+		$comment  = velotok_core_checkout_scalar( velotok_core_checkout_first_filled( $data, array( 'customer_note', 'order_comments' ), velotok_core_checkout_first_filled( $context, array( 'customer_note', 'comment' ), '' ) ) );
+		$tracking = velotok_core_checkout_scalar( velotok_core_checkout_first_filled( $data, array( 'delivery_tracking_number', 'tracking_number' ), velotok_core_checkout_first_filled( $context, array( 'delivery_tracking_number', 'tracking_number' ), '' ) ) );
 
-		$order_data[ $contract['order']['delivery_field'] ] = velotok_core_checkout_scalar( $delivery );
-		$order_data[ $contract['order']['payment_field'] ]  = velotok_core_checkout_scalar( $payment );
-		$order_data[ $contract['order']['comment_field'] ]  = velotok_core_checkout_scalar( $comment );
-		$order_data[ $contract['order']['tracking_field'] ] = velotok_core_checkout_scalar( $tracking );
+		$order_data[ $contract['order']['delivery_field'] ] = $delivery;
+		$order_data[ $contract['order']['payment_field'] ]  = $payment;
+		$order_data[ $contract['order']['comment_field'] ]  = $comment;
+		$order_data[ $contract['order']['tracking_field'] ] = $tracking;
 
 		if ( ! isset( $order_data['order_comments'] ) ) {
-			$order_data['order_comments'] = velotok_core_checkout_scalar( $comment );
+			$order_data['order_comments'] = $comment;
 		}
 
 		$user_id = velotok_core_checkout_value( $data, array( 'user_id', 'customer_id' ), velotok_core_checkout_value( $context, array( 'user_id', 'customer_id' ), 0 ) );
@@ -699,15 +893,29 @@ if ( ! function_exists( 'velotok_core_checkout_persist_order' ) ) {
 		velotok_core_checkout_request_key( $key, true );
 
 		$meta = array(
-			$contract['order']['delivery_meta'] => velotok_core_checkout_value( $data, array( 'delivery_method', 'shipping_method' ), '' ),
-			$contract['order']['payment_meta']  => velotok_core_checkout_value( $data, array( 'payment_method' ), '' ),
-			$contract['order']['comment_meta']  => velotok_core_checkout_value( $data, array( 'customer_note', 'order_comments' ), '' ),
-			$contract['order']['tracking_meta'] => velotok_core_checkout_value( $data, array( 'delivery_tracking_number', 'tracking_number' ), '' ),
+			$contract['order']['delivery_meta'] => velotok_core_checkout_method_id( velotok_core_checkout_first_filled( $data, array( 'delivery_method', 'shipping_method', 'velotok_delivery_method' ), '' ) ),
+			$contract['order']['payment_meta']  => velotok_core_checkout_first_filled( $data, array( 'payment_method' ), '' ),
+			$contract['order']['comment_meta']  => velotok_core_checkout_first_filled( $data, array( 'customer_note', 'order_comments' ), '' ),
+			$contract['order']['tracking_meta'] => velotok_core_checkout_first_filled( $data, array( 'delivery_tracking_number', 'tracking_number' ), '' ),
 			$contract['idempotency']['meta']    => $key,
 		);
 
 		foreach ( $meta as $meta_key => $meta_value ) {
 			velotok_core_checkout_set_order_meta( $order, $meta_key, velotok_core_checkout_scalar( $meta_value ) );
+		}
+
+		if ( is_object( $order ) ) {
+			$order_fields = array(
+				'set_payment_method'  => $meta[ $contract['order']['payment_meta'] ],
+				'set_customer_note'   => $meta[ $contract['order']['comment_meta'] ],
+				'set_shipping_method' => $meta[ $contract['order']['delivery_meta'] ],
+			);
+
+			foreach ( $order_fields as $setter => $value ) {
+				if ( method_exists( $order, $setter ) ) {
+					$order->$setter( $value );
+				}
+			}
 		}
 
 		if ( is_object( $order ) && method_exists( $order, 'save' ) ) {
@@ -733,16 +941,12 @@ if ( ! function_exists( 'velotok_core_checkout_order_details' ) ) {
 			}
 		}
 
-		$items = velotok_core_checkout_value( $order, array( 'line_items', 'items' ), velotok_core_checkout_value( $data, array( 'line_items', 'items' ), array() ) );
+		$items = velotok_core_checkout_order_items( $order, $data );
 
-		if ( is_object( $items ) && method_exists( $items, 'get_items' ) ) {
-			$items = $items->get_items();
-		}
-
-		$delivery = velotok_core_checkout_order_meta( $order, $contract['order']['delivery_meta'], velotok_core_checkout_value( $data, array( 'delivery_method', 'shipping_method' ), '' ) );
-		$payment  = velotok_core_checkout_order_meta( $order, $contract['order']['payment_meta'], velotok_core_checkout_value( $data, array( 'payment_method' ), '' ) );
-		$comment  = velotok_core_checkout_order_meta( $order, $contract['order']['comment_meta'], velotok_core_checkout_value( $data, array( 'customer_note', 'order_comments' ), '' ) );
-		$tracking = velotok_core_checkout_order_meta( $order, $contract['order']['tracking_meta'], velotok_core_checkout_value( $data, array( 'delivery_tracking_number', 'tracking_number' ), '' ) );
+		$delivery = velotok_core_checkout_order_delivery_method( $order, $data );
+		$payment  = velotok_core_checkout_order_payment_method( $order, $data );
+		$comment  = velotok_core_checkout_order_comment( $order, $data );
+		$tracking = velotok_core_checkout_order_tracking_number( $order, $data );
 
 		return array(
 			'order_id'        => velotok_core_checkout_order_id( $order ),
