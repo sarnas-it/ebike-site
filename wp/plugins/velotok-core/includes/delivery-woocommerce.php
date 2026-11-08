@@ -136,29 +136,22 @@ if ( ! function_exists( 'velotok_core_delivery_package_order' ) ) {
 
 		foreach ( (array) velotok_core_delivery_zones_value( $package, array( 'contents' ), array() ) as $line ) {
 			$product  = velotok_core_delivery_zones_value( $line, array( 'data', 'product' ), null );
-			$quantity = velotok_core_delivery_zones_number( velotok_core_delivery_zones_value( $line, array( 'quantity', 'qty' ), 1 ), 1 );
-			$item_weight = null;
-
-			if ( is_object( $product ) ) {
-				if ( method_exists( $product, 'get_weight' ) ) {
-					$item_weight = $product->get_weight();
-				}
-
-				if ( ( ! is_numeric( $item_weight ) || '' === (string) $item_weight ) && method_exists( $product, 'get_id' ) && function_exists( 'get_post_meta' ) ) {
-					$item_weight = get_post_meta( (int) $product->get_id(), '_velotok_weight_kg', true );
-				}
-			} else {
-				$item_weight = velotok_core_delivery_zones_value( $line, array( 'weight', 'product_weight' ), null );
-			}
-
-			$item = array(
-				'quantity' => max( 0, $quantity ),
+			$quantity = max(
+				0,
+				velotok_core_delivery_zones_number( velotok_core_delivery_zones_value( $line, array( 'quantity', 'qty' ), 1 ), 1 )
 			);
+			$item     = array(
+				'quantity' => $quantity,
+				'product'  => $product,
+				'weight'   => velotok_core_delivery_zones_value( $line, array( 'weight', 'product_weight' ), null ),
+			);
+			$item_weight = velotok_core_delivery_zones_item_weight( $item );
 
-			if ( is_numeric( $item_weight ) && '' !== (string) $item_weight ) {
-				$item['weight'] = (float) $item_weight;
-				$weight        += (float) $item_weight * max( 0, $quantity );
+			if ( null !== $item_weight ) {
+				$item['weight'] = $item_weight;
+				$weight        += $item_weight * $quantity;
 			} else {
+				unset( $item['weight'] );
 				$complete = false;
 			}
 
@@ -270,9 +263,155 @@ if ( function_exists( 'add_action' ) ) {
 	add_action( 'woocommerce_review_order_after_shipping', 'velotok_core_delivery_checkout_test_mode_banner' );
 }
 
+if ( ! function_exists( 'velotok_core_delivery_order_eta_range' ) ) {
+	/**
+	 * Read the persisted ETA range from an order.
+	 *
+	 * The ETA is stored as a range (min/max plus a human-readable label). The
+	 * helper also understands the older separate meta keys, so existing orders
+	 * keep their delivery time.
+	 *
+	 * @param int|object $order Order identifier or order object.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_order_eta_range( $order = 0 ) {
+		$empty = array(
+			'min_days' => null,
+			'max_days' => null,
+			'min'      => null,
+			'max'      => null,
+			'range'    => array( 'min' => null, 'max' => null ),
+			'label'    => '',
+			'text'     => '',
+		);
+
+		if ( ! function_exists( 'get_post_meta' ) ) {
+			return $empty;
+		}
+
+		if ( is_object( $order ) ) {
+			$order_id = method_exists( $order, 'get_id' ) ? (int) $order->get_id() : 0;
+		} else {
+			$order_id = (int) $order;
+		}
+
+		if ( $order_id <= 0 ) {
+			return $empty;
+		}
+
+		$stored = get_post_meta( $order_id, '_velotok_delivery_eta', true );
+		$min    = null;
+		$max    = null;
+		$label  = '';
+
+		if ( is_array( $stored ) ) {
+			$min_value = velotok_core_delivery_zones_value( $stored, array( 'min_days', 'min' ), null );
+			$max_value = velotok_core_delivery_zones_value( $stored, array( 'max_days', 'max' ), null );
+			$min       = is_numeric( $min_value ) ? (int) ceil( (float) $min_value ) : null;
+			$max       = is_numeric( $max_value ) ? (int) ceil( (float) $max_value ) : null;
+			$label      = (string) velotok_core_delivery_zones_value( $stored, array( 'label', 'text' ), '' );
+		} elseif ( is_string( $stored ) && '' !== trim( $stored ) ) {
+			$label = trim( $stored );
+		}
+
+		if ( null === $min ) {
+			$value = get_post_meta( $order_id, '_velotok_delivery_eta_min_days', true );
+			$min   = is_numeric( $value ) ? (int) ceil( (float) $value ) : null;
+		}
+
+		if ( null === $max ) {
+			$value = get_post_meta( $order_id, '_velotok_delivery_eta_max_days', true );
+			$max   = is_numeric( $value ) ? (int) ceil( (float) $value ) : null;
+		}
+
+		if ( '' === $label ) {
+			$value = get_post_meta( $order_id, '_velotok_delivery_eta_label', true );
+			$label = is_scalar( $value ) ? trim( (string) $value ) : '';
+		}
+
+		if ( '' !== $label && ( null === $min || null === $max ) ) {
+			$parsed = velotok_core_delivery_zones_eta_parse( $label );
+
+			if ( null === $min && null !== $parsed['min'] ) {
+				$min = $parsed['min'];
+			}
+
+			if ( null === $max && null !== $parsed['max'] ) {
+				$max = $parsed['max'];
+			}
+		}
+
+		if ( null !== $min && null !== $max && $min > $max ) {
+			$swap = $min;
+			$min  = $max;
+			$max  = $swap;
+		}
+
+		if ( null !== $min || null !== $max ) {
+			$formatted = velotok_core_delivery_zones_eta_label( $min, $max );
+
+			if ( '' !== $formatted ) {
+				$label = $formatted;
+			}
+		}
+
+		return array(
+			'min_days' => $min,
+			'max_days' => $max,
+			'min'      => $min,
+			'max'      => $max,
+			'range'    => array( 'min' => $min, 'max' => $max ),
+			'label'    => $label,
+			'text'     => $label,
+		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_order_eta_html' ) ) {
+	/**
+	 * Render the persisted delivery ETA range for the order owner.
+	 *
+	 * @param int|object $order Order identifier or order object.
+	 * @return string
+	 */
+	function velotok_core_delivery_order_eta_html( $order = 0 ) {
+		$eta = velotok_core_delivery_order_eta_range( $order );
+
+		if ( '' === $eta['label'] ) {
+			return '';
+		}
+
+		$min = null === $eta['min_days'] ? '' : (string) $eta['min_days'];
+		$max = null === $eta['max_days'] ? '' : (string) $eta['max_days'];
+
+		return '<p class="velotok-delivery-eta velotok-delivery-order-eta" data-eta-min="' . velotok_core_delivery_woocommerce_escape( $min ) . '" data-eta-max="' . velotok_core_delivery_woocommerce_escape( $max ) . '">'
+			. velotok_core_delivery_woocommerce_escape( $eta['label'] )
+			. '</p>';
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_order_eta' ) ) {
+	/**
+	 * Echo the order ETA range on the order details screen.
+	 *
+	 * @param int|object $order Order identifier or order object.
+	 * @return void
+	 */
+	function velotok_core_delivery_order_eta( $order = 0 ) {
+		echo velotok_core_delivery_order_eta_html( $order );
+	}
+}
+if ( function_exists( 'add_action' ) ) {
+	add_action( 'woocommerce_order_details_after_order_table', 'velotok_core_delivery_order_eta', 10, 1 );
+}
+
 if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 	/**
 	 * Persist the selected delivery method, cost and ETA range on the order.
+	 *
+	 * The ETA is stored as a range: separate min/max meta keys plus a combined
+	 * range array and its label. This keeps the order display and any later
+	 * re-read of the delivery time unambiguous.
 	 *
 	 * @param int $order_id Order identifier.
 	 * @return void
@@ -290,22 +429,69 @@ if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 
 		foreach ( (array) $order->get_shipping_methods() as $shipping ) {
 			$method_id = method_exists( $shipping, 'get_method_id' ) ? (string) $shipping->get_method_id() : '';
+			$meta      = method_exists( $shipping, 'get_meta_data' ) ? (array) $shipping->get_meta_data() : array();
+			$range     = null;
 
-			if ( ! in_array( $method_id, array( 'cdek', 'russian_post' ), true ) ) {
-				continue;
+			foreach ( array( '_velotok_eta_range', '_velotok_delivery_eta' ) as $range_key ) {
+				if ( isset( $meta[ $range_key ] ) && is_array( $meta[ $range_key ] ) ) {
+					$range = $meta[ $range_key ];
+					break;
+				}
 			}
 
-			$meta = method_exists( $shipping, 'get_meta_data' ) ? (array) $shipping->get_meta_data() : array();
+			$min = isset( $meta['_velotok_eta_min_days'] )
+				? $meta['_velotok_eta_min_days']
+				: velotok_core_delivery_zones_value( $range, array( 'min_days', 'min' ), null );
+			$max = isset( $meta['_velotok_eta_max_days'] )
+				? $meta['_velotok_eta_max_days']
+				: velotok_core_delivery_zones_value( $range, array( 'max_days', 'max' ), null );
+			$label = isset( $meta['_velotok_eta_label'] )
+				? $meta['_velotok_eta_label']
+				: velotok_core_delivery_zones_value( $range, array( 'label', 'text' ), '' );
+
+			$eta = velotok_core_delivery_zones_eta_range(
+				array(
+					'eta'           => array(
+						'min_days' => $min,
+						'max_days' => $max,
+					),
+					'delivery_time' => $label,
+				)
+			);
+			$has_eta   = null !== $eta['min_days'] || null !== $eta['max_days'] || '' !== $eta['label'];
+			$recognized = in_array( $method_id, array( 'cdek', 'russian_post' ), true );
+
+			if ( ! $recognized && ! $has_eta ) {
+				continue;
+			}
 
 			update_post_meta( $order_id, '_velotok_delivery_method', $method_id );
 			update_post_meta( $order_id, '_velotok_delivery_cost', method_exists( $shipping, 'get_total' ) ? (float) $shipping->get_total() : 0.0 );
 
-			if ( isset( $meta['_velotok_eta_min_days'] ) ) {
-				update_post_meta( $order_id, '_velotok_delivery_eta_min_days', (int) $meta['_velotok_eta_min_days'] );
+			if ( null !== $eta['min_days'] ) {
+				update_post_meta( $order_id, '_velotok_delivery_eta_min_days', (int) $eta['min_days'] );
 			}
 
-			if ( isset( $meta['_velotok_eta_max_days'] ) ) {
-				update_post_meta( $order_id, '_velotok_delivery_eta_max_days', (int) $meta['_velotok_eta_max_days'] );
+			if ( null !== $eta['max_days'] ) {
+				update_post_meta( $order_id, '_velotok_delivery_eta_max_days', (int) $eta['max_days'] );
+			}
+
+			if ( '' !== $eta['label'] ) {
+				update_post_meta( $order_id, '_velotok_delivery_eta_label', $eta['label'] );
+			}
+
+			if ( $has_eta ) {
+				$range = array(
+					'min_days' => $eta['min_days'],
+					'max_days' => $eta['max_days'],
+					'min'      => $eta['min_days'],
+					'max'      => $eta['max_days'],
+					'range'    => $eta['range'],
+					'label'    => $eta['label'],
+				);
+
+				update_post_meta( $order_id, '_velotok_delivery_eta', $range );
+				update_post_meta( $order_id, '_velotok_delivery_eta_range', $range );
 			}
 
 			break;

@@ -1,0 +1,96 @@
+name: "Finalize PR #68 evidence"
+run-name: "Finalize PR #68 evidence"
+
+# The finalizer must not be dispatched by the recovery workflow. GitHub only
+# allows workflow_dispatch for workflows that already exist on the default
+# branch, so on the recovery branch the dispatch failed with "workflow not
+# found" after the checks were already published and the PR was merged.
+#
+# Instead both workflows run from the same push. The finalizer discovers the
+# recovery run by the exact triggering commit, waits for it to complete, and
+# only then publishes the completed evidence. No self-dispatch is involved.
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        default: '68'
+      sha:
+        description: Exact commit under test
+        required: true
+      run_id:
+        description: Recovery workflow run id to finalize
+        required: true
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  issues: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: finalize-pr-68-evidence-${{ github.event_name }}-${{ github.sha }}-${{ github.event.inputs.run_id || '' }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Finalize PR #68 evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve the pull request head and recovery trigger
+        id: target
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ github.event.inputs.pr || '68' }}
+          INPUT_SHA: ${{ github.event.inputs.sha }}
+          INPUT_RUN_ID: ${{ github.event.inputs.run_id }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "pr=$INPUT_PR" >>"$GITHUB_OUTPUT"
+            echo "sha=$INPUT_SHA" >>"$GITHUB_OUTPUT"
+            echo "run_id=$INPUT_RUN_ID" >>"$GITHUB_OUTPUT"
+          else
+            node scripts/ci/resolve-pr-target.mjs \
+              --repo "$GITHUB_REPOSITORY" \
+              --pr 68 \
+              --github-output "$GITHUB_OUTPUT"
+            echo "pr=68" >>"$GITHUB_OUTPUT"
+            echo "run_id=" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for the recovery run and publish completed evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TRIGGER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          args=(
+            --repo "$GITHUB_REPOSITORY"
+            --pr "${{ steps.target.outputs.pr }}"
+            --sha "${{ steps.target.outputs.sha }}"
+            --workflow .github/workflows/recover-pr68.yml
+            --comment-file docs/testeb-65-comment.md
+            --comment-marker '<!-- testeb-65-recovery -->'
+            --timeout-ms 2400000
+            --interval-ms 15000
+          )
+          if [ -n "${{ steps.target.outputs.run_id }}" ]; then
+            args+=(--run-id "${{ steps.target.outputs.run_id }}")
+          else
+            args+=(--trigger-sha "$TRIGGER_SHA")
+          fi
+          node scripts/ci/wait-and-publish-evidence.mjs "${args[@]}"
