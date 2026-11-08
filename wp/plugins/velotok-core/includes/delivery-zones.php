@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -47,12 +47,21 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			),
 			'supported_providers'     => array( 'cdek', 'russian_post' ),
 			'eta'                     => array(
+				'requirement'=> 'TESTEB-31',
 				'format'    => 'range',
 				'min_key'   => 'min_days',
 				'max_key'   => 'max_days',
+				'min_keys'  => array( 'min_days', 'min', 'from', 'delivery_min_days', 'eta_min_days' ),
+				'max_keys'  => array( 'max_days', 'max', 'to', 'delivery_max_days', 'eta_max_days' ),
 				'label'     => '{min}–{max} дн.',
 				'min_label' => '{min} дн.',
 				'max_label' => '{max} дн.',
+				'order_meta'=> array(
+					'range' => '_velotok_delivery_eta',
+					'min'   => '_velotok_delivery_eta_min_days',
+					'max'   => '_velotok_delivery_eta_max_days',
+					'label' => '_velotok_delivery_eta_label',
+				),
 			),
 			'weight'                  => array(
 				'requirement'    => 'TESTEB-30',
@@ -631,9 +640,84 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_id' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_zones_eta_parse' ) ) {
+	/**
+	 * Parse an ETA range written as text.
+	 *
+	 * Accepts values such as «1–3», «1-3 дн.», «от 2 до 5 дней» or a single
+	 * value such as «3 дн.». Numeric scalars are handled by the caller.
+	 *
+	 * @param mixed $value Raw ETA value.
+	 * @return array<string,int|null>
+	 */
+	function velotok_core_delivery_zones_eta_parse( $value ) {
+		$parsed = array(
+			'min' => null,
+			'max' => null,
+		);
+
+		if ( ! is_scalar( $value ) ) {
+			return $parsed;
+		}
+
+		$text = trim( (string) $value );
+
+		if ( '' === $text ) {
+			return $parsed;
+		}
+
+		if ( preg_match( '/^(?:\s*от\s*)?(\d+)\s*(?:[-–—]|\.\.|\s+до\s+)\s*(\d+)/iu', $text, $matches ) ) {
+			$parsed['min'] = (int) $matches[1];
+			$parsed['max'] = (int) $matches[2];
+
+			return $parsed;
+		}
+
+		if ( ! is_numeric( $text ) && preg_match( '/(\d+)/u', $text, $matches ) ) {
+			$parsed['min'] = (int) $matches[1];
+			$parsed['max'] = (int) $matches[1];
+		}
+
+		return $parsed;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_eta_label' ) ) {
+	/**
+	 * Format an ETA range using the delivery contract labels.
+	 *
+	 * @param int|null $min Minimum days.
+	 * @param int|null $max Maximum days.
+	 * @return string
+	 */
+	function velotok_core_delivery_zones_eta_label( $min = null, $max = null ) {
+		$contract = velotok_core_delivery_zones_contract();
+
+		if ( null !== $min && null !== $max ) {
+			return $min === $max
+				? str_replace( '{min}', (string) $min, $contract['eta']['min_label'] )
+				: str_replace( array( '{min}', '{max}' ), array( (string) $min, (string) $max ), $contract['eta']['label'] );
+		}
+
+		if ( null !== $min ) {
+			return str_replace( '{min}', (string) $min, $contract['eta']['min_label'] );
+		}
+
+		if ( null !== $max ) {
+			return str_replace( '{max}', (string) $max, $contract['eta']['max_label'] );
+		}
+
+		return '';
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 	/**
 	 * Return a delivery ETA range.
+	 *
+	 * The range is stored and returned as both boundaries (min/max), never as
+	 * an unordered or single-sided value. Configured text ranges such as
+	 * «1–3» are parsed as well.
 	 *
 	 * @param mixed $method Method data.
 	 * @return array<string,mixed>
@@ -641,29 +725,114 @@ if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 	function velotok_core_delivery_zones_eta_range( $method ) {
 		$contract = velotok_core_delivery_zones_contract();
 		$settings = velotok_core_delivery_zones_settings( $method );
-		$eta      = velotok_core_delivery_zones_value( $method, array( 'eta', 'eta_range', 'delivery_time' ), array() );
+		$sentinel = new \stdClass();
 
-		$min = velotok_core_delivery_zones_value(
-			$eta,
-			array( 'min_days', 'min', 'from' ),
-			velotok_core_delivery_zones_value(
-				$method,
-				array( 'eta_min_days', 'min_days' ),
-				isset( $settings['eta_min_days'] ) ? $settings['eta_min_days'] : null
-			)
-		);
-		$max = velotok_core_delivery_zones_value(
-			$eta,
-			array( 'max_days', 'max', 'to' ),
-			velotok_core_delivery_zones_value(
-				$method,
-				array( 'eta_max_days', 'max_days' ),
-				isset( $settings['eta_max_days'] ) ? $settings['eta_max_days'] : null
-			)
+		$min_keys = $contract['eta']['min_keys'];
+		$max_keys = $contract['eta']['max_keys'];
+		$sources  = array();
+		$eta      = velotok_core_delivery_zones_value(
+			$method,
+			array( 'eta', 'eta_range', 'delivery_eta' ),
+			$sentinel
 		);
 
-		$min = is_numeric( $min ) ? (int) ceil( (float) $min ) : null;
-		$max = is_numeric( $max ) ? (int) ceil( (float) $max ) : null;
+		if ( $eta !== $sentinel && null !== $eta ) {
+			$sources[] = $eta;
+		}
+
+		$sources[] = $method;
+		$sources[] = $settings;
+
+		$pick = function ( $source, $keys ) use ( $sentinel ) {
+			foreach ( (array) $keys as $key ) {
+				$value = velotok_core_delivery_zones_value( $source, array( $key ), $sentinel );
+
+				if ( $value === $sentinel || null === $value || ! is_scalar( $value ) ) {
+					continue;
+				}
+
+				if ( '' !== trim( (string) $value ) ) {
+					return $value;
+				}
+			}
+
+			return $sentinel;
+		};
+
+		$normalize = function ( $value ) {
+			if ( ! is_scalar( $value ) ) {
+				return null;
+			}
+
+			$value = trim( (string) $value );
+
+			if ( '' === $value ) {
+				return null;
+			}
+
+			if ( false !== strpos( $value, ',' ) && false === strpos( $value, '.' ) ) {
+				$value = str_replace( ',', '.', $value );
+			}
+
+			return is_numeric( $value ) ? max( 0, (int) ceil( (float) $value ) ) : null;
+		};
+
+		$min = null;
+		$max = null;
+
+		foreach ( $sources as $source ) {
+			if ( null === $min ) {
+				$candidate = $pick( $source, $min_keys );
+
+				if ( $candidate !== $sentinel ) {
+					$min = $normalize( $candidate );
+				}
+			}
+
+			if ( null === $max ) {
+				$candidate = $pick( $source, $max_keys );
+
+				if ( $candidate !== $sentinel ) {
+					$max = $normalize( $candidate );
+				}
+			}
+		}
+
+		$label_keys = array( 'label', 'delivery_time', 'eta_label', 'text', 'range' );
+
+		foreach ( $sources as $source ) {
+			if ( is_scalar( $source ) ) {
+				$parsed = velotok_core_delivery_zones_eta_parse( $source );
+
+				if ( null !== $parsed['min'] && null === $min ) {
+					$min = $parsed['min'];
+				}
+
+				if ( null !== $parsed['max'] && null === $max ) {
+					$max = $parsed['max'];
+				}
+
+				continue;
+			}
+
+			foreach ( $label_keys as $label_key ) {
+				$value = velotok_core_delivery_zones_value( $source, array( $label_key ), $sentinel );
+
+				if ( $value === $sentinel || null === $value || ! is_scalar( $value ) ) {
+					continue;
+				}
+
+				$parsed = velotok_core_delivery_zones_eta_parse( $value );
+
+				if ( null !== $parsed['min'] && null === $min ) {
+					$min = $parsed['min'];
+				}
+
+				if ( null !== $parsed['max'] && null === $max ) {
+					$max = $parsed['max'];
+				}
+			}
+		}
 
 		if ( null !== $min && null !== $max && $min > $max ) {
 			$swap = $min;
@@ -671,17 +840,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 			$max  = $swap;
 		}
 
-		$label = '';
-
-		if ( null !== $min && null !== $max ) {
-			$label = $min === $max
-				? str_replace( '{min}', (string) $min, $contract['eta']['min_label'] )
-				: str_replace( array( '{min}', '{max}' ), array( (string) $min, (string) $max ), $contract['eta']['label'] );
-		} elseif ( null !== $min ) {
-			$label = str_replace( '{min}', (string) $min, $contract['eta']['min_label'] );
-		} elseif ( null !== $max ) {
-			$label = str_replace( '{max}', (string) $max, $contract['eta']['max_label'] );
-		}
+		$label = velotok_core_delivery_zones_eta_label( $min, $max );
 
 		return array(
 			'min_days' => $min,
@@ -690,6 +849,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 			'max'      => $max,
 			'range'    => array( 'min' => $min, 'max' => $max ),
 			'label'    => $label,
+			'text'     => $label,
 		);
 	}
 }
