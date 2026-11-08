@@ -150,6 +150,18 @@ function testTesteb68CommentRecordsCauseWithoutStub() {
       comment.includes('<!-- testeb-68-evidence:end -->'),
     'the TESTEB-68 comment must contain the evidence block the finalizer replaces',
   );
+  assert.ok(
+    comment.includes('42505520113'),
+    'the TESTEB-68 comment must link the successful post-fix recovery run',
+  );
+  assert.ok(
+    comment.includes('330a631e8655c0ae1f2c8d76a011ae319e90a0ac'),
+    'the TESTEB-68 comment must record the real merge commit of PR #78',
+  );
+  assert.ok(
+    comment.includes('ci/recover=success'),
+    'the TESTEB-68 comment must show the status that unblocked the deferred merge',
+  );
   for (const placeholder of [
     'будут добавлены',
     'будет добавлен',
@@ -172,6 +184,14 @@ function testTesteb68TaskCommentRecordExists() {
   assert.ok(record.includes('42504665607'));
   assert.ok(record.includes('128791152777'));
   assert.ok(record.includes('Resource not accessible by integration'));
+  assert.ok(
+    record.includes('42505520113'),
+    'the TESTEB-68 task record must link the successful recovery run',
+  );
+  assert.ok(
+    record.includes('330a631e8655c0ae1f2c8d76a011ae319e90a0ac'),
+    'the TESTEB-68 task record must record the real merge commit',
+  );
   for (const check of REQUIRED_CHECKS) {
     assert.ok(
       record.includes(check),

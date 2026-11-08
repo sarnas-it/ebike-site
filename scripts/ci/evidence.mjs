@@ -180,8 +180,12 @@ export function summarizeRecoveryEvidence({
     checks: {
       total: checks.total,
       success: checks.success,
-      names: checkRuns.map(checkName),
-      conclusions: checkRuns.map((check) => ({
+      // Only the newest run per check name is authoritative. Listing the raw
+      // check runs would repeat a stale in_progress duplicate next to the
+      // completed run that actually unblocked the pull request, making green
+      // evidence look as if it still had a pending check.
+      names: checks.effectiveRuns.map(checkName),
+      conclusions: checks.effectiveRuns.map((check) => ({
         name: checkName(check),
         conclusion: check.conclusion ?? null,
       })),

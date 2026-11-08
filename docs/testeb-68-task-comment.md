@@ -46,6 +46,13 @@ Recovery-механизм из TESTEB-67 был зашит на PR #73, поэт
   `php wp/plugins/velotok-core/tests/accounts-contract-test.php`.
 - `scripts/ci/resolve-pr-target.mjs` и `scripts/ci/should-recover.mjs` умеют
   разрешать PR по коммиту, поэтому recovery не привязан к номеру задачи.
+- `scripts/ci/evidence.mjs`: в блок доказательств попадает только самый свежий
+  check run для каждого имени, поэтому зависший `in_progress`-дубликат больше
+  не выглядит как незавершённая проверка рядом с зелёным результатом.
+- `scripts/ci/tests/pr78-recovery-evidence.test.mjs`: red-green тест на реальном
+  снимке PR #78 — инцидентное состояние (упавший run #42504665607, PR не
+  смержен) обязано быть red, а фактическое post-fix состояние (run #42505520113,
+  merge `330a631...`) — green.
 
 ## Доказательства
 
@@ -69,10 +76,31 @@ Recovery-механизм из TESTEB-67 был зашит на PR #73, поэт
   чужого check run и проверяют, что recovery публикует новые завершённые
   проверки на нужном SHA и всё равно завершает отложенный мерж. Без ветки
   fallback в `upsertCheckRun` эти тесты падают.
-- После push с починкой recovery публикует на проверяемом SHA завершённые
-  check runs `php-lint`, `php-tests`, `php-plugin-tests`, `plugin-tests`,
-  `ci-repair-tests` и статус `ci/recover=success`, после чего отложенный мерж
-  PR #78 выполняется без ручного вмешательства.
+- Фактический post-fix recovery-прогон:
+  [#42505520113](https://github.com/sarnas-it/ebike-site/actions/runs/42505520113)
+  (`.github/workflows/recover-pr78.yml`, событие `push`) —
+  `status=completed`, `conclusion=success`, runner head
+  `65899b710cb71e2dea0c5b3ec46dc3171fac5a4f`, ветка
+  `feat/ebike-site-testeb-68`.
+- На проверяемом head `841470c...` опубликованы завершённые зелёные check runs:
+  `php-lint` (128807297687), `php-tests` (128807302983), `plugin-tests`
+  (128807306499), `php-plugin-tests` (128807310353), `ci-repair-tests`
+  (128807314799). Старый `in_progress`-дубликат `128791152777` остаётся в
+  истории, но для `php-tests` authoritative является более свежий завершённый
+  run.
+- Commit status `ci/recover=success` на `841470c...` ссылается на
+  [#42505520113](https://github.com/sarnas-it/ebike-site/actions/runs/42505520113),
+  поэтому зелёные проверки привязаны к реальному run.
+- Отложенный мерж PR #78 выполнен без ручного вмешательства:
+  `merged=true`, merge commit
+  `330a631e8655c0ae1f2c8d76a011ae319e90a0ac`, merged at
+  `2026-11-08T17:33:38Z`; финализатор
+  [Finalize PR #78 evidence #42505520131](https://github.com/sarnas-it/ebike-site/actions/runs/42505520131)
+  завершился `completed/success`.
+- Red-green тест на критерии приёмки:
+  `node scripts/ci/tests/pr78-recovery-evidence.test.mjs` — инцидентное
+  состояние red, фактическое post-fix состояние green; evidence-блок содержит
+  реальный run, merge commit и итог `доказательства полные (green)`.
 - Локальная проверка полного набора:
   `for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done`
   — все тесты проходят.

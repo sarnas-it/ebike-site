@@ -306,5 +306,35 @@ bash scripts/ci/run-checks.sh .
   и завершает отложенный мерж при зелёных проверках.
 * `.github/workflows/finalize-pr78-evidence.yml` публикует итоговые
   доказательства только после завершения recovery-прогона.
+* `scripts/ci/evidence.mjs` перечисляет в доказательствах только самый свежий
+  check run для каждого имени, поэтому старый `in_progress`-дубликат не
+  выглядит как незавершённая проверка рядом с зелёным результатом.
+
+### Результат после починки (фактический)
+
+* recovery-прогон
+  [#42505520113](https://github.com/sarnas-it/ebike-site/actions/runs/42505520113)
+  — `.github/workflows/recover-pr78.yml`, событие `push`,
+  `status=completed`, `conclusion=success`, runner head
+  `65899b710cb71e2dea0c5b3ec46dc3171fac5a4f` (ветка
+  `feat/ebike-site-testeb-68`);
+* на проверяемом head PR #78 `841470c19d9e62c1a6c4e4c402dff322c81fd747`
+  опубликованы завершённые зелёные check runs `php-lint` (128807297687),
+  `php-tests` (128807302983), `plugin-tests` (128807306499),
+  `php-plugin-tests` (128807310353), `ci-repair-tests` (128807314799);
+* commit status `ci/recover=success` на этом коммите ссылается на run
+  #42505520113, а старый pending-дубликат `php-tests` `128791152777` больше не
+  является authoritative;
+* финализатор [Finalize PR #78 evidence
+  #42505520131](https://github.com/sarnas-it/ebike-site/actions/runs/42505520131)
+  завершился `completed/success`;
+* отложенный мерж PR #78 выполнен без ручного вмешательства
+  `2026-11-08T17:33:38Z`, merge commit
+  `330a631e8655c0ae1f2c8d76a011ae319e90a0ac`.
+
+Red-green проверка критериев приёмки:
+`node scripts/ci/tests/pr78-recovery-evidence.test.mjs` держит инцидентный
+снимок (упавший run #42504665607, PR не смержен) красным, а фактический
+post-fix снимок (run #42505520113, merge `330a631...`) зелёным.
 
 Проверка: `for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done`.
