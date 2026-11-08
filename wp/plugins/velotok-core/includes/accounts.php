@@ -311,7 +311,7 @@ function velotok_core_account_public_user( $user ) {
 		return array();
 	}
 
-	unset( $user['password_hash'], $user['confirmation_token'] );
+	unset( $user['password_hash'], $user['confirmation_token'], $user['pending_guest_cart'], $user['pending_user_cart'] );
 
 	$user['authenticated'] = true;
 	$user['guest']         = false;
@@ -527,6 +527,18 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		$email    = isset( $request['email'] ) ? $request['email'] : '';
 		$password = isset( $request['password'] ) ? $request['password'] : '';
 		$options  = isset( $request['options'] ) && is_array( $request['options'] ) ? $request['options'] : $options;
+
+		if ( ! is_array( $options ) ) {
+			$options = array();
+		}
+
+		if ( isset( $request['guest_cart'] ) ) {
+			$options['guest_cart'] = $request['guest_cart'];
+		}
+
+		if ( isset( $request['user_cart'] ) ) {
+			$options['user_cart'] = $request['user_cart'];
+		}
 	}
 
 	$options = velotok_core_account_registration_options( $options );
@@ -611,6 +623,9 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		$state['next_id'] = $user_id + 1;
 	}
 
+	$pending_guest_cart = isset( $options['guest_cart'] ) && is_array( $options['guest_cart'] ) ? $options['guest_cart'] : array();
+	$pending_user_cart  = isset( $options['user_cart'] ) && is_array( $options['user_cart'] ) ? $options['user_cart'] : array();
+
 	$user = array(
 		'user_id'            => $user_id,
 		'email'              => $email,
@@ -620,6 +635,8 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		'confirmation_token' => $token,
 		'password_hash'      => velotok_core_account_hash_password( $password ),
 		'registered'         => true,
+		'pending_guest_cart' => $pending_guest_cart,
+		'pending_user_cart'  => $pending_user_cart,
 		'mocked'             => true,
 		'source'             => 'stub',
 		'provider'           => 'stub',
@@ -719,6 +736,20 @@ function velotok_core_account_confirm_email( $token_or_email = '', $token = '', 
 
 	$user = $state['users'][ $key ];
 
+	/*
+	 * The cart provided while registering is carried through the mandatory
+	 * email confirmation step. When the confirmation request does not repeat
+	 * the cart snapshot, the snapshot stored at registration is used so the
+	 * completed registration still transfers the guest cart to checkout.
+	 */
+	if ( empty( $guest_cart ) && isset( $user['pending_guest_cart'] ) && is_array( $user['pending_guest_cart'] ) ) {
+		$guest_cart = $user['pending_guest_cart'];
+	}
+
+	if ( empty( $user_cart ) && isset( $user['pending_user_cart'] ) && is_array( $user['pending_user_cart'] ) ) {
+		$user_cart = $user['pending_user_cart'];
+	}
+
 	$session_token = isset( $options['session_token'] ) && is_scalar( $options['session_token'] ) && '' !== (string) $options['session_token']
 		? (string) $options['session_token']
 		: velotok_core_account_new_token();
@@ -732,6 +763,8 @@ function velotok_core_account_confirm_email( $token_or_email = '', $token = '', 
 		$transfer = velotok_core_account_transfer_guest_cart( $guest_cart, $user_cart, $user );
 		$redirect = velotok_core_account_checkout_redirect( $transfer, $user, $options );
 	}
+
+	unset( $state['users'][ $key ]['pending_guest_cart'], $state['users'][ $key ]['pending_user_cart'] );
 
 	$result = array(
 		'valid'              => true,

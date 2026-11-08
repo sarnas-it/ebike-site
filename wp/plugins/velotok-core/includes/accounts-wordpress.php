@@ -40,6 +40,10 @@ if ( ! defined( 'VELOTOK_ACCOUNT_TOKEN_META' ) ) {
 	define( 'VELOTOK_ACCOUNT_TOKEN_META', '_velotok_confirmation_token' );
 }
 
+if ( ! defined( 'VELOTOK_ACCOUNT_PENDING_CART_META' ) ) {
+	define( 'VELOTOK_ACCOUNT_PENDING_CART_META', '_velotok_pending_guest_cart' );
+}
+
 /**
  * Whether the runtime exposes a persistent user storage API.
  *
@@ -373,6 +377,18 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		$email    = isset( $request['email'] ) ? $request['email'] : '';
 		$password = isset( $request['password'] ) ? $request['password'] : '';
 		$options  = isset( $request['options'] ) && is_array( $request['options'] ) ? $request['options'] : $options;
+
+		if ( ! is_array( $options ) ) {
+			$options = array();
+		}
+
+		if ( isset( $request['guest_cart'] ) ) {
+			$options['guest_cart'] = $request['guest_cart'];
+		}
+
+		if ( isset( $request['user_cart'] ) ) {
+			$options['user_cart'] = $request['user_cart'];
+		}
 	}
 
 	$options = velotok_core_account_registration_options( $options );
@@ -446,6 +462,10 @@ function velotok_core_wp_register_account( $email = '', $password = '', $options
 		update_user_meta( $user_id, VELOTOK_ACCOUNT_CONFIRMED_META, '0' );
 		update_user_meta( $user_id, VELOTOK_ACCOUNT_STATUS_META, 'pending' );
 		update_user_meta( $user_id, VELOTOK_ACCOUNT_TOKEN_META, $token );
+
+		if ( isset( $options['guest_cart'] ) && is_array( $options['guest_cart'] ) ) {
+			update_user_meta( $user_id, VELOTOK_ACCOUNT_PENDING_CART_META, $options['guest_cart'] );
+		}
 	}
 
 	$sent = velotok_core_wp_send_confirmation_email( $email, $token, $user_id );
@@ -673,6 +693,19 @@ function velotok_core_wp_confirm_email( $token_or_email = '', $token = '', $opti
 		delete_user_meta( $user_id, VELOTOK_ACCOUNT_TOKEN_META );
 	}
 
+	/*
+	 * A guest cart captured at registration is carried through the mandatory
+	 * email confirmation step. The cart is merged and the visitor is sent to
+	 * checkout once the account is confirmed.
+	 */
+	if ( empty( $options['guest_cart'] ) && function_exists( 'get_user_meta' ) ) {
+		$pending_cart = get_user_meta( $user_id, VELOTOK_ACCOUNT_PENDING_CART_META, true );
+
+		if ( is_array( $pending_cart ) && ! empty( $pending_cart ) ) {
+			$options['guest_cart'] = $pending_cart;
+		}
+	}
+
 	if ( function_exists( 'wp_set_current_user' ) ) {
 		wp_set_current_user( $user_id );
 	}
@@ -683,6 +716,10 @@ function velotok_core_wp_confirm_email( $token_or_email = '', $token = '', $opti
 
 	$transfer = velotok_core_wp_transfer_guest_cart( $options );
 	$redirect = velotok_core_wp_checkout_redirect( $transfer, $user_id, $options );
+
+	if ( function_exists( 'delete_user_meta' ) ) {
+		delete_user_meta( $user_id, VELOTOK_ACCOUNT_PENDING_CART_META );
+	}
 
 	$result = array(
 		'valid'           => true,
