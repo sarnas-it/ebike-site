@@ -757,7 +757,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 			);
 		}
 
-		$amount = velotok_core_delivery_zones_value( $result, array( 'amount', 'cost', 'total' ), null );
+		$amount = is_numeric( $result )
+			? $result
+			: velotok_core_delivery_zones_value( $result, array( 'amount', 'cost', 'total', 'rate', 'price', 'tariff' ), null );
 
 		if ( ! is_numeric( $amount ) ) {
 			return array(
@@ -851,8 +853,12 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 		);
 		$free_from = velotok_core_delivery_zones_value(
 			$method,
-			array( 'free_from', 'free_shipping_threshold' ),
-			isset( $settings['free_from'] ) ? $settings['free_from'] : null
+			array( 'free_from', 'free_shipping_threshold', 'min_amount', 'minimum_amount' ),
+			isset( $settings['free_from'] )
+				? $settings['free_from']
+				: ( isset( $settings['min_amount'] )
+					? $settings['min_amount']
+					: ( isset( $settings['minimum_amount'] ) ? $settings['minimum_amount'] : null ) )
 		);
 		$free_from = is_numeric( $free_from ) ? (float) $free_from : null;
 		$base_total = $subtotal > 0 ? $subtotal : $total;

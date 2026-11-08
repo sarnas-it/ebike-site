@@ -217,6 +217,31 @@ velotok_delivery_zones_assert( null === $provider_error['methods']['cdek']['cost
 velotok_delivery_zones_assert( 'DELIVERY_PROVIDER_ERROR' === $provider_error['methods']['cdek']['error_code'], 'Ошибка провайдера должна быть видимой.' );
 velotok_delivery_zones_assert( 510.0 === (float) $provider_error['methods']['russian_post']['cost'], 'Рабочий адаптер должен продолжать считать свой тариф.' );
 
+$numeric_zones = $zones;
+$numeric_zones[0]['shipping_methods'][0]['rate_provider'] = function () {
+	return 777;
+};
+
+$numeric_provider = velotok_core_delivery_zone_methods(
+	$address,
+	$numeric_zones,
+	array( 'order' => array( 'subtotal' => 1000, 'weight' => 2 ) )
+);
+velotok_delivery_zones_assert( true === $numeric_provider['methods']['cdek']['available'], 'Числовой тариф провайдера должен приниматься.' );
+velotok_delivery_zones_assert( 777.0 === (float) $numeric_provider['methods']['cdek']['cost'], 'Числовой тариф провайдера должен попадать в стоимость.' );
+
+$min_amount_zones = $zones;
+$min_amount_zones[0]['shipping_methods'][0]['settings']['min_amount'] = 5000;
+unset( $min_amount_zones[0]['shipping_methods'][0]['settings']['free_from'] );
+
+$min_amount_free = velotok_core_delivery_zone_methods(
+	$address,
+	$min_amount_zones,
+	array( 'order' => array( 'subtotal' => 6000, 'weight' => 2 ) )
+);
+velotok_delivery_zones_assert( true === $min_amount_free['methods']['cdek']['free'], 'Порог бесплатной доставки должен читаться из настроек зоны.' );
+velotok_delivery_zones_assert( 0.0 === (float) $min_amount_free['methods']['cdek']['cost'], 'Порог бесплатной доставки должен обнулять тариф зоны.' );
+
 $single = velotok_core_delivery_zone_option( 'cdek', $address, $zones, array( 'order' => array( 'subtotal' => 1000, 'weight' => 1 ) ) );
 velotok_delivery_zones_assert( is_array( $single ) && 'cdek' === $single['method_id'], 'Должен возвращаться отдельный способ по идентификатору.' );
 
