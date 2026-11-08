@@ -566,13 +566,134 @@ if ( function_exists( 'add_action' ) ) {
 	add_action( 'woocommerce_order_details_after_order_table', 'velotok_core_delivery_order_eta', 10, 1 );
 }
 
+if ( ! function_exists( 'velotok_core_delivery_normalize_method_id' ) ) {
+	/**
+	 * Normalize a WooCommerce shipping method identifier.
+	 *
+	 * WooCommerce rate ids may include an instance suffix ("flat_rate:12"),
+	 * while the selected method stored on the order uses the base id.
+	 *
+	 * @param mixed $value Method id, rate id, rate object or array.
+	 * @return string
+	 */
+	function velotok_core_delivery_normalize_method_id( $value ) {
+		if ( is_object( $value ) ) {
+			foreach ( array( 'get_method_id', 'get_id' ) as $method ) {
+				if ( method_exists( $value, $method ) ) {
+					$value = $value->$method();
+					break;
+				}
+			}
+		}
+
+		if ( is_array( $value ) ) {
+			foreach ( array( 'method_id', 'id', 'value' ) as $key ) {
+				if ( isset( $value[ $key ] ) && ! is_array( $value[ $key ] ) && ! is_object( $value[ $key ] ) ) {
+					$value = $value[ $key ];
+					break;
+				}
+			}
+		}
+
+		if ( is_array( $value ) || is_object( $value ) ) {
+			return '';
+		}
+
+		$value = strtolower( trim( velotok_core_delivery_zones_scalar( $value ) ) );
+
+		if ( '' !== $value && false !== strpos( $value, ':' ) ) {
+			$parts = explode( ':', $value, 2 );
+			$value = trim( $parts[0] );
+		}
+
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_method_provider' ) ) {
+	/**
+	 * Resolve the provider behind a selected delivery method.
+	 *
+	 * @param string $method_id Normalized method id.
+	 * @param array  $meta      Shipping line metadata.
+	 * @return string
+	 */
+	function velotok_core_delivery_method_provider( $method_id, $meta = array() ) {
+		$providers = array( 'cdek', 'russian_post', 'local_pickup', 'free_shipping', 'flat_rate' );
+		$stored    = velotok_core_delivery_normalize_method_id(
+			velotok_core_delivery_zones_value( $meta, array( '_velotok_delivery_provider', 'provider' ), '' )
+		);
+
+		if ( '' !== $stored ) {
+			return $stored;
+		}
+
+		$method_id = velotok_core_delivery_normalize_method_id( $method_id );
+
+		if ( '' === $method_id ) {
+			return '';
+		}
+
+		if ( in_array( $method_id, $providers, true ) ) {
+			return $method_id;
+		}
+
+		$resolved = velotok_core_delivery_zones_method_id( array( 'method_id' => $method_id ) );
+
+		return '' !== $resolved ? $resolved : $method_id;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_method_label' ) ) {
+	/**
+	 * Resolve the human-readable label of the selected delivery method.
+	 *
+	 * @param mixed  $shipping  Shipping line.
+	 * @param array  $meta      Shipping line metadata.
+	 * @param string $method_id Normalized method id.
+	 * @return string
+	 */
+	function velotok_core_delivery_method_label( $shipping, $meta = array(), $method_id = '' ) {
+		foreach ( array( '_velotok_delivery_method_label', '_velotok_delivery_label' ) as $key ) {
+			if ( isset( $meta[ $key ] ) && is_scalar( $meta[ $key ] ) && '' !== trim( (string) $meta[ $key ] ) ) {
+				return trim( (string) $meta[ $key ] );
+			}
+		}
+
+		if ( is_object( $shipping ) ) {
+			foreach ( array( 'get_name', 'get_method_title', 'get_label' ) as $method ) {
+				if ( method_exists( $shipping, $method ) ) {
+					$value = $shipping->$method();
+
+					if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+						return trim( (string) $value );
+					}
+				}
+			}
+		}
+
+		$label = velotok_core_delivery_zones_value( $shipping, array( 'name', 'title', 'label', 'method_title' ), '' );
+
+		if ( is_scalar( $label ) && '' !== trim( (string) $label ) ) {
+			return trim( (string) $label );
+		}
+
+		$contract = velotok_core_delivery_zones_contract();
+		$method_id = velotok_core_delivery_normalize_method_id( $method_id );
+
+		return isset( $contract['methods'][ $method_id ] ) ? (string) $contract['methods'][ $method_id ] : $method_id;
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 	/**
-	 * Persist the selected delivery method, cost and ETA range on the order.
+	 * Persist the selected delivery method, provider, cost and ETA on the order.
 	 *
-	 * The ETA is stored as a range: separate min/max meta keys plus a combined
-	 * range array and its label. This keeps the order display and any later
-	 * re-read of the delivery time unambiguous.
+	 * Every selected WooCommerce shipping method is recorded, including the
+	 * store's own flat/free rates and local pickup. The ETA is stored as a
+	 * range: separate min/max meta keys plus a combined range array and its
+	 * label. This keeps the order display and any later re-read of the
+	 * delivery time unambiguous.
 	 *
 	 * @param int $order_id Order identifier.
 	 * @return void
@@ -589,9 +710,13 @@ if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 		}
 
 		foreach ( (array) $order->get_shipping_methods() as $shipping ) {
-			$method_id = method_exists( $shipping, 'get_method_id' ) ? (string) $shipping->get_method_id() : '';
+			$method_id = velotok_core_delivery_normalize_method_id( $shipping );
 			$meta      = method_exists( $shipping, 'get_meta_data' ) ? (array) $shipping->get_meta_data() : array();
 			$range     = null;
+
+			if ( '' === $method_id ) {
+				continue;
+			}
 
 			foreach ( array( '_velotok_eta_range', '_velotok_delivery_eta' ) as $range_key ) {
 				if ( isset( $meta[ $range_key ] ) && is_array( $meta[ $range_key ] ) ) {
@@ -606,7 +731,7 @@ if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 			$max = isset( $meta['_velotok_eta_max_days'] )
 				? $meta['_velotok_eta_max_days']
 				: velotok_core_delivery_zones_value( $range, array( 'max_days', 'max' ), null );
-			$label = isset( $meta['_velotok_eta_label'] )
+			$eta_label = isset( $meta['_velotok_eta_label'] )
 				? $meta['_velotok_eta_label']
 				: velotok_core_delivery_zones_value( $range, array( 'label', 'text' ), '' );
 
@@ -616,18 +741,26 @@ if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 						'min_days' => $min,
 						'max_days' => $max,
 					),
-					'delivery_time' => $label,
+					'delivery_time' => $eta_label,
 				)
 			);
-			$has_eta   = null !== $eta['min_days'] || null !== $eta['max_days'] || '' !== $eta['label'];
-			$recognized = in_array( $method_id, array( 'cdek', 'russian_post' ), true );
-
-			if ( ! $recognized && ! $has_eta ) {
-				continue;
-			}
+			$has_eta = null !== $eta['min_days'] || null !== $eta['max_days'] || '' !== $eta['label'];
+			$provider = velotok_core_delivery_method_provider( $method_id, $meta );
+			$label    = velotok_core_delivery_method_label( $shipping, $meta, $method_id );
+			$cost     = method_exists( $shipping, 'get_total' ) ? (float) $shipping->get_total() : 0.0;
+			$selection = array(
+				'method_id'       => $method_id,
+				'delivery_method' => $method_id,
+				'provider'        => $provider,
+				'label'           => $label,
+				'cost'            => $cost,
+				'selected'        => true,
+			);
 
 			update_post_meta( $order_id, '_velotok_delivery_method', $method_id );
-			update_post_meta( $order_id, '_velotok_delivery_cost', method_exists( $shipping, 'get_total' ) ? (float) $shipping->get_total() : 0.0 );
+			update_post_meta( $order_id, '_velotok_delivery_provider', $provider );
+			update_post_meta( $order_id, '_velotok_delivery_method_label', $label );
+			update_post_meta( $order_id, '_velotok_delivery_cost', $cost );
 
 			if ( null !== $eta['min_days'] ) {
 				update_post_meta( $order_id, '_velotok_delivery_eta_min_days', (int) $eta['min_days'] );
@@ -653,7 +786,15 @@ if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 
 				update_post_meta( $order_id, '_velotok_delivery_eta', $range );
 				update_post_meta( $order_id, '_velotok_delivery_eta_range', $range );
+
+				$selection['eta'] = array(
+					'min_days' => $eta['min_days'],
+					'max_days' => $eta['max_days'],
+					'label'    => $eta['label'],
+				);
 			}
+
+			update_post_meta( $order_id, '_velotok_delivery_selection', $selection );
 
 			break;
 		}
