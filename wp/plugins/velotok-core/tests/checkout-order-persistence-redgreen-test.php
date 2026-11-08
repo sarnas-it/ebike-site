@@ -121,11 +121,11 @@ if ( 0 !== $green['status'] ) {
 $mutations = array(
 	'marking TESTEB-25' => str_replace(
 		array(
-			"array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25' )",
+			"array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-26' )",
 			"'requirement'       => 'TESTEB-25',",
 		),
 		array(
-			"array( 'TESTEB-23', 'TESTEB-24' )",
+			"array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-26' )",
 			"'requirement'       => 'TESTEB-23',",
 		),
 		$source
