@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -98,6 +98,10 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'available_for_ambiguous_address' => true,
 				'available_without_zone_match' => true,
 				'only_russia'         => true,
+				'only_russia_requirement' => 'TESTEB-36',
+				'russia_requirement'  => 'TESTEB-36',
+				'hide_outside_russia' => true,
+				'outside_russia_available' => false,
 				'country'             => 'RU',
 				'points_by_radius'    => true,
 				'points_requirement'  => 'TESTEB-32',
@@ -2596,6 +2600,16 @@ if ( ! function_exists( 'velotok_core_delivery_zones_pickup_option' ) ) {
 		$pickup      = $contract['pickup'];
 		$point_context = $context;
 		$address     = isset( $context['address'] ) ? $context['address'] : array();
+		$country     = strtoupper(
+			trim(
+				velotok_core_delivery_zones_scalar(
+					velotok_core_delivery_zones_value( $address, array( 'country', 'country_code' ), '' )
+				)
+			)
+		);
+		$russia_only    = ! empty( $pickup['only_russia'] );
+		$pickup_allowed = ! empty( $pickup['enabled'] )
+			&& ( ! $russia_only || '' === $country || $pickup['country'] === $country );
 
 		if ( isset( $context['pickup_points_result'] ) && is_array( $context['pickup_points_result'] ) ) {
 			$points_result = $context['pickup_points_result'];
@@ -2615,10 +2629,13 @@ if ( ! function_exists( 'velotok_core_delivery_zones_pickup_option' ) ) {
 			'provider_id'         => 'pickup',
 			'zone_id'             => 0,
 			'source'              => 'pickup',
-			'available'           => true,
-			'enabled'             => true,
+			'available'           => $pickup_allowed,
+			'enabled'             => $pickup_allowed,
 			'independent_of_zone' => true,
-			'pickup'              => true,
+			'pickup'              => $pickup_allowed,
+			'only_russia'         => $russia_only,
+			'country'             => $pickup['country'],
+			'country_allowed'     => $pickup_allowed,
 			'eta'                 => array( 'min_days' => 0, 'max_days' => 0 ),
 			'eta_min_days'        => 0,
 			'eta_max_days'        => 0,

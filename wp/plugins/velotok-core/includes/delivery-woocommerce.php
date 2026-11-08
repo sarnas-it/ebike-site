@@ -108,6 +108,28 @@ if ( ! function_exists( 'velotok_core_delivery_rate_method_id' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_rate_is_pickup' ) ) {
+	/**
+	 * Whether a WooCommerce rate represents pickup.
+	 *
+	 * @param mixed  $rate      Rate object or array.
+	 * @param string $pickup_id Configured pickup method id.
+	 * @return bool
+	 */
+	function velotok_core_delivery_rate_is_pickup( $rate, $pickup_id = 'local_pickup' ) {
+		$method_id = strtolower( trim( velotok_core_delivery_rate_method_id( $rate ) ) );
+		$candidates = array_filter( array_unique( array( strtolower( (string) $pickup_id ), 'local_pickup', 'pickup' ) ) );
+
+		foreach ( $candidates as $candidate ) {
+			if ( $method_id === $candidate || 0 === strpos( $method_id, $candidate . ':' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_package_country' ) ) {
 	/**
 	 * Resolve the destination country from a WooCommerce package.
@@ -134,37 +156,41 @@ if ( ! function_exists( 'velotok_core_delivery_add_pickup_rate' ) ) {
 	 * Add the pickup rate to a package independently of shipping zones.
 	 *
 	 * Pickup is offered for Russia even when no WooCommerce zone matched the
-	 * address (or the address is ambiguous). Outside Russia it is not shown.
-	 * An existing pickup rate is left untouched, so the zone-configured method
-	 * and the zone-independent fallback never duplicate each other.
+	 * address (or the address is ambiguous). Outside Russia it is not shown, and
+	 * any pickup rate already added by a zone is removed from the package.
+	 * Inside Russia an existing pickup rate is left untouched, so the
+	 * zone-configured method and the zone-independent fallback never duplicate
+	 * each other.
 	 *
 	 * @param mixed $rates   Shipping rates keyed by rate id.
 	 * @param array $package Shipping package.
 	 * @return mixed
 	 */
 	function velotok_core_delivery_add_pickup_rate( $rates, $package = array() ) {
-		$contract = velotok_core_delivery_zones_contract();
-
-		if ( empty( $contract['pickup']['enabled'] ) ) {
-			return $rates;
-		}
-
+		$contract    = velotok_core_delivery_zones_contract();
 		$package     = is_array( $package ) ? $package : array();
 		$destination = velotok_core_delivery_zones_value( $package, array( 'destination' ), $package );
 		$destination = ( is_array( $destination ) || is_object( $destination ) ) ? $destination : array();
 		$country     = velotok_core_delivery_package_country( $package );
 		$pickup_id   = (string) $contract['pickup']['method_id'];
+		$rates       = is_array( $rates ) ? $rates : array();
 
 		if ( '' !== $country && $contract['pickup']['country'] !== $country ) {
+			foreach ( $rates as $rate_key => $rate ) {
+				if ( velotok_core_delivery_rate_is_pickup( $rate, $pickup_id ) ) {
+					unset( $rates[ $rate_key ] );
+				}
+			}
+
 			return $rates;
 		}
 
-		$rates = is_array( $rates ) ? $rates : array();
+		if ( empty( $contract['pickup']['enabled'] ) ) {
+			return $rates;
+		}
 
 		foreach ( $rates as $rate ) {
-			$method_id = velotok_core_delivery_rate_method_id( $rate );
-
-			if ( $pickup_id === $method_id || 'local_pickup' === $method_id ) {
+			if ( velotok_core_delivery_rate_is_pickup( $rate, $pickup_id ) ) {
 				return $rates;
 			}
 		}
