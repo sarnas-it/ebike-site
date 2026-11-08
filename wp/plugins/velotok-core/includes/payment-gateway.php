@@ -1730,6 +1730,39 @@ if ( ! function_exists( 'velotok_payment_status_is_valid' ) ) {
 		return velotok_core_payment_status_is_valid( $status );
 	}
 }
+if ( ! function_exists( 'velotok_payment_status_model' ) ) {
+	function velotok_payment_status_model() {
+		return velotok_core_payment_status_model();
+	}
+}
+if ( ! function_exists( 'velotok_core_payment_status_ids' ) ) {
+	function velotok_core_payment_status_ids() {
+		return velotok_core_payment_statuses();
+	}
+}
+if ( ! function_exists( 'velotok_payment_normalize_status' ) ) {
+	function velotok_payment_normalize_status( $status ) {
+		return velotok_core_payment_normalize_status( $status );
+	}
+}
+if ( ! function_exists( 'velotok_payment_status_label' ) ) {
+	function velotok_payment_status_label( $status ) {
+		return velotok_core_payment_status_label( $status );
+	}
+}
+if ( ! function_exists( 'velotok_payment_can_transition' ) ) {
+	function velotok_payment_can_transition( $from, $to ) {
+		return velotok_core_payment_can_transition( $from, $to );
+	}
+}
+if ( ! function_exists( 'velotok_core_payment_status_transitions' ) ) {
+	function velotok_core_payment_status_transitions( $status ) {
+		$model = velotok_core_payment_status_model();
+		$key   = velotok_core_payment_normalize_status( $status );
+
+		return isset( $model[ $key ] ) ? $model[ $key ]['transitions'] : array();
+	}
+}
 if ( ! function_exists( 'velotok_payment_webhook_signature' ) ) {
 	function velotok_payment_webhook_signature( $body, $secret = null ) {
 		return velotok_core_payment_webhook_signature( $body, $secret );

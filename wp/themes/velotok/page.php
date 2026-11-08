@@ -11,7 +11,7 @@ get_header();
 
 $velotok_wide = function_exists( 'is_cart' ) && ( is_cart() || is_checkout() || is_account_page() );
 ?>
-<main id="main" class="page-main">
+<main id="main" class="page-main" tabindex="-1">
 	<?php
 	while ( have_posts() ) :
 		the_post();

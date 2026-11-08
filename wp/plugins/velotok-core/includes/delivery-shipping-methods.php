@@ -158,6 +158,31 @@ abstract class Velotok_Shipping_Method extends WC_Shipping_Method {
 			)
 		);
 		$pickup_points  = velotok_core_delivery_pickup_points( $destination, null, $points_context );
+		$pickup_failed  = empty( $pickup_points['ok'] );
+		$pickup_errors  = isset( $pickup_points['errors'] ) && is_array( $pickup_points['errors'] ) ? $pickup_points['errors'] : array();
+		$pickup_notice  = '';
+
+		foreach ( $pickup_errors as $pickup_error ) {
+			$pickup_code = is_array( $pickup_error ) && isset( $pickup_error['code'] ) ? (string) $pickup_error['code'] : '';
+
+			if ( 'DELIVERY_PICKUP_POINTS_UNAVAILABLE' === $pickup_code || 'DELIVERY_PICKUP_POINTS_ERROR' === $pickup_code ) {
+				$pickup_notice = is_array( $pickup_error ) && ! empty( $pickup_error['message'] )
+					? (string) $pickup_error['message']
+					: 'Список пунктов выдачи недоступен.';
+				break;
+			}
+		}
+
+		if ( $pickup_failed && '' === $pickup_notice && isset( $pickup_points['code'] ) && in_array( $pickup_points['code'], array( 'DELIVERY_PICKUP_POINTS_UNAVAILABLE', 'DELIVERY_PICKUP_POINTS_ERROR' ), true ) ) {
+			$pickup_notice = isset( $pickup_points['message'] ) && '' !== (string) $pickup_points['message']
+				? (string) $pickup_points['message']
+				: 'Список пунктов выдачи недоступен.';
+		}
+
+		if ( '' !== $pickup_notice && function_exists( 'wc_add_notice' ) ) {
+			wc_add_notice( $this->title . ': ' . $pickup_notice, 'error' );
+		}
+
 		$rate           = array(
 			'id'        => $this->id . ':' . velotok_core_delivery_woocommerce_absint( $this->instance_id ),
 			'label'     => $this->title,
@@ -178,6 +203,10 @@ abstract class Velotok_Shipping_Method extends WC_Shipping_Method {
 				'_velotok_pickup_points_radius_km'=> isset( $pickup_points['radius_km'] ) ? $pickup_points['radius_km'] : null,
 				'_velotok_pickup_points_code'     => isset( $pickup_points['code'] ) ? $pickup_points['code'] : '',
 				'_velotok_pickup_points_message'  => isset( $pickup_points['message'] ) ? $pickup_points['message'] : '',
+				'_velotok_pickup_points_ok'       => ! empty( $pickup_points['ok'] ),
+				'_velotok_pickup_points_available'=> ! empty( $pickup_points['available'] ),
+				'_velotok_pickup_points_errors'   => $pickup_errors,
+				'_velotok_pickup_points_explicit_failure' => true,
 				'_velotok_test_mode'              => $context['test_mode'] ? 'yes' : 'no',
 			),
 		);
