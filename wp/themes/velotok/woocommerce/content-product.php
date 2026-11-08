@@ -17,4 +17,8 @@ if ( ! $product instanceof WC_Product ) {
 	return;
 }
 
+if ( ! velotok_is_valid_product( $product ) ) {
+	return;
+}
+
 get_template_part( 'template-parts/model-card', null, velotok_normalize_product( $product ) );
