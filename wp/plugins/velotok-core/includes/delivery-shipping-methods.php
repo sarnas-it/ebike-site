@@ -159,6 +159,12 @@ abstract class Velotok_Shipping_Method extends WC_Shipping_Method {
 				'_velotok_eta_min_days'      => $eta['min_days'],
 				'_velotok_eta_max_days'      => $eta['max_days'],
 				'_velotok_eta_label'         => $eta['label'],
+				'_velotok_eta_range'         => $eta['range'],
+				'_velotok_delivery_eta'      => array(
+					'min_days' => $eta['min_days'],
+					'max_days' => $eta['max_days'],
+					'label'    => $eta['label'],
+				),
 				'_velotok_test_mode'         => $context['test_mode'] ? 'yes' : 'no',
 			),
 		);
