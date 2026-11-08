@@ -10,7 +10,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const fixture = JSON.parse(
   readFileSync(
-    path.join(here, 'fixtures/pr65-ci-42499869265.json'),
+    path.join(here, 'fixtures/pr65-ci-recording.json'),
     'utf8',
   ),
 );
@@ -26,7 +26,7 @@ function testFixtureIsRecordedFromGithub() {
   assert.strictEqual(pr.base.ref, 'main');
   assert.strictEqual(repository.default_branch, 'main');
   assert.strictEqual(pr.number, 65);
-  assert.strictEqual(run.id, 42499869265);
+  assert.strictEqual(run.id, 42500669683);
   assert.strictEqual(run.head_sha, pr.head.sha);
   assert.strictEqual(run.path, '.github/workflows/ci.yml');
   assert.strictEqual(run.event, 'pull_request');
@@ -92,34 +92,77 @@ function testRealEvidenceIsGreenAndPinnedToTheHead() {
   console.log('PASS: the recorded PR #65 head is green and ready for automerge');
 }
 
-function testDocumentationPublishesTheActualRun() {
+function testRecordedEvidenceCannotProveAnotherSubmittedHead() {
+  // Regression for the review finding: the recording was captured on the
+  // rejected commit, so it must never satisfy a gate for a different head.
+  const submittedSha = '0123456789abcdef0123456789abcdef01234567';
+  const evidence = summarizeRolloutEvidence({
+    pr: {
+      ...fixture.pullRequest,
+      head: { ...fixture.pullRequest.head, sha: submittedSha },
+    },
+    repository: fixture.repository,
+    workflow: fixture.workflow.present ? fixture.workflow : null,
+    run: fixture.run,
+    jobs: fixture.jobs,
+    checkRuns: fixture.checkRuns,
+    targetSha: submittedSha,
+    workflowRef: submittedSha,
+  });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some(
+      (problem) =>
+        problem.includes(`is for ${fixture.pullRequest.head.sha}`) &&
+        problem.includes(`expected ${submittedSha}`),
+    ),
+    'recorded evidence from the rejected commit must not prove a new head',
+  );
+  console.log(
+    'PASS: recorded evidence for the rejected commit is rejected for another head',
+  );
+}
+
+function testDocumentationDescribesDynamicEvidence() {
   for (const relative of ['docs/testeb-63-comment.md', 'docs/ci.md']) {
     const text = readFileSync(path.join(repoRoot, relative), 'utf8');
     assert.ok(
       text.includes(fixture.pullRequest.head.sha),
-      `${relative} must name the real head commit that was verified`,
+      `${relative} must name the recorded (historical) commit`,
     );
     assert.ok(
       text.includes(String(fixture.run.id)),
-      `${relative} must link the real ci run id for PR #65`,
+      `${relative} must link the recorded historical ci run for PR #65`,
     );
     assert.ok(
       text.includes(fixture.run.html_url),
-      `${relative} must link the real ci run url for PR #65`,
+      `${relative} must link the recorded historical ci run url for PR #65`,
     );
     assert.ok(
-      text.includes('pr65-ci-42499869265.json'),
+      text.includes('pr65-ci-recording.json'),
       `${relative} must point at the recorded GitHub API fixture`,
     );
+    assert.ok(
+      text.includes('TARGET_SHA') && text.includes('verify-ci-rollout'),
+      `${relative} must describe the dynamic per-head evidence workflow`,
+    );
+    assert.ok(
+      text.includes('не источник истины') ||
+        text.includes('не является доказательством'),
+      `${relative} must label the recording as historical, not current evidence`,
+    );
   }
-  console.log('PASS: CI documentation publishes the actual PR #65 run, not a synthetic one');
+  console.log(
+    'PASS: CI documentation labels the recording as historical and describes dynamic evidence',
+  );
 }
 
 function main() {
   testFixtureIsRecordedFromGithub();
   testRealRunHasEveryRequiredJobAndCheck();
   testRealEvidenceIsGreenAndPinnedToTheHead();
-  testDocumentationPublishesTheActualRun();
+  testRecordedEvidenceCannotProveAnotherSubmittedHead();
+  testDocumentationDescribesDynamicEvidence();
 }
 
 try {

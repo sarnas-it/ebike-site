@@ -215,24 +215,39 @@ head-коммите PR #65 проверяются red-green гейтом
 и передаётся `--sha`, поэтому доказательство всегда относится именно к тому
 коммиту, который сдаётся, а не к предыдущей сдаче.
 
-#### Зафиксированный прогон на head PR #65 (фактические данные)
+#### Историческое доказательство по отклонённому head `05c8f37` (не источник истины)
+
+Предыдущая сдача была отклонена именно потому, что документация ссылалась на
+чужой прогон: сдавался коммит `05c8f37...`, а доказательства были сняты на
+более старом `a93a945...` и прогоне `42499869265`. Ниже зафиксированы
+фактические данные уже для того коммита, который был сдан и отклонён, чтобы
+закрыть это замечание. Это **историческая запись**, а не доказательство для
+какой-либо будущей сдачи: каждый новый push создаёт новый head и новый прогон.
 
 | Что | Значение |
 | --- | --- |
-| PR / head | [#65](https://github.com/sarnas-it/ebike-site/pull/65), `state=open`, `merged=false`, `mergeable=true`, `mergeable_state=clean`, base `main`, head `a93a94563a176f148a1c31ae6464e2b1a91d86e3` |
-| Штатный прогон `ci` | [#42499869265](https://github.com/sarnas-it/ebike-site/actions/runs/42499869265) — `event=pull_request`, `status=completed`, `conclusion=success`, `head_sha=a93a94563a176f148a1c31ae6464e2b1a91d86e3`, `check_suite_id=115124170132` |
-| Job | `php-lint=success` (128790072463), `php-tests=success` (128790072714), `php-plugin-tests=success` (128790072617), `plugin-tests=success` (128790072611), `ci-repair-tests=success` (128790072591) |
-| Check runs | те же пять имён, `completed/success`, `head_sha=a93a945...`, все принадлежат check suite `115124170132` проверяемого прогона `ci` |
+| PR / отклонённый head | [#65](https://github.com/sarnas-it/ebike-site/pull/65), `state=open`, `merged=false`, `mergeable=true`, `mergeable_state=clean`, base `main`, head `05c8f37df92f3186927c9eaa0f10d164a5d443af` |
+| Штатный прогон `ci` | [#42500669683](https://github.com/sarnas-it/ebike-site/actions/runs/42500669683) — `event=pull_request`, `status=completed`, `conclusion=success`, `head_sha=05c8f37df92f3186927c9eaa0f10d164a5d443af`, `check_suite_id=115126237945` |
+| Job | `php-lint=success` (128792491441), `php-tests=success` (128792491873), `php-plugin-tests=success` (128792491767), `plugin-tests=success` (128792491912), `ci-repair-tests=success` (128792491724) |
+| Check runs | те же пять имён, `completed/success`, `head_sha=05c8f37...`, все принадлежат check suite `115126237945` проверяемого прогона `ci` |
 | Workflow в head | `.github/workflows/ci.yml`, blob `bfbbedad5b9cbae52fad917e955f4ed276275d38` |
 
 Эти значения сняты с GitHub API и записаны в
-`scripts/ci/tests/fixtures/pr65-ci-42499869265.json`; `rollout.test.mjs` читает
-этот fixture, поэтому тесты используют фактические SHA/run id/suite id, а не
-синтетические константы. Любой следующий push сдвигает head, и
-`verify-ci-rollout` на событии `pull_request` автоматически проверяет уже новый
-head (`TARGET_SHA`), обновляя комментарий на PR #65. Гейт сравнивает `head_sha`
-прогона и каждого check run с проверяемым коммитом, поэтому зафиксированный
-прогон `a93a945` не может подтвердить другой (более новый) сдаваемый коммит.
+`scripts/ci/tests/fixtures/pr65-ci-recording.json`; `rollout.test.mjs` читает
+этот fixture как набор фактических SHA/run id/suite id для red-green тестов.
+Сам fixture намеренно помечен как историческая запись: ни документация, ни
+тесты не выдают его за доказательство текущей сдачи.
+
+Источник истины для критериев 2 и 3 — не захардкоженный SHA в документации, а
+штатный прогон `verify-ci-rollout` на событии `pull_request` для **актуального**
+head. Он берёт `TARGET_SHA` из `github.event.pull_request.head.sha`, передаёт
+его в `verify-rollout.mjs`/`publish-rollout-evidence.mjs`, сравнивает с ним
+`head_sha` прогона `ci` и каждого check run и только при совпадении публикует
+комментарий `<!-- testeb-63-rollout -->` и артефакт `rollout-evidence`. Любой
+следующий push сдвигает head и заново прогоняет этот гейт, поэтому
+зафиксированный здесь `05c8f37` (как и прежний `a93a945`) не может подтвердить
+другой, более новый сдаваемый коммит: гейт отвергает прогон и check runs на
+чужом SHA.
 
 После зелёного гейта шаг `publish-rollout-evidence.mjs` создаёт или обновляет
 один идемпотентный комментарий на PR #65 (`<!-- testeb-63-rollout -->`) со
@@ -527,7 +542,10 @@ bash scripts/ci/run-checks.sh .
   red-green тесты закрывают замечание ревьюера: check run из другого check
   suite не принимается, даже если его `details_url` ссылается на проверяемый
   прогон `ci` (до исправления он проходил по ссылке), а check run, привязанный
-  к другому коммиту (например, `7052bf2` или `a93a945` вместо нового сдаваемого head), даёт red.
+  к другому коммиту (например, `7052bf2`, `a93a945` или исторический
+  `05c8f37` вместо нового сдаваемого head), даёт red. Отдельный red-green тест
+  воспроизводит именно замечание ревьюера: запись прогона/check runs, снятая
+  на отклонённом коммите, не принимается для более нового сдаваемого head.
   Проверяется и выбор последнего прогона: новый упавший прогон не маскируется
   старым успешным. Evidence-комментарий привязан к реальному head, обновляется
   идемпотентно, содержит штатные check runs и merge commit и не публикуется при

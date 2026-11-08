@@ -14,13 +14,15 @@ import {
 } from '../rollout.mjs';
 
 // This fixture is a verbatim recording of the GitHub API responses for the real
-// ci run on the pull request #65 head that was submitted for review. Using it
-// keeps the rollout tests on actual repository data instead of invented SHAs
-// and run ids.
+// ci run on the pull request #65 head that was rejected for stale evidence
+// (05c8f37). It is regression-test input: the authoritative evidence for a
+// submission is always the ci run on that submission's actual head, generated
+// by the verify-ci-rollout workflow. Using the recording keeps the rollout
+// tests on actual repository data instead of invented SHAs and run ids.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = JSON.parse(
   readFileSync(
-    path.join(here, 'fixtures/pr65-ci-42499869265.json'),
+    path.join(here, 'fixtures/pr65-ci-recording.json'),
     'utf8',
   ),
 );
@@ -328,6 +330,37 @@ function testRunOnStaleCommitIsRed() {
     'a run for an older commit is not even a candidate for the current head',
   );
   console.log('PASS: a green run from a stale commit is rejected as evidence');
+}
+
+function testRecordedEvidenceCannotProveALaterSubmittedHead() {
+  // This is the exact review finding: the recorded evidence was captured on
+  // HEAD_SHA (the rejected commit), but a later submission has a new head. The
+  // recorded run and its check runs must not be accepted for that new head.
+  const submittedSha = '0123456789abcdef0123456789abcdef01234567';
+  const evidence = greenEvidence({
+    pr: { ...OPEN_PR, head: { ...OPEN_PR.head, sha: submittedSha } },
+    targetSha: submittedSha,
+  });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some(
+      (problem) =>
+        problem.includes(`CI run ${RUN_ID} is for ${HEAD_SHA}`) &&
+        problem.includes(`expected ${submittedSha}`),
+    ),
+    'a recorded run on the rejected commit must not prove a new submitted head',
+  );
+  assert.ok(
+    evidence.problems.some(
+      (problem) =>
+        problem.includes(`is for ${HEAD_SHA}`) &&
+        problem.includes(`expected ${submittedSha}`),
+    ),
+    'recorded check runs on the rejected commit must not prove a new submitted head',
+  );
+  console.log(
+    'PASS: evidence recorded on the rejected commit cannot prove a later submitted head',
+  );
 }
 
 function testFailedOrIncompleteRunIsRed() {
@@ -703,6 +736,7 @@ async function main() {
   testWrongBaseBranchIsRed();
   testMissingWorkflowOnHeadIsRed();
   testRunOnStaleCommitIsRed();
+  testRecordedEvidenceCannotProveALaterSubmittedHead();
   testFailedOrIncompleteRunIsRed();
   testMissingOrFailedJobIsRed();
   testWrongWorkflowPathIsRed();
