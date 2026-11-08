@@ -777,7 +777,7 @@ function velotok_get_home_models() {
 	$index = 0;
 
 	foreach ( $raw as $product ) {
-		if ( $product instanceof WC_Product && velotok_product_is_valid( $product ) ) {
+		if ( velotok_product_is_valid( $product ) ) {
 			$index++;
 			$models[] = velotok_normalize_product( $product, $index );
 		}
@@ -821,7 +821,7 @@ function velotok_get_products_by_category( $slug, $limit = 3 ) {
 	$models = array();
 	$index  = 0;
 	foreach ( $products as $product ) {
-		if ( $product instanceof WC_Product && velotok_product_is_valid( $product ) ) {
+		if ( velotok_product_is_valid( $product ) ) {
 			$index++;
 			$models[] = velotok_normalize_product( $product, $index );
 		}
