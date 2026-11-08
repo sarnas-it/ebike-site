@@ -40,7 +40,10 @@ function parseArgs(argv) {
     repo: process.env.GITHUB_REPOSITORY || 'sarnas-it/ebike-site',
     pr: null,
     sha: null,
-    runId: process.env.GITHUB_RUN_ID || null,
+    // Default to the latest successful recovery run, as documented. Taking
+    // GITHUB_RUN_ID here would verify whatever workflow happens to invoke this
+    // script instead of the recovery run that produced the checks.
+    runId: null,
     workflow: RECOVERY_WORKFLOW_PATH,
     commentFile: null,
     commentMarker: '<!-- testeb-66-recovery -->',

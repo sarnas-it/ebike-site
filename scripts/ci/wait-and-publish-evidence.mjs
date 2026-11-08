@@ -17,7 +17,8 @@ instead of an in-progress run.
 
 The finalizer is triggered by the same push as recovery, so it normally finds
 the matching recovery run by --trigger-sha instead of receiving a run id. The
-run is discovered by its exact head SHA, never guessed from the incident report.
+run is discovered by its exact head SHA, never guessed from the incident report
+and never taken from the finalizer's own GITHUB_RUN_ID.
 
 Options:
   --repo <owner/name>    Repository (default: $GITHUB_REPOSITORY or sarnas-it/ebike-site)
@@ -208,12 +209,16 @@ export async function finalizeRecoveryEvidence({
   return { run, published: true, ...result };
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     repo: process.env.GITHUB_REPOSITORY || 'sarnas-it/ebike-site',
     pr: null,
     sha: null,
-    runId: process.env.GITHUB_RUN_ID || null,
+    // The finalizer is a different workflow run from recovery. Defaulting to
+    // GITHUB_RUN_ID here would make it wait for itself forever and never
+    // discover the recovery run that actually published the checks. The run is
+    // therefore selected explicitly: --run-id, or --trigger-sha discovery.
+    runId: null,
     triggerSha: null,
     workflow: RECOVERY_WORKFLOW_PATH,
     commentFile: null,

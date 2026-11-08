@@ -23,6 +23,7 @@ const GREEN_CHECKS = [
   { name: 'php-lint', conclusion: 'success', head_sha: TARGET_SHA },
   { name: 'php-tests', conclusion: 'success', head_sha: TARGET_SHA },
   { name: 'plugin-tests', conclusion: 'success', head_sha: TARGET_SHA },
+  { name: 'php-plugin-tests', conclusion: 'success', head_sha: TARGET_SHA },
 ];
 
 const SUCCESS_RUN = {
@@ -116,7 +117,12 @@ function testGreenEvidenceIsReady() {
   assert.strictEqual(evidence.pullRequest.mergeCommitSha, MERGE_SHA);
   assert.deepStrictEqual(
     evidence.checks.conclusions.map((check) => `${check.name}=${check.conclusion}`),
-    ['php-lint=success', 'php-tests=success', 'plugin-tests=success'],
+    [
+      'php-lint=success',
+      'php-tests=success',
+      'plugin-tests=success',
+      'php-plugin-tests=success',
+    ],
   );
   console.log('PASS: green checks backed by a successful recovery run are ready');
 }
@@ -249,6 +255,10 @@ function testRenderedCommentContainsRealEvidence() {
   assert.ok(body.includes('status=completed'));
   assert.ok(body.includes('conclusion=success'));
   assert.ok(body.includes('php-lint=success'));
+  assert.ok(
+    body.includes('php-plugin-tests=success'),
+    'the evidence must include the plugin PHP acceptance checks',
+  );
   console.log('PASS: the comment contains the run URL/id, checks and merge commit');
 }
 

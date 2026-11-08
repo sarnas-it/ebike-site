@@ -34,7 +34,9 @@ PR-деревьях workflow присутствует. В ветке PR #71 та
   `INCIDENT_SHA` для аудита: если head уедет, recovery проверит и смержит
   именно новый head, а не будет пропускать мерж. Workflow выкачивает
   разрешённый коммит, сверяет `git rev-parse HEAD` с ним, прогоняет те же
-  проверки, что и обычный CI (`php-lint`, `php-tests`, `plugin-tests`),
+  проверки, что и обычный CI (`php-lint`, `php-tests`, `plugin-tests`,
+  `php-plugin-tests`, включая обязательную команду
+  `php wp/plugins/velotok-core/tests/accounts-contract-test.php`),
   публикует результаты на этот SHA и завершает отложенный мерж PR #71. Мерж
   выполняется только если все проверки зелёные и head PR всё ещё равен
   проверенному коммиту; если head уехал во время прогона, следующий push в PR
@@ -44,7 +46,10 @@ PR-деревьях workflow присутствует. В ветке PR #71 та
   `workflow_dispatch`. Он находит recovery-прогон по точному SHA триггера,
   дожидается его завершения и только затем обновляет этот комментарий,
   поэтому в доказательствах фиксируется `completed/success`, а не
-  `in_progress`. Первый recovery-прогон не смог задиспатчить финализатор,
+  `in_progress`. Финализатор больше не берёт `runId` из своего
+  `GITHUB_RUN_ID`: при наличии `--trigger-sha` он обязан найти именно
+  recovery-прогон, иначе он ждал бы сам себя и не опубликовал бы этот
+  комментарий. Первый recovery-прогон не смог задиспатчить финализатор,
   потому что workflow ещё не было в базовой ветке; проверки и мерж при этом
   уже прошли.
 
@@ -52,8 +57,10 @@ PR-деревьях workflow присутствует. В ветке PR #71 та
 ## Подтверждение из реального recovery-прогона
 
 - Проверяемый коммит (актуальный head PR #71): `19c4f0dbfb0b14eb7b9ef5fc6ecd6207769e5008`
-- Recovery workflow run: [#42487589325](https://github.com/sarnas-it/ebike-site/actions/runs/42487589325) — этот прогон опубликовал зелёные проверки и смержил PR, но завершился `failure` на шаге запуска отдельного финализатора, который ещё не существовал в базовой ветке
-- Проверки на проверяемом коммите: `php-lint=success`, `php-tests=success`, `plugin-tests=success`
+- Post-fix recovery workflow run: [#42488812111](https://github.com/sarnas-it/ebike-site/actions/runs/42488812111) — `completed/success`, триггер `1f59a83908f8535a0e6bf70f8b13b95c52d205ec`
+- Предыдущий run [#42487589325](https://github.com/sarnas-it/ebike-site/actions/runs/42487589325) завершился `failure` только на шаге `workflow_dispatch` финализатора, которого ещё не было в базовой ветке; он не является финальным доказательством
+- Проверки на проверяемом коммите: `php-lint=success`, `php-tests=success`, `plugin-tests=success`, `php-plugin-tests=success`
+- Обязательная команда `php wp/plugins/velotok-core/tests/accounts-contract-test.php` входит в `php-plugin-tests` и завершилась `PASS` (exit code 0)
 - PR merged=true, merge commit=`99f296a30502af717ac31af5794928e5e540b136`
-- Итог: проверки и отложенный мерж выполнены; публикацию этого блока повторно подтверждает push-триггер финализатора после починки
+- Итог: проверки и отложенный мерж выполнены; этот блок публикуется/обновляется push-триггером финализатора после исправления выбора run по trigger SHA
 <!-- testeb-66-evidence:end -->
