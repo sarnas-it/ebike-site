@@ -11,11 +11,14 @@ import {
 export const RECOVERY_WORKFLOW_PATH = '.github/workflows/recover-pr73.yml';
 export const RECOVERY_STATUS_CONTEXT = 'ci/recover';
 
-// Recovery used to be hard-coded to PR #73. Keeping the workflow mapping
+// Recovery used to be hard-coded to a single PR. Keeping the workflow mapping
 // explicit lets existing evidence stay verifiable while new pull requests use
 // their own recovery workflow (or the generic one).
 export function recoveryWorkflowForPullRequest(pullNumber) {
   const number = Number(pullNumber);
+  if (number === 68) {
+    return '.github/workflows/recover-pr68.yml';
+  }
   if (number === 73) {
     return '.github/workflows/recover-pr73.yml';
   }

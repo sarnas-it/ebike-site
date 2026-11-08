@@ -1,5 +1,63 @@
 # CI
 
+## Причина `no_checks` по PR #68 (TESTEB-65)
+
+Застрявший коммит `766eade4e49a86d4c14791da8d33e735948cfadb` (head ветки
+`feat/ebike-site-testeb-29`) не содержит `.github/workflows` в своём дереве.
+Это проверено по содержимому самого коммита: `git ls-tree` и
+`GET /contents/.github/workflows` для этого SHA не находят каталог workflow, а
+patch PR #68 меняет только файлы внутри `wp/**`.
+
+Проблема не только в head: в базовой ветке `main` на момент постановки задачи
+тоже не было `.github/workflows`. `main` тогда указывал на `efe1bc4` (мерж
+PR #62), и его дерево также состояло только из `wp/**`; корневого `.github/`
+не было. Для события `pull_request` GitHub ищет workflow-файл в дереве PR
+(merge-дерево head + base). Ни в head, ни в base файла не было, поэтому
+запускать было нечего — отсюда `no checks reported for the pull request`.
+
+GitHub не запускает workflow задним числом: появление файла в другой ветке или
+позже в `main` не создаёт прогон для уже существующего неизменённого head PR.
+Нужен либо новый коммит в head (новое событие `pull_request`/`synchronize`),
+либо отдельный прогон, который явно проверит актуальный head PR.
+
+Проверенные данные:
+
+* PR #68 — head `766eade4e49a86d4c14791da8d33e735948cfadb`, base `main`;
+* в дереве `766eade4` нет `.github/workflows` (raw/contents возвращает `404`);
+* в `main` на момент постановки (`efe1bc4`) не было `.github/workflows` и
+  вообще не было корневых файлов, только `wp/**`;
+* patch PR #68 добавляет и меняет только `wp/**`, workflow не добавляет;
+* фильтров по путям и веткам в CI нет: триггер `pull_request` широкий, без
+  `paths`;
+* очередь раннеров и лимит минут не при чём: прогон для этого SHA вообще не
+  создавался;
+* allow-list интеграции содержит `sarnas-it/ebike-site`, иначе PR #68 не был
+  бы создан.
+
+## Вторая причина по PR #68 (TESTEB-65): падение recovery на самодиспатче финализатора
+
+Первый recovery-прогон `Recover PR #68 checks` (run `42473326719`) успешно
+опубликовал проверки и завершил отложенный мерж PR #68, но упал на последнем
+шаге `Request completed evidence finalization`. Причина: recovery вызывал
+`workflow_dispatch` для `finalize-pr68-evidence.yml`, а GitHub разрешает
+диспатчить только workflow, который уже существует в базовой ветке. На ветке
+починки финализатор есть, в `main` его ещё не было, поэтому dispatch вернул
+«workflow not found». В результате на head ветки починки оставался красный
+check `Recover PR #68 checks`, хотя проверки и мерж уже прошли.
+
+Исправление: убрать самодиспатч. Recovery и finalizer запускаются одним и тем
+же `push`; finalizer сам находит recovery-прогон по точному SHA триггера
+(`--trigger-sha`), ждёт его завершения и только потом публикует доказательства.
+Если передан `--trigger-sha`, `wait-and-publish-evidence.mjs` **не**
+подставляет собственный `GITHUB_RUN_ID`: иначе финализатор ждал бы сам себя и
+никогда не увидел бы recovery-прогон.
+
+Recovery для застрявшего PR #68 описан в разделе ниже; он использует
+`.github/workflows/recover-pr68.yml`, а доказательства публикует
+`.github/workflows/finalize-pr68-evidence.yml` с комментарием
+`docs/testeb-65-comment.md` и маркерами `<!-- testeb-65-evidence:start/end -->`.
+
+
 ## Причина `no_checks` по PR #73 (TESTEB-67)
 
 Застрявший коммит `525b0d4803e03858cdb0bfce9cb90837bdf0473e` (head ветки

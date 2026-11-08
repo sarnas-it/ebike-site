@@ -101,6 +101,8 @@ function main() {
   testFinalizerWorkflowIsGreen();
   testPr78RecoveryWorkflowIsGreen();
   testPr78FinalizerIsGreen();
+  testPr68RecoveryWorkflowIsGreen();
+  testPr68FinalizerIsGreen();
   testSharedCheckRunnerCoversAllGroups();
   testCiWorkflowRunsPluginPhpContracts();
   testCiWorkflowKeepsTheVerifiedJobSet();
@@ -322,6 +324,95 @@ function testFinalizerWorkflowIsGreen() {
     'the finalizer must only accept a completed successful run',
   );
   console.log('PASS: the push-triggered finalizer waits for completion and publishes final evidence');
+}
+
+function testPr68RecoveryWorkflowIsGreen() {
+  const text = readFileSync(
+    path.join(repoRoot, '.github/workflows/recover-pr68.yml'),
+    'utf8',
+  );
+  const analysis = analyzeWorkflow(text);
+  const permissions = analyzePermissions(text);
+  const env = analyzeEnv(text);
+
+  assert.ok(analysis.triggers.includes('push'), 'PR #68 recovery must run on push');
+  assert.ok(
+    analysis.triggers.includes('workflow_dispatch'),
+    'PR #68 recovery must be manually dispatchable',
+  );
+  assert.strictEqual(analysis.hasPathsFilter, false);
+  assert.strictEqual(permissions['checks'], 'write');
+  assert.strictEqual(permissions['statuses'], 'write');
+  assert.strictEqual(permissions['pull-requests'], 'write');
+  assert.strictEqual(permissions['contents'], 'write');
+  assert.strictEqual(env.TARGET_PR, '68');
+  assert.strictEqual(
+    env.INCIDENT_SHA,
+    '766eade4e49a86d4c14791da8d33e735948cfadb',
+    'the PR #68 incident commit must stay recorded for auditing',
+  );
+  assert.ok(
+    text.includes('scripts/ci/resolve-pr-target.mjs'),
+    'PR #68 recovery must resolve the current head at run time',
+  );
+  assert.ok(
+    /ref:\s*\$\{\{\s*steps\.target\.outputs\.sha\s*\}\}/.test(text),
+    'PR #68 recovery must check out the resolved head',
+  );
+  assert.ok(
+    text.includes('scripts/ci/run-checks.sh'),
+    'PR #68 recovery must run the same checks as CI',
+  );
+  assert.ok(
+    text.includes('scripts/ci/recover-pr.mjs'),
+    'PR #68 recovery must publish checks and complete the deferred merge',
+  );
+  assert.ok(
+    !text.includes('--allow-running'),
+    'PR #68 recovery must not publish an in-progress run as final evidence',
+  );
+  assert.ok(
+    !/525b0d48/.test(text),
+    'PR #68 recovery must not pin the TESTEB-67 incident SHA',
+  );
+  assert.ok(
+    /^name:\s*["'].*#68.*["']\s*$/m.test(text),
+    'the PR #68 recovery name must be quoted so "#68" is not a YAML comment',
+  );
+  console.log('PASS: PR #68 recovery resolves the current head and completes the merge');
+}
+
+function testPr68FinalizerIsGreen() {
+  const text = readFileSync(
+    path.join(repoRoot, '.github/workflows/finalize-pr68-evidence.yml'),
+    'utf8',
+  );
+  const analysis = analyzeWorkflow(text);
+  const permissions = analyzePermissions(text);
+
+  assert.ok(analysis.triggers.includes('push'));
+  assert.ok(analysis.triggers.includes('workflow_dispatch'));
+  assert.strictEqual(analysis.hasPathsFilter, false);
+  assert.strictEqual(permissions['actions'], 'read');
+  assert.strictEqual(permissions['issues'], 'write');
+  assert.strictEqual(permissions['pull-requests'], 'write');
+  assert.ok(
+    text.includes('scripts/ci/wait-and-publish-evidence.mjs'),
+    'the PR #68 finalizer must wait for the recovery run to complete',
+  );
+  assert.ok(
+    text.includes('--trigger-sha'),
+    'the PR #68 finalizer must discover recovery by the triggering commit',
+  );
+  assert.ok(
+    text.includes('--comment-file docs/testeb-65-comment.md'),
+    'the PR #68 finalizer must update the TESTEB-65 evidence comment',
+  );
+  assert.ok(
+    !text.includes('--allow-running'),
+    'the PR #68 finalizer must only publish a completed successful run',
+  );
+  console.log('PASS: PR #68 finalizer waits for completion and publishes final evidence');
 }
 
 function testSharedCheckRunnerCoversAllGroups() {
