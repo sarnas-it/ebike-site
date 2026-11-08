@@ -712,7 +712,36 @@ if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 		foreach ( (array) $order->get_shipping_methods() as $shipping ) {
 			$method_id = velotok_core_delivery_normalize_method_id( $shipping );
 			$meta      = method_exists( $shipping, 'get_meta_data' ) ? (array) $shipping->get_meta_data() : array();
+
+			if ( function_exists( 'velotok_core_delivery_order_shipping_meta' ) ) {
+				$meta = velotok_core_delivery_order_shipping_meta( $shipping );
+			}
+
 			$range     = null;
+			$tracking  = '';
+
+			foreach ( array( '_velotok_delivery_tracking_number', '_velotok_tracking_number', '_tracking_number', 'tracking_number', 'delivery_tracking_number' ) as $tracking_key ) {
+				if ( isset( $meta[ $tracking_key ] ) && is_scalar( $meta[ $tracking_key ] ) && '' !== trim( (string) $meta[ $tracking_key ] ) ) {
+					$tracking = trim( (string) $meta[ $tracking_key ] );
+					break;
+				}
+			}
+
+			if ( '' === $tracking && is_object( $shipping ) && method_exists( $shipping, 'get_meta' ) ) {
+				foreach ( array( '_velotok_delivery_tracking_number', '_velotok_tracking_number', '_tracking_number', 'tracking_number', 'delivery_tracking_number' ) as $tracking_key ) {
+					$value = $shipping->get_meta( $tracking_key, true );
+
+					if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+						$tracking = trim( (string) $value );
+						break;
+					}
+				}
+			}
+
+			if ( '' === $tracking ) {
+				$existing_tracking = get_post_meta( $order_id, '_velotok_delivery_tracking_number', true );
+				$tracking          = is_scalar( $existing_tracking ) ? trim( (string) $existing_tracking ) : '';
+			}
 
 			if ( '' === $method_id ) {
 				continue;
@@ -757,10 +786,23 @@ if ( ! function_exists( 'velotok_core_delivery_persist_order_meta' ) ) {
 				'selected'        => true,
 			);
 
+			if ( '' !== $tracking ) {
+				$selection['tracking_number'] = $tracking;
+				$selection['tracking']        = array(
+					'number'          => $tracking,
+					'tracking_number' => $tracking,
+					'visible_to_owner'=> true,
+				);
+			}
+
 			update_post_meta( $order_id, '_velotok_delivery_method', $method_id );
 			update_post_meta( $order_id, '_velotok_delivery_provider', $provider );
 			update_post_meta( $order_id, '_velotok_delivery_method_label', $label );
 			update_post_meta( $order_id, '_velotok_delivery_cost', $cost );
+
+			if ( '' !== $tracking ) {
+				update_post_meta( $order_id, '_velotok_delivery_tracking_number', $tracking );
+			}
 
 			if ( null !== $eta['min_days'] ) {
 				update_post_meta( $order_id, '_velotok_delivery_eta_min_days', (int) $eta['min_days'] );

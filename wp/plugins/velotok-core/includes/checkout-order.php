@@ -17,7 +17,7 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 			'parent_spec'     => 'ecommerce-store',
 			'requirement'     => 'TESTEB-23',
 			'task'            => 'TESTEB-23',
-			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-26', 'TESTEB-27' ),
+			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24', 'TESTEB-25', 'TESTEB-26', 'TESTEB-27', 'TESTEB-38' ),
 			'provider'        => 'woocommerce',
 			'provider_label'  => 'WooCommerce',
 			'checkout_class'  => 'WC_Checkout',
@@ -77,6 +77,8 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 				'payment_meta'      => '_payment_method',
 				'comment_meta'      => '_customer_note',
 				'tracking_meta'     => '_velotok_delivery_tracking_number',
+				'tracking_requirement' => 'TESTEB-38',
+				'tracking_visible_to_owner' => true,
 				'persisted'         => true,
 				'visible_to'        => array( 'customer', 'owner' ),
 			),
@@ -1001,6 +1003,14 @@ if ( ! function_exists( 'velotok_core_checkout_order_details' ) ) {
 			'comment'         => $comment,
 			'customer_note'   => $comment,
 			'tracking_number' => $tracking,
+			'tracking'        => array(
+				'number'          => $tracking,
+				'tracking_number' => $tracking,
+				'has_tracking'    => '' !== $tracking,
+				'visible_to'      => $contract['order']['visible_to'],
+				'visible_to_owner'=> true,
+			),
+			'tracking_visible_to_owner' => true,
 			'visible_to'      => $contract['order']['visible_to'],
 		);
 	}
