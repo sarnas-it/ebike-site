@@ -73,4 +73,6 @@ jobs:
         run: |
           set -e
           node scripts/ci/tests/repair-pr-checks.test.mjs
+          node scripts/ci/tests/recover-pr.test.mjs
+          node scripts/ci/tests/run-checks.test.mjs
           node scripts/ci/tests/workflow-triggers.test.mjs

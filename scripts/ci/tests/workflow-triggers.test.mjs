@@ -88,6 +88,9 @@ function testRepositoryWorkflowIsGreen() {
 function main() {
   testBrokenWorkflowIsRed();
   testRepositoryWorkflowIsGreen();
+  testBrokenRecoveryWorkflowIsRed();
+  testRecoveryWorkflowIsGreen();
+  testSharedCheckRunnerCoversAllGroups();
 }
 
 try {
@@ -95,4 +98,140 @@ try {
 } catch (error) {
   process.stderr.write(`${error.stack || error.message}\n`);
   process.exitCode = 1;
+}
+
+function analyzePermissions(text) {
+  const lines = text.split(/\r?\n/);
+  const index = lines.findIndex((line) => /^permissions:\s*$/.test(line));
+  const permissions = {};
+  if (index < 0) {
+    return permissions;
+  }
+  for (let i = index + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^\S/.test(line) && line.trim() !== '') {
+      break;
+    }
+    const match = line.match(/^  ([A-Za-z_-]+):\s*(\S+)/);
+    if (match) {
+      permissions[match[1]] = match[2];
+    }
+  }
+  return permissions;
+}
+
+function analyzeEnv(text) {
+  const lines = text.split(/\r?\n/);
+  const index = lines.findIndex((line) => /^env:\s*$/.test(line));
+  const env = {};
+  if (index < 0) {
+    return env;
+  }
+  for (let i = index + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^\S/.test(line) && line.trim() !== '') {
+      break;
+    }
+    const match = line.match(/^  ([A-Za-z_]+):\s*(.+)$/);
+    if (match) {
+      env[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, '');
+    }
+  }
+  return env;
+}
+
+function recoveryWorkflowChecks(text) {
+  const analysis = analyzeWorkflow(text);
+  const permissions = analyzePermissions(text);
+  const env = analyzeEnv(text);
+  return {
+    triggers: analysis.triggers,
+    hasPathsFilter: analysis.hasPathsFilter,
+    permissions,
+    env,
+    checksOutExactSha: /ref:\s*(?:\$\{\{\s*env\.TARGET_SHA\s*\}\}|578e87b5a8587d6078aade92d26bd449448dd1d3)/.test(text),
+    runsSharedChecks: /scripts\/ci\/run-checks\.sh/.test(text),
+    publishesAndMerges: /scripts\/ci\/recover-pr\.mjs/.test(text),
+  };
+}
+
+function testBrokenRecoveryWorkflowIsRed() {
+  const broken = [
+    'name: Recover',
+    'on:',
+    '  workflow_dispatch:',
+    'permissions:',
+    '  contents: read',
+    'env:',
+    '  TARGET_PR: "62"',
+    '  TARGET_SHA: deadbeef',
+    'jobs:',
+    '  recover:',
+    '    runs-on: ubuntu-latest',
+    '    steps:',
+    '      - run: echo ok',
+  ].join('\n');
+  const checks = recoveryWorkflowChecks(broken);
+  assert.ok(!checks.triggers.includes('push'), 'a recovery without push must be red');
+  assert.strictEqual(checks.permissions['checks'], undefined);
+  assert.strictEqual(checks.permissions['statuses'], undefined);
+  assert.strictEqual(checks.permissions['pull-requests'], undefined);
+  assert.strictEqual(checks.checksOutExactSha, false);
+  assert.strictEqual(checks.runsSharedChecks, false);
+  assert.strictEqual(checks.publishesAndMerges, false);
+  console.log('PASS: a recovery workflow without write permissions and exact checkout is red');
+}
+
+function testRecoveryWorkflowIsGreen() {
+  const text = readFileSync(path.join(repoRoot, '.github/workflows/recover-pr62.yml'), 'utf8');
+  const checks = recoveryWorkflowChecks(text);
+
+  assert.ok(checks.triggers.includes('push'), 'recovery must run on push to any branch');
+  assert.ok(
+    checks.triggers.includes('workflow_dispatch'),
+    'recovery must be manually dispatchable',
+  );
+  assert.strictEqual(checks.hasPathsFilter, false, 'recovery must not filter by paths');
+  assert.strictEqual(checks.permissions['checks'], 'write');
+  assert.strictEqual(checks.permissions['statuses'], 'write');
+  assert.strictEqual(checks.permissions['pull-requests'], 'write');
+  assert.strictEqual(checks.permissions['contents'], 'write');
+  assert.strictEqual(
+    checks.env.TARGET_PR,
+    '62',
+    'recovery must target the pull request from the incident',
+  );
+  assert.strictEqual(
+    checks.env.TARGET_SHA,
+    '578e87b5a8587d6078aade92d26bd449448dd1d3',
+    'recovery must check out the exact commit from the incident',
+  );
+  assert.strictEqual(
+    checks.checksOutExactSha,
+    true,
+    'recovery must check out the exact target SHA, not a branch head',
+  );
+  assert.strictEqual(
+    checks.runsSharedChecks,
+    true,
+    'recovery must run the same checks as the normal CI',
+  );
+  assert.strictEqual(
+    checks.publishesAndMerges,
+    true,
+    'recovery must publish checks and complete the deferred merge',
+  );
+  assert.ok(
+    text.includes('docs/testeb-63-comment.md'),
+    'recovery must post a confirmed comment on the pull request',
+  );
+  console.log('PASS: recovery workflow targets PR #62 at the exact SHA and publishes checks');
+}
+
+function testSharedCheckRunnerCoversAllGroups() {
+  const runner = readFileSync(path.join(repoRoot, 'scripts/ci/run-checks.sh'), 'utf8');
+  for (const group of ['php-lint', 'php-tests', 'plugin-tests', 'ci-repair-tests']) {
+    assert.ok(runner.includes(group), `run-checks.sh must keep the ${group} check`);
+  }
+  console.log('PASS: the shared runner keeps the full check set');
 }

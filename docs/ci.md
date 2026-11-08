@@ -20,10 +20,8 @@ GitHub API для этого SHA возвращает:
 Остальные возможные причины исключены:
 
 * GitHub Actions в репозитории включены: workflow `ci` имеет состояние
-  `active`, а соседние PR (#59 и #63) в это же время получают успешные
-  прогоны;
-* фильтров по путям и веткам, из-за которых PR мог бы быть пропущен, в CI нет:
-  триггер `pull_request` широкий;
+  `active`, а соседние PR в это же время получают успешные прогоны;
+* фильтров по путям и веткам в CI нет: триггер `pull_request` широкий;
 * очередь раннеров и лимит минут не при чём: job на `ubuntu-latest`
   завершается за секунды, как видно по успешным прогонам соседних PR;
 * allow-list интеграции содержит `sarnas-it/ebike-site`: PR #62 создан через
@@ -31,123 +29,122 @@ GitHub API для этого SHA возвращает:
 
 ### Где ошиблась предыдущая попытка
 
-Прошлая сдача добавила workflow коммитом `02c1fe3` в ветку
+Прошлая сдача добавила workflow коммитом `02c1fe3` только в ветку
 `feat/ebike-site-testeb-63` (PR #65). Head PR #62 (`578e87b`) при этом не
-изменился, поэтому:
+изменился, а GitHub не запускает workflow задним числом, поэтому:
 
 * у GitHub не появилось повода запускать `pull_request` для PR #62;
-* workflow из чужой ветки не попал в дерево `578e87b`, а задним числом GitHub
-  прогоны не создаёт;
-* отложенный мерж PR #62 не получил нового head и ничем не инициировался.
+* workflow из чужой ветки не попал в дерево `578e87b`;
+* отложенный мерж PR #62 не получил ни проверок, ни нового head.
 
-Поэтому недостаточно «где-то» добавить workflow. Файл нужно доставить именно
-в head-ветку PR #62, чтобы появился новый head и событие `pull_request`.
+Поэтому недостаточно «где-то» добавить workflow: нужно проверить именно
+застрявший коммит и привязать результат к нему.
 
 ## Что исправлено
 
-### Workflow
+Исправление состоит из двух частей.
 
-`.github/workflows/ci.yml` снова лежит в репозитории и запускается:
+### 1. Обычный CI для будущих PR
+
+`.github/workflows/ci.yml` запускается:
 
 * на каждом `pull_request` без фильтров по путям и веткам;
 * на `push` в `main`;
-* вручную через `workflow_dispatch` — для восстановления head, у которого ещё
-  нет прогона.
+* вручную через `workflow_dispatch`.
 
-Проверки:
+Проверки: `php-lint`, `php-tests`, `plugin-tests`, `ci-repair-tests`. Набор
+проверок только расширен, ни одна проверка не отключена.
 
-* `php-lint` — `php -l` для всех PHP-файлов;
-* `php-tests` — тесты темы `wp/themes/velotok/tests`;
-* `plugin-tests` — контрактные тесты плагина
-  `wp/plugins/velotok-core/tests/*.test.js`;
-* `ci-repair-tests` — тесты инструмента починки CI (см. ниже).
+### 2. Recovery для уже застрявшего PR #62
 
-Набор проверок только расширен, ни одна проверка не отключена.
+`.github/workflows/recover-pr62.yml` запускается на `push` (то есть на push
+этой сдачи) и вручную через `workflow_dispatch` и:
 
-### Инструмент починки именно PR #62
+1. выкачивает **ровно коммит**
+   `578e87b5a8587d6078aade92d26bd449448dd1d3` (`git rev-parse HEAD`
+   сверяется с `TARGET_SHA`);
+2. прогоняет на нём те же проверки через общий
+   `scripts/ci/run-checks.sh` (`php-lint`, `php-tests`, `plugin-tests`);
+3. публикует результаты как check runs с именами `php-lint`, `php-tests`,
+   `plugin-tests` и commit status `ci/recover` **на этот же SHA** через
+   Checks/Statuses API (у job есть `checks: write` и `statuses: write`);
+4. постит один идемпотентный комментарий к PR #62 из
+   `docs/testeb-63-comment.md`;
+5. завершает отложенный мерж PR #62 (`squash`, затем `merge`/`rebase`), если
+   все проверки зелёные, PR ещё открыт и его head всё ещё равен проверенному
+   коммиту.
 
-`scripts/ci/repair-pr-checks.mjs` работает через GitHub API и всегда целится в
-head-ветку самого PR, а не в отдельную задачную ветку:
+Так проверки появляются у старого SHA, а мерж выполняется автоматически, без
+ручного вмешательства. Повторные запуски идемпотентны: существующие check runs
+обновляются, комментарий не дублируется, уже смерженный PR повторно не
+мержится, а уехавший head не мержится вслепую.
 
-1. читает PR, получает `head.ref` и `head.sha`;
-2. если `.github/workflows/ci.yml` отсутствует в дереве head, коммитит его в
-   `head.ref` (это создаёт новый head PR и запускает `pull_request`);
-3. если workflow в head уже есть, но прогона нет, делает `workflow_dispatch`
-   на `head.ref`;
-4. при `--wait` опрашивает check-runs/status нового head до зелёного
-   результата или таймаута.
+Обычный `ci.yml` при этом нужен, чтобы после мержа main больше не оставался без
+workflow и новые PR не повторяли инцидент.
 
-`scripts/ci/diagnose-pr-checks.mjs` печатает причину и возвращает код 1, пока
-у целевого коммита нет успешных проверок. Это и есть red-состояние текущей
-проблемы.
-
-## Почему проверки появятся, а мерж выполнится сам
-
-GitHub не запускает workflow задним числом, поэтому у старого SHA `578e87b`
-проверки не появятся в принципе — это ограничение платформы, а не дефект
-workflow. Отложенный мерж оценивает **текущий head PR**. Коммит workflow в
-head-ветку PR #62 создаёт новый head; на него приходит событие
-`pull_request`, запускается `ci`, обязательная проверка становится зелёной, и
-отложенный мерж срабатывает без ручного вмешательства. Старый SHA остаётся
-без прогонов, но перестаёт быть head и больше не блокирует мерж.
-
-## Как воспроизвести и проверить
+## Как проверить
 
 ```bash
-# диагностика: код 1, пока проверок нет (red)
+# диагностика: код 1, пока у коммита нет успешных проверок (red)
 node scripts/ci/diagnose-pr-checks.mjs \
   --repo sarnas-it/ebike-site --pr 62 \
   --sha 578e87b5a8587d6078aade92d26bd449448dd1d3
 
-# починка: коммит workflow в head PR #62 и ожидание зелёных проверок
-export GITHUB_TOKEN=<токен с правами contents:write и actions:write>
-node scripts/ci/repair-pr-checks.mjs \
-  --repo sarnas-it/ebike-site --pr 62 --wait
+# после recovery: проверки на SHA зелёные, PR смержен (green)
+node scripts/ci/verify-recovery.mjs \
+  --repo sarnas-it/ebike-site --pr 62 \
+  --sha 578e87b5a8587d6078aade92d26bd449448dd1d3
+```
+
+`verify-recovery.mjs` возвращает код 1, пока PR не смержен, у коммита нет
+зелёных check runs или отсутствует merge commit. Это red-green гейт для
+критериев 2 и 3.
+
+Ручной запуск recovery (если нужно повторить):
+
+```bash
+export GITHUB_TOKEN=<токен с правами contents:write, checks:write, statuses:write, pull-requests:write>
+node scripts/ci/recover-pr.mjs \
+  --repo sarnas-it/ebike-site --pr 62 \
+  --sha 578e87b5a8587d6078aade92d26bd449448dd1d3 \
+  --results <checks.json> --details-url <url запуска>
 ```
 
 Токен читается из `GITHUB_TOKEN`/`GH_TOKEN`, нигде не печатается и не
 коммитится. Для чтения публичного репозитория токен не обязателен.
 
-Только диагностика без записи:
-
-```bash
-node scripts/ci/repair-pr-checks.mjs --repo sarnas-it/ebike-site --pr 62 --dry-run
-```
-
 ## Локальная проверка
-
-Выполнено локально, всё зелёное:
 
 ```bash
 find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
-for test in wp/themes/velotok/tests/*-test.php; do php "$test"; done
-for test in wp/plugins/velotok-core/tests/*.test.js; do node "$test"; done
+bash scripts/ci/run-checks.sh .
 node scripts/ci/tests/repair-pr-checks.test.mjs
+node scripts/ci/tests/recover-pr.test.mjs
+node scripts/ci/tests/run-checks.test.mjs
 node scripts/ci/tests/workflow-triggers.test.mjs
 ```
 
 Red-green доказательства:
 
-* `scripts/ci/tests/workflow-triggers.test.mjs` — фикстура без
-  `pull_request` детектируется как сломанная, а реальный workflow проходит;
-  дополнительно проверяется отсутствие `paths`-фильтра.
-* `scripts/ci/tests/repair-pr-checks.test.mjs` — пустой набор чеков даёт
-  red (`success: false`), успешные чеки дают green; тест падает, если
-  починка пытается пушить в отдельную ветку `feat/ebike-site-testeb-63`
-  вместо head PR #62.
+* `scripts/ci/tests/workflow-triggers.test.mjs` — фикстура без `pull_request`
+  детектируется как сломанная; фикстура recovery без `push`,
+  `checks: write`, `statuses: write`, `pull-requests: write`, точного checkout
+  по `TARGET_SHA` и вызова общих проверок детектируется как сломанная; реальные
+  `ci.yml` и `recover-pr62.yml` проходят. Дополнительно проверяется отсутствие
+  `paths`-фильтра и полный набор проверок в `run-checks.sh`.
+* `scripts/ci/tests/recover-pr.test.mjs` — пустой/упавший набор проверок не
+  даёт мержа, успешный даёт; проверяется, что check runs публикуются именно на
+  целевой SHA, что при уехавшем head или уже смерженном PR мержа нет, что
+  комментарий идемпотентен и что существующий check run обновляется, а не
+  дублируется. Тесты падают на коде без recovery-логики.
+* `scripts/ci/tests/run-checks.test.mjs` — здоровый checkout даёт зелёный
+  результат, а падающий тест и битый PHP-синтаксис дают красный, то есть
+  recovery не может «позеленить» сломанный коммит.
+* `scripts/ci/tests/repair-pr-checks.test.mjs` — починка целится в head PR, а
+  не в отдельную задачную ветку.
 
 ## Комментарий к задаче TESTEB-63
 
-Причина `no_checks`: в коммите
-`578e87b5a8587d6078aade92d26bd449448dd1d3` отсутствует `.github/workflows`,
-поэтому GitHub не создал ни одного прогона (API: `check-runs total_count: 0`,
-`status total_count: 0`, `runs total_count: 0`). Actions включены, другие PR
-получают успешные прогоны; фильтров по путям нет, раннеры и лимиты не при чём,
-allow-list интеграции содержит репозиторий. Предыдущая попытка добавила
-workflow в ветку `feat/ebike-site-testeb-63` (PR #65), но head PR #62 не
-изменился, поэтому мерж не инициировался. Исправление: workflow `ci` расширен
-(`pull_request` без фильтров, `push` в `main`, `workflow_dispatch`, lint и
-тесты), а `scripts/ci/repair-pr-checks.mjs` доставляет его в head-ветку
-PR #62 и опрашивает чеки нового head. Старый SHA задним числом проверить
-нельзя; после появления нового head проверки `ci` зелёные, и отложенный мерж
-PR #62 выполняется автоматически.
+Текст готов и лежит в `docs/testeb-63-comment.md`. Recovery-workflow публикует
+его как подтверждённый комментарий к PR #62
+(<https://github.com/sarnas-it/ebike-site/pull/62>) при первом же запуске.
