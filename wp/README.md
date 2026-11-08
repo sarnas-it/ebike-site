@@ -34,6 +34,13 @@ php wp/themes/velotok/tests/catalog-all-products-test.php
 php wp/themes/velotok/tests/catalog-published-products-test.php
 php wp/plugins/velotok-core/tests/product-attributes-contract-test.php
 php wp/plugins/velotok-core/tests/product-attributes-card-test.php
+php wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
+node wp/plugins/velotok-core/tests/payment-gateway-contract.test.js
+php wp/plugins/velotok-core/tests/accounts-contract-test.php
+php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
+node wp/plugins/velotok-core/tests/accounts-contract.test.js
+node wp/plugins/velotok-core/tests/accounts-redgreen.test.js
+node wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
 bash wp/tests/smoke.sh
 ```
 
@@ -49,8 +56,26 @@ WooCommerce → список моделей → шаблон каталога �
 товары, а пустой активный каталог выводит пустое состояние без демо-карточек.
 Тесты `product-attributes-contract-test.php`
 и `product-attributes-card-test.php` проверяют mocked-контракт источника
-произвольных дополнительных атрибутов и их вывод в карточке. Дымовой тест
-дополнительно проверяет эти элементы на реальной главной странице.
+произвольных дополнительных атрибутов и их вывод в карточке. Тест
+`payment-gateway-contract-test.php` проверяет шлюз ЮKassa для WooCommerce:
+создание платежа, подпись и идемпотентность webhook, статусы заказа и полный
+возврат в `refunded`; секреты читаются только из окружения или настроек.
+Дымовой тест дополнительно проверяет эти элементы на реальной главной странице.
+
+Тест аккаунтов `accounts-contract-test.php` проверяет регистрацию по email и
+паролю, обязательное подтверждение email, вход существующего пользователя без
+дубля, запрет доступа неподтверждённому пользователю к личному кабинету,
+перенос гостевой корзины с переходом на `/checkout/` и завершение сессии
+выходом. Red-green тест падает, если регистрация перестаёт требовать
+подтверждения email.
+
+Тест `accounts-wordpress-integration-test.php` проверяет реальную интеграцию:
+пользователь сохраняется через `wc_create_new_customer()`, повторный email не
+создаёт дубль, аккаунт остаётся `pending` до подтверждения, вход выполняется
+через `wp_signon()`, выход — через `wp_logout()`, а форма регистрации
+отправляется в `admin-post.php`. Его red-green версия
+`accounts-wordpress-integration.test.js` падает, если при регистрации аккаунт
+сразу помечается подтверждённым.
 
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
 
@@ -70,6 +95,8 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/themes/velotok/` — тема витрины и шаблоны WooCommerce;
 * `wp/plugins/velotok-core/` — поля характеристик электровелосипедов;
 * `wp/plugins/velotok-core/includes/product-attributes.php` — stub источника дополнительных атрибутов;
+* `wp/plugins/velotok-core/includes/payment-gateway.php` — шлюз WooCommerce и ЮKassa API v3;
+* `wp/plugins/velotok-core/tests/payment-gateway-contract-test.php` — тест оплаты, webhook и возврата;
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
 * `wp/cli/wp-entrypoint.sh` — обёртка WP-CLI для контейнера `wpcli`;

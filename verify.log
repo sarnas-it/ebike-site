@@ -1,0 +1,95 @@
+TESTEB-63: CI не дал результат (no_checks): TESTEB-1 — sarnas-it/ebike-site#62
+----------------------------------------------------------------
+
+Причина no_checks
+-----------------
+Застрявший коммит PR #62 `578e87b5a8587d6078aade92d26bd449448dd1d3` не
+содержал `.github/workflows` в своём дереве, а `main` на момент открытия и
+последнего push PR был пустым (`40134b5`) и тоже не содержал workflow.
+Для события `pull_request` GitHub ищет workflow в дереве PR (head + base),
+поэтому запускать было нечего: `no checks reported for the pull request`.
+GitHub не запускает workflow ретроспективно.
+
+Починка: `.github/workflows/ci.yml` теперь запускается на каждом
+`pull_request` (без `paths`-фильтра), на `push` в `main` и по
+`workflow_dispatch`. Гейт `.github/workflows/verify-ci-rollout.yml` на самом
+PR #65 привязывает доказательство к `TARGET_SHA` из
+`github.event.pull_request.head.sha` и публикует ссылку на штатный прогон
+`ci`, его job, стандартные check runs и состояние `mergeable` PR #65.
+
+Доказательство для текущей сдачи
+--------------------------------
+В репозитории намеренно не фиксируется ссылка на конкретный прогон: коммит с
+такой ссылкой сам меняет проверяемый SHA и превращает доказательство в
+устаревшее. Для каждой сдачи прогон `ci` запускается на её собственном коммите,
+а ссылка на прогон указывается в результате сдачи (result), а не файлом в
+репозитории.
+
+Актуальное доказательство формирует workflow `verify-ci-rollout`: на событии
+`pull_request` он берёт `TARGET_SHA` из `github.event.pull_request.head.sha`,
+сравнивает с ним `head_sha` прогона `ci` и каждого штатного check run и только
+при совпадении обновляет комментарий `<!-- testeb-63-rollout -->` на PR #65.
+Запись на другом SHA не может подтвердить новый коммит. Пока GitHub
+пересчитывает mergeability, `mergeable` может временно вернуть `null`; workflow
+повторяет запрос, пока не получит определённое значение.
+
+Red-green тест привязки доказательства к сдаваемому SHA:
+`scripts/ci/tests/submitted-sha-evidence.test.mjs`. Он проверяет, что прогон без
+`head_sha` и прогон/check runs на другом коммите не принимаются.
+
+Локальные проверки
+------------------
+$ for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done
+exit code: 0
+
+PASS: контракт аккаунтов выполняется.
+PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
+PASS: регистрация требует подтверждения email (TESTEB-2).
+PASS: WordPress-регистрация требует подтверждения email (TESTEB-2).
+PASS: существующий email ведёт ко входу без дубля (TESTEB-3).
+PASS: TESTEB-3 падает без обработки существующего email и проходит с ней.
+PASS: TESTEB-5 падает без завершения сессии при выходе и проходит с ним.
+PASS: выход завершает сессию и закрывает личный кабинет (TESTEB-5).
+PASS: TESTEB-4 падает без переноса корзины при регистрации и проходит с ним.
+PASS: регистрация завершается переносом корзины и переходом к оформлению (TESTEB-4).
+PASS: регистрация требует подтверждения email независимо от переданных опций (TESTEB-2).
+PASS: TESTEB-6 падает без запрета доступа неподтверждённому пользователю и проходит с ним.
+PASS: неподтверждённый пользователь не имеет доступа к личному кабинету (TESTEB-6).
+PASS: WordPress-интеграция аккаунтов выполняется.
+PASS: оформление заказа через WooCommerce Checkout проверено.
+OK: стоимость доставки считается по тарифу и порогу бесплатной доставки.
+OK: срок получения отображается и хранится диапазоном.
+OK: вес заказа для тарифа рассчитывается однозначно.
+OK: WooCommerce предлагает СДЭК и Почту РФ из зон с тарифом, сроком и видимой ошибкой.
+OK: способы доставки из зон WooCommerce, тарифы, сроки и самовывоз на месте.
+OK: mocked-контракт гостевой корзины и регистрации на месте.
+OK: mocked-контракт данных спецификации на месте.
+OK: каталог выводит все товары, обязательное описание и дополнительные атрибуты.
+OK: каталог электровелосипедов выводит все карточки с обязательными и произвольными атрибутами.
+OK: каталог электровелосипедов выводит фото, название, описание, цену и произвольные атрибуты.
+PASS: интеграция оформления заказа с WooCommerce Checkout проверена.
+ok - нормализация товара передаёт описание в карточку
+ok - карточка содержит фото товара
+ok - карточка содержит название товара
+ok - карточка содержит описание товара
+ok - карточка содержит цену товара
+ok - если краткое описание пустое, используется полное
+ok - демо-карточка также содержит описание
+PASS: обязательные атрибуты карточки отображаются.
+
+$ for t in scripts/ci/tests/*.test.mjs; do node "$t" || exit 1; done
+exit code: 0
+(все наборы scripts/ci/tests прошли, включая новый
+scripts/ci/tests/submitted-sha-evidence.test.mjs)
+
+$ node scripts/ci/tests/submitted-sha-evidence.test.mjs
+PASS: the submitted SHA has its own green ci run, standard check runs and a mergeable PR (criteria 2 and 3)
+PASS: evidence recorded on the submitted SHA is rejected for any later submission
+PASS: a run without commit provenance is rejected as evidence for the submitted SHA
+PASS: criterion 3 requires mergeable=true without conflicts
+PASS: the evidence comment always pins the submitted SHA to its own run
+PASS: documentation leaves the run link to the submission result instead of pinning a stale SHA
+exit code: 0
+
+PHP-файлы продуктовых пакетов в этой правке не менялись: изменены только
+документация, verify.log и тесты/фикстура CI-инструментов.

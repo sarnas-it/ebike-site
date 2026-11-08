@@ -83,6 +83,8 @@ services:
         wp eval-file wp-content/plugins/velotok-core/tests/spec-data-contract-test.php --allow-root
         echo "Running product attributes contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/product-attributes-contract-test.php --allow-root
+        echo "Running payment gateway contract test:"
+        wp eval-file wp-content/plugins/velotok-core/tests/payment-gateway-contract-test.php --allow-root
         echo "Running product attributes card test:"
         php wp-content/plugins/velotok-core/tests/product-attributes-card-test.php
         echo "Running catalog render test:"

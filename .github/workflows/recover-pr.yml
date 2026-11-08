@@ -1,0 +1,147 @@
+name: "Recover pull request checks"
+run-name: "Recover pull request checks from ${{ github.sha }}"
+
+# GitHub normally reports a check conclusion for every job, but a superseded or
+# cancelled run can leave a stale pending duplicate with the same check name.
+# Branch protection then waits forever even though the job log finished green.
+# This workflow runs after the regular ci workflow completes, detects that
+# symptom and republishes completed checks on the actual pull request head.
+#
+# It also runs on pull_request events so the no_checks class is not left without
+# a result: when a commit has no ci run at all, no workflow_run event will ever
+# fire. The decision step only recovers in that case; if a ci run exists (even
+# queued) the regular workflow owns the result and recovery stays out of the way.
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number (optional when sha is set)
+        required: false
+      sha:
+        description: Commit used to resolve the pull request (optional)
+        required: false
+
+permissions:
+  actions: read
+  checks: write
+  contents: write
+  issues: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: recover-pr-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr || github.event.pull_request.number || github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Recover pull request checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out CI tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+          persist-credentials: false
+
+      - name: Decide whether recovery is needed
+        id: need
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ github.event.inputs.pr }}
+          INPUT_SHA: ${{ github.event.inputs.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          args=(--repo "$GITHUB_REPOSITORY" --github-output "$GITHUB_OUTPUT")
+          if [ -n "$INPUT_PR" ]; then
+            args+=(--pr "$INPUT_PR")
+          elif [ -n "$PR_NUMBER" ]; then
+            args+=(--pr "$PR_NUMBER")
+          elif [ -n "$RUN_PR" ]; then
+            args+=(--pr "$RUN_PR")
+          elif [ -n "$INPUT_SHA" ]; then
+            args+=(--sha "$INPUT_SHA")
+          elif [ -n "$PR_HEAD_SHA" ]; then
+            args+=(--sha "$PR_HEAD_SHA")
+          else
+            args+=(--sha "$RUN_HEAD_SHA")
+          fi
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # Only take over when GitHub never started ci for this commit.
+            args+=(--require-missing-ci-run --workflow .github/workflows/ci.yml)
+          fi
+          node tooling/scripts/ci/should-recover.mjs "${args[@]}"
+
+      - name: Check out resolved pull request head
+        if: steps.need.outputs.needed == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.need.outputs.sha }}
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up PHP
+        if: steps.need.outputs.needed == 'true'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Set up Node.js
+        if: steps.need.outputs.needed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Record checked commit
+        if: steps.need.outputs.needed == 'true'
+        env:
+          TARGET_SHA: ${{ steps.need.outputs.sha }}
+          RECOVERY_REASON: ${{ steps.need.outputs.reason }}
+        run: |
+          set -euo pipefail
+          checked="$(git -C target rev-parse HEAD)"
+          test "$checked" = "$TARGET_SHA"
+          {
+            echo "Checked commit: $checked"
+            echo "Recovery reason: $RECOVERY_REASON"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Run repository checks against resolved head
+        if: steps.need.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          bash tooling/scripts/ci/run-checks.sh target "$RUNNER_TEMP/checks.json" || true
+          cat "$RUNNER_TEMP/checks.json"
+
+      - name: Publish completed checks and complete deferred merge
+        if: steps.need.outputs.needed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.need.outputs.sha }}
+          TARGET_PR: ${{ steps.need.outputs.pr }}
+          CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          node tooling/scripts/ci/recover-pr.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$TARGET_PR" \
+            --sha "$TARGET_SHA" \
+            --results "$RUNNER_TEMP/checks.json" \
+            --details-url "$CI_RUN_URL" \
+            --summary "Recovered checks for PR #${TARGET_PR} at ${TARGET_SHA}" \
+            --comment-file tooling/docs/ci-recovery-comment.md \
+            --comment-marker '<!-- ci-recovery -->'
