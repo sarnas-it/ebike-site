@@ -10,7 +10,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const fixture = JSON.parse(
   readFileSync(
-    path.join(here, 'fixtures/pr65-ci-recording.json'),
+    path.join(here, 'fixtures/pr65-rejected-head-recording.json'),
     'utf8',
   ),
 );
@@ -154,37 +154,38 @@ function testRecordedChecksWithoutCommitProvenanceAreRejected() {
   );
 }
 
-function testDocumentationDescribesDynamicEvidence() {
+function testDocumentationDoesNotPinStaleEvidence() {
+  // Regression for the review finding: documentation used to present the run
+  // recorded on an already rejected head as if it were the current evidence.
+  // The repository must not pin any run to the PR #65 submission; instead it
+  // must point readers at the dynamic evidence published for the exact head by
+  // the verify-ci-rollout workflow. The rejected-head recording stays a test
+  // input only and must never be cited as proof in the documentation.
   for (const relative of ['docs/testeb-63-comment.md', 'docs/ci.md']) {
     const text = readFileSync(path.join(repoRoot, relative), 'utf8');
     assert.ok(
-      text.includes(fixture.pullRequest.head.sha),
-      `${relative} must name the recorded (historical) commit`,
+      !text.includes(fixture.pullRequest.head.sha),
+      `${relative} must not pin the rejected head ${fixture.pullRequest.head.sha} as evidence`,
     );
     assert.ok(
-      text.includes(String(fixture.run.id)),
-      `${relative} must link the recorded historical ci run for PR #65`,
+      !text.includes(String(fixture.run.id)),
+      `${relative} must not link the stale run ${fixture.run.id} as evidence`,
     );
     assert.ok(
-      text.includes(fixture.run.html_url),
-      `${relative} must link the recorded historical ci run url for PR #65`,
-    );
-    assert.ok(
-      text.includes('pr65-ci-recording.json'),
-      `${relative} must point at the recorded GitHub API fixture`,
+      !text.includes(fixture.run.html_url),
+      `${relative} must not link the stale run url as evidence`,
     );
     assert.ok(
       text.includes('TARGET_SHA') && text.includes('verify-ci-rollout'),
       `${relative} must describe the dynamic per-head evidence workflow`,
     );
     assert.ok(
-      text.includes('не источник истины') ||
-        text.includes('не является доказательством'),
-      `${relative} must label the recording as historical, not current evidence`,
+      text.includes('<!-- testeb-63-rollout -->'),
+      `${relative} must point at the PR #65 comment that is regenerated for the submitted head`,
     );
   }
   console.log(
-    'PASS: CI documentation labels the recording as historical and describes dynamic evidence',
+    'PASS: CI documentation does not pin stale evidence and points at the per-head evidence',
   );
 }
 
@@ -194,7 +195,7 @@ function main() {
   testRealEvidenceIsGreenAndPinnedToTheHead();
   testRecordedEvidenceCannotProveAnotherSubmittedHead();
   testRecordedChecksWithoutCommitProvenanceAreRejected();
-  testDocumentationDescribesDynamicEvidence();
+  testDocumentationDoesNotPinStaleEvidence();
 }
 
 try {
