@@ -97,30 +97,21 @@ GitHub не запускает workflow задним числом: появле�
 * в дереве `578e87b` нет `.github/workflows`;
 * в `main` на тот момент workflow тоже не было.
 
-### Фактические данные API для SHA отклонённой сдачи (TESTEB-63)
+### Где находится доказательство для текущей сдачи (TESTEB-63)
 
-Отклонённая сдача указывала SHA `fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e`.
-К текущей проверке для этого коммита уже есть собственные данные GitHub API:
+В репозитории не фиксируется ссылка на конкретный прогон: коммит с такой
+ссылкой сам меняет проверяемый SHA, поэтому доказательство всегда относится к
+предыдущей сдаче. Для каждой сдачи прогон `ci` запускается на её собственном
+коммите, а ссылка на прогон указывается в результате сдачи (result), а не
+файлом в репозитории.
 
-* `ci` — [#42506679632](https://github.com/sarnas-it/ebike-site/actions/runs/42506679632),
-  `completed/success`, `event=pull_request`, `head_sha=fc1fe23e...`;
-  job `php-lint`, `php-tests`, `php-plugin-tests`, `plugin-tests`,
-  `ci-repair-tests` — все `success`;
-* штатные check runs на `fc1fe23e...` принадлежат check suite `115141962596`
-  этого прогона и имеют `head_sha=fc1fe23e...`;
-* `verify-ci-rollout` — [#42506679696](https://github.com/sarnas-it/ebike-site/actions/runs/42506679696),
-  `completed/success`, зафиксировал `mergeable=true` и отсутствие конфликтов
-  с `main`;
-* опубликованный гейтом комментарий:
-  [#issuecomment-6720902130](https://github.com/sarnas-it/ebike-site/pull/65#issuecomment-6720902130).
-
-Это доказательство относится к конкретному SHA из отклонённой сдачи. Для нового
-коммита `verify-ci-rollout` берёт `TARGET_SHA` из
-`github.event.pull_request.head.sha` и публикует ссылку на прогон и `mergeable`
-уже для нового head; запись выше не может подтвердить другой коммит, потому что
-гейт сравнивает `head_sha` прогона и каждого check run. Пока GitHub
-пересчитывает mergeability, `mergeable` может быть `null`; workflow повторяет
-запрос, пока не получит определённое значение.
+Актуальное доказательство формирует workflow `verify-ci-rollout`: на событии
+`pull_request` он берёт `TARGET_SHA` из `github.event.pull_request.head.sha` и
+сравнивает с ним `head_sha` прогона `ci` и каждого штатного check run, после
+чего обновляет комментарий `<!-- testeb-63-rollout -->`. Запись на другой SHA
+не может подтвердить новый коммит. Пока GitHub пересчитывает mergeability,
+`mergeable` может быть `null`; workflow повторяет запрос, пока не получит
+определённое значение.
 
 ### Почему это не противоречит «ci active» и зелёным соседним PR
 

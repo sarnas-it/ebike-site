@@ -1,5 +1,5 @@
 TESTEB-63: CI не дал результат (no_checks): TESTEB-1 — sarnas-it/ebike-site#62
-================================================================
+----------------------------------------------------------------
 
 Причина no_checks
 -----------------
@@ -17,87 +17,25 @@ PR #65 привязывает доказательство к `TARGET_SHA` из
 `github.event.pull_request.head.sha` и публикует ссылку на штатный прогон
 `ci`, его job, стандартные check runs и состояние `mergeable` PR #65.
 
-Доказательство для SHA из отклонённой сдачи
--------------------------------------------
-SHA: `fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e`
-PR:  https://github.com/sarnas-it/ebike-site/pull/65
+Доказательство для текущей сдачи
+--------------------------------
+В репозитории намеренно не фиксируется ссылка на конкретный прогон: коммит с
+такой ссылкой сам меняет проверяемый SHA и превращает доказательство в
+устаревшее. Для каждой сдачи прогон `ci` запускается на её собственном коммите,
+а ссылка на прогон указывается в результате сдачи (result), а не файлом в
+репозитории.
 
-Команда (реальные данные GitHub API):
+Актуальное доказательство формирует workflow `verify-ci-rollout`: на событии
+`pull_request` он берёт `TARGET_SHA` из `github.event.pull_request.head.sha`,
+сравнивает с ним `head_sha` прогона `ci` и каждого штатного check run и только
+при совпадении обновляет комментарий `<!-- testeb-63-rollout -->` на PR #65.
+Запись на другом SHA не может подтвердить новый коммит. Пока GitHub
+пересчитывает mergeability, `mergeable` может временно вернуть `null`; workflow
+повторяет запрос, пока не получит определённое значение.
 
-$ node scripts/ci/diagnose-pr-checks.mjs \
-    --repo sarnas-it/ebike-site --pr 65 \
-    --sha fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
-
-pull request: #65
-head branch:  feat/ebike-site-testeb-63
-target sha:   fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
-runs for sha: 5
-checks:       total=9 pending=0 failed=0
-workflow ci:  active (#407713517, .github/workflows/ci.yml)
-exit code: 0
-
-Штатный прогон ci именно на этом SHA:
-
-$ curl -s https://api.github.com/repos/sarnas-it/ebike-site/actions/runs/42506679632
-
-run id:      42506679632
-url:         https://github.com/sarnas-it/ebike-site/actions/runs/42506679632
-workflow:    ci (.github/workflows/ci.yml)
-event:       pull_request
-status:      completed
-conclusion:  success
-head_sha:    fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
-
-Job этого прогона (GET /actions/runs/42506679632/jobs):
-
-128810708965 php-lint            completed success
-128810708673 php-tests           completed success
-128810708806 php-plugin-tests    completed success
-128810708889 plugin-tests        completed success
-128810708807 ci-repair-tests     completed success
-
-Стандартные check runs на этом же SHA (GET /commits/fc1fe23.../check-runs):
-
-128810708965 php-lint            completed success head=fc1fe23e... suite=115141962596
-128810708673 php-tests           completed success head=fc1fe23e... suite=115141962596
-128810708806 php-plugin-tests    completed success head=fc1fe23e... suite=115141962596
-128810708889 plugin-tests        completed success head=fc1fe23e... suite=115141962596
-128810708807 ci-repair-tests     completed success head=fc1fe23e... suite=115141962596
-
-Прогон гейта для этого SHA:
-
-$ curl -s https://api.github.com/repos/sarnas-it/ebike-site/actions/runs/42506679696
-
-run id:      42506679696
-url:         https://github.com/sarnas-it/ebike-site/actions/runs/42506679696
-workflow:    verify-ci-rollout (.github/workflows/verify-ci-rollout.yml)
-event:       pull_request
-status:      completed
-conclusion:  success
-head_sha:    fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
-job:         128810708854 verify-ci-rollout completed success
-
-Опубликованное гейтом доказательство (PR #65, comment 6720902130,
-https://github.com/sarnas-it/ebike-site/pull/65#issuecomment-6720902130):
-
-- PR #65 -> main: state=open, merged=false, mergeable=true,
-  mergeable_state=unstable (конфликтов с main нет)
-- Проверяемый head-коммит: fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
-- Штатный прогон ci: #42506679632 — completed, success, event=pull_request,
-  head=fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e
-- Job: php-tests=success, php-plugin-tests=success, ci-repair-tests=success,
-  plugin-tests=success, php-lint=success
-- Итог: green — CI на реальном head зелёный, PR готов к автомержу
-
-GitHub пересчитывает mergeability асинхронно и может временно вернуть
-`mergeable=null`; workflow `verify-ci-rollout` повторяет запрос, пока не
-получит определённое значение. Значение `mergeable=true` выше — то, которое
-гейт наблюдал и записал для этого SHA.
-
-Новый коммит (новая сдача) получает собственный прогон `ci` и собственные
-check runs на своём head; гейт сравнивает `head_sha` прогона, каждого check run
-и `TARGET_SHA` и не принимает запись с другого коммита. Red-green тест этого
-требования: `scripts/ci/tests/submitted-sha-evidence.test.mjs`.
+Red-green тест привязки доказательства к сдаваемому SHA:
+`scripts/ci/tests/submitted-sha-evidence.test.mjs`. Он проверяет, что прогон без
+`head_sha` и прогон/check runs на другом коммите не принимаются.
 
 Локальные проверки
 ------------------
@@ -147,9 +85,10 @@ scripts/ci/tests/submitted-sha-evidence.test.mjs)
 $ node scripts/ci/tests/submitted-sha-evidence.test.mjs
 PASS: the submitted SHA has its own green ci run, standard check runs and a mergeable PR (criteria 2 and 3)
 PASS: evidence recorded on the submitted SHA is rejected for any later submission
+PASS: a run without commit provenance is rejected as evidence for the submitted SHA
 PASS: criterion 3 requires mergeable=true without conflicts
 PASS: the evidence comment always pins the submitted SHA to its own run
-PASS: the task comment cites the submitted SHA and its own run instead of a different commit
+PASS: documentation leaves the run link to the submission result instead of pinning a stale SHA
 exit code: 0
 
 PHP-файлы продуктовых пакетов в этой правке не менялись: изменены только
