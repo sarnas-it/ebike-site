@@ -272,3 +272,34 @@ bash scripts/ci/run-checks.sh .
   приёмочная PHP-команда действительно исполняется.
 * `scripts/ci/tests/repair-pr-checks.test.mjs` — починка целится в head PR, а
   не в отдельную задачную ветку.
+
+## Причина `unknown` по PR #78 (TESTEB-68)
+
+Джоба `php-tests` прогона `ci` #42500219010 отработала успешно: theme-тесты
+прошли, после них выполнился `Post job cleanup`. При этом у коммита остался
+`in_progress`-дубликат check run с тем же именем `php-tests` — след отменённого
+или перезапущенного предыдущего прогона (`concurrency.cancel-in-progress`).
+Проверка статусов считала любой pending-дубликат блокирующим, поэтому мерж ждал
+`php-tests` 30 минут и был отложен с классом `unknown`. Recovery из TESTEB-67
+был зашит на PR #73, поэтому для #78 автоматического восстановления не было.
+
+Исправление:
+
+* `scripts/ci/lib.mjs` выбирает самый свежий check run для каждого имени (и
+  самый свежий commit status для каждого контекста), поэтому старый pending не
+  перекрывает завершённую успешную проверку. При публикации recovery
+  завершаются все оставшиеся pending-дубликаты check runs.
+* `.github/workflows/ci.yml` не отменяет предыдущий прогон
+  (`cancel-in-progress: false`), чтобы отменённые джобы не оставляли вечные
+  `in_progress`.
+* `.github/workflows/recover-pr.yml` — общий recovery после завершения `ci` и
+  вручную. Он определяет PR по событию или коммиту, проверяет только зависшие
+  или отсутствующие результаты (`scripts/ci/should-recover.mjs`) и не маскирует
+  настоящие падения.
+* `.github/workflows/recover-pr78.yml` — recovery текущего PR #78. Он берёт
+  актуальный head через GitHub API, прогоняет полный `scripts/ci/run-checks.sh`
+  и завершает отложенный мерж при зелёных проверках.
+* `.github/workflows/finalize-pr78-evidence.yml` публикует итоговые
+  доказательства только после завершения recovery-прогона.
+
+Проверка: `for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done`.

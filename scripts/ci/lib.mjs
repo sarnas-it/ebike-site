@@ -60,6 +60,20 @@ export async function getPullRequest({
   );
 }
 
+export async function getPullRequestsForCommit({
+  owner,
+  repo,
+  ref,
+  token,
+  fetchImpl = globalThis.fetch,
+}) {
+  return requestJson(
+    fetchImpl,
+    apiUrl(owner, repo, `/commits/${encodeURIComponent(ref)}/pulls`),
+    { headers: headers(token) },
+  );
+}
+
 export async function getRepository({
   owner,
   repo,
@@ -267,14 +281,103 @@ const PENDING_CONCLUSIONS = new Set([
   'requested',
 ]);
 
+function isCompletedCheckRun(run) {
+  return (
+    run?.status === 'completed' ||
+    (run?.conclusion != null && !PENDING_CONCLUSIONS.has(run.conclusion))
+  );
+}
+
+function timestampOf(value) {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function newestFirst(a, b) {
+  const left = timestampOf(a?.completed_at) ?? timestampOf(a?.started_at);
+  const right = timestampOf(b?.completed_at) ?? timestampOf(b?.started_at);
+  if (left != null && right != null && left !== right) {
+    return right - left;
+  }
+  if (left != null && right == null) {
+    return -1;
+  }
+  if (left == null && right != null) {
+    return 1;
+  }
+  const leftId = Number(a?.id);
+  const rightId = Number(b?.id);
+  if (Number.isFinite(leftId) && Number.isFinite(rightId) && leftId !== rightId) {
+    return rightId - leftId;
+  }
+  const leftDone = isCompletedCheckRun(a);
+  const rightDone = isCompletedCheckRun(b);
+  if (leftDone !== rightDone) {
+    return leftDone ? -1 : 1;
+  }
+  return 0;
+}
+
+// GitHub can return several check runs with the same name for one commit (for
+// example a superseded/cancelled run plus the current one). Only the newest run
+// for a name is authoritative; an older pending duplicate must not keep a
+// successfully completed check "in_progress" forever.
+export function latestCheckRunPerName(checkRuns = []) {
+  const byName = new Map();
+  for (const run of Array.isArray(checkRuns) ? checkRuns : []) {
+    const name = run?.name || '';
+    const current = byName.get(name);
+    if (!current || newestFirst(run, current) < 0) {
+      byName.set(name, run);
+    }
+  }
+  return [...byName.values()];
+}
+
+export function latestStatusPerContext(statuses = []) {
+  const byContext = new Map();
+  for (const status of Array.isArray(statuses) ? statuses : []) {
+    const context = status?.context || '';
+    const current = byContext.get(context);
+    if (!current) {
+      byContext.set(context, status);
+      continue;
+    }
+    const left = timestampOf(status?.updated_at);
+    const right = timestampOf(current?.updated_at);
+    if (left != null && right != null && left !== right) {
+      if (left > right) {
+        byContext.set(context, status);
+      }
+    } else {
+      const leftId = Number(status?.id);
+      const rightId = Number(current?.id);
+      if (Number.isFinite(leftId) && Number.isFinite(rightId) && leftId > rightId) {
+        byContext.set(context, status);
+      } else if (!Number.isFinite(leftId) || !Number.isFinite(rightId)) {
+        byContext.set(context, status);
+      }
+    }
+  }
+  return [...byContext.values()];
+}
+
 export function summarizeChecks(checkRuns = [], statuses = []) {
   const runs = Array.isArray(checkRuns) ? checkRuns : [];
   const legacy = Array.isArray(statuses) ? statuses : [];
+  const effectiveRuns = latestCheckRunPerName(runs);
+  const effectiveStatuses = latestStatusPerContext(legacy);
   const conclusions = [
-    ...runs.map((run) => run.conclusion),
-    ...legacy.map((status) => status.state),
+    ...effectiveRuns.map((run) => run.conclusion),
+    ...effectiveStatuses.map((status) => status.state),
   ];
-  const total = conclusions.length;
+  // `total` stays the raw number of reported checks/statuses for diagnostics;
+  // pending/failed are evaluated only on the authoritative newest run per name
+  // so a stale duplicate cannot block a completed success.
+  const total = runs.length + legacy.length;
   const pending = conclusions.filter(
     (value) => value == null || PENDING_CONCLUSIONS.has(value),
   );
@@ -286,6 +389,8 @@ export function summarizeChecks(checkRuns = [], statuses = []) {
     success: total > 0 && pending.length === 0 && failed.length === 0,
     runs,
     statuses: legacy,
+    effectiveRuns,
+    effectiveStatuses,
   };
 }
 
@@ -552,18 +657,44 @@ export async function upsertCheckRun({
     token,
     fetchImpl,
   });
-  const current = (existing?.check_runs || []).find((run) => run.name === name);
-  if (current) {
-    return updateCheckRun({
-      owner,
-      repo,
-      checkRunId: current.id,
-      conclusion,
-      detailsUrl,
-      summary,
-      token,
-      fetchImpl,
-    });
+  const matching = (existing?.check_runs || []).filter(
+    (run) => run.name === name,
+  );
+  // A commit may carry stale pending duplicates of the same check name (for
+  // example a superseded workflow run). Completing every pending duplicate is
+  // what actually unblocks the required status check, not just creating yet
+  // another completed run next to the stale one.
+  const pending = matching.filter((run) => !isCompletedCheckRun(run));
+  const targets = pending.length
+    ? pending
+    : latestCheckRunPerName(matching).slice(0, 1);
+  if (targets.length > 0) {
+    let last = null;
+    let updateError = null;
+    for (const target of targets) {
+      try {
+        last = await updateCheckRun({
+          owner,
+          repo,
+          checkRunId: target.id,
+          conclusion,
+          detailsUrl,
+          summary,
+          token,
+          fetchImpl,
+        });
+      } catch (error) {
+        updateError = error;
+      }
+    }
+    if (last) {
+      return last;
+    }
+    if (pending.length === 0) {
+      throw updateError;
+    }
+    // A pending run owned by another app cannot always be patched. Publish a
+    // completed check run of our own so the newest run for this name is green.
   }
   return createCheckRun({
     owner,
