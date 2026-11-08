@@ -8,10 +8,52 @@ import {
   upsertIssueComment,
 } from './lib.mjs';
 
-export const RECOVERY_WORKFLOW_PATH = '.github/workflows/recover-pr62.yml';
+export const RECOVERY_WORKFLOW_PATH = '.github/workflows/recover-pr73.yml';
+export const RECOVERY_WORKFLOW_PATHS = {
+  62: '.github/workflows/recover-pr62.yml',
+  73: '.github/workflows/recover-pr73.yml',
+};
+
+export function recoveryWorkflowForPullRequest(pullNumber, fallback = RECOVERY_WORKFLOW_PATH) {
+  return RECOVERY_WORKFLOW_PATHS[Number(pullNumber)] || fallback;
+}
+
+export const RECOVERY_STATUS_CONTEXT = 'ci/recover';
+export const EVIDENCE_START = '<!-- testeb-67-evidence:start -->';
+export const EVIDENCE_END = '<!-- testeb-67-evidence:end -->';
 
 function runPath(run) {
   return run?.path || run?.workflow_path || null;
+}
+
+function runIdFromUrl(url) {
+  const match = /\/actions\/runs\/(\d+)(?:[/?#]|$)/.exec(url || '');
+  return match ? Number(match[1]) : null;
+}
+
+// Recovery runs execute on the commit that triggered the push, not necessarily
+// on the pull request head. The only durable link between the head commit and
+// the run that verified it is the ci/recover commit status published on that
+// head. Resolve the exact run id from that status so evidence can never fall
+// back to an unrelated "latest successful" run.
+export function findRecoveryRunLink(
+  statuses = [],
+  context = RECOVERY_STATUS_CONTEXT,
+) {
+  const list = Array.isArray(statuses) ? statuses : [];
+  for (const status of list) {
+    if (status?.context !== context) {
+      continue;
+    }
+    if (status?.state !== 'success') {
+      continue;
+    }
+    const id = runIdFromUrl(status?.target_url);
+    if (id) {
+      return { id, url: status.target_url, state: status.state };
+    }
+  }
+  return null;
 }
 
 function runUrl(run) {
@@ -81,6 +123,19 @@ export function summarizeRecoveryEvidence({
     }
   }
 
+  const linkedRun = findRecoveryRunLink(statuses);
+  if (!linkedRun) {
+    problems.push(
+      `commit ${targetSha} has no successful ${RECOVERY_STATUS_CONTEXT} status ` +
+        'linking a recovery run',
+    );
+  } else if (normalizedRun && linkedRun.id !== normalizedRun.id) {
+    problems.push(
+      `recovery run ${normalizedRun.id} is not linked from the ` +
+        `${RECOVERY_STATUS_CONTEXT} commit status, which points to run ${linkedRun.id}`,
+    );
+  }
+
   if (checkRuns.length === 0) {
     problems.push(`commit ${targetSha} has no check runs`);
   }
@@ -143,23 +198,20 @@ export function summarizeRecoveryEvidence({
   };
 }
 
-export function renderEvidenceComment(template, evidence) {
+export function renderEvidenceBlock(evidence) {
   const lines = [];
-  const body = (template || '').trim();
-  if (body) {
-    lines.push(body, '');
-  }
-  lines.push('---');
+  lines.push('## Подтверждение из реального recovery-прогона');
   lines.push('');
-  lines.push('## Подтверждение из CI (сформировано автоматически)');
-  lines.push('');
-  lines.push(`- Целевой коммит: \`${evidence.targetSha}\``);
+  lines.push(`- Проверяемый коммит (актуальный head PR): \`${evidence.targetSha}\``);
   if (evidence.run) {
     lines.push(
       `- Recovery workflow run: [#${evidence.run.id}](${evidence.run.url}) — ` +
         `status=${evidence.run.status}, conclusion=${evidence.run.conclusion}, ` +
-        `event=${evidence.run.event}, head=\`${evidence.run.headSha}\``,
+        `event=${evidence.run.event}, runner head=\`${evidence.run.headSha}\``,
     );
+    if (evidence.run.headBranch) {
+      lines.push(`- Ветка прогона: \`${evidence.run.headBranch}\``);
+    }
   } else {
     lines.push('- Recovery workflow run: не найден');
   }
@@ -168,15 +220,38 @@ export function renderEvidenceComment(template, evidence) {
         .map((check) => `\`${check.name}=${check.conclusion}\``)
         .join(', ')
     : 'нет';
-  lines.push(`- Проверки на целевом коммите: ${conclusions}`);
+  lines.push(`- Проверки на проверяемом коммите: ${conclusions}`);
   lines.push(
     `- PR merged=${evidence.pullRequest.merged}, ` +
       `merge commit=\`${evidence.pullRequest.mergeCommitSha ?? 'none'}\`, ` +
       `merged at=${evidence.pullRequest.mergedAt ?? 'none'}`,
   );
   lines.push(
+    `- Head PR совпадает с проверенным коммитом: ${evidence.pullRequest.headMatches}`,
+  );
+  lines.push(
     `- Итог: ${evidence.ready ? 'доказательства полные (green)' : 'доказательств недостаточно (red)'}`,
   );
+  return lines.join('\n');
+}
+
+export function renderEvidenceComment(template, evidence) {
+  const body = (template || '').trimEnd();
+  const block = `${EVIDENCE_START}\n${renderEvidenceBlock(evidence)}\n${EVIDENCE_END}`;
+
+  if (body.includes(EVIDENCE_START) && body.includes(EVIDENCE_END)) {
+    const start = body.indexOf(EVIDENCE_START);
+    const end = body.indexOf(EVIDENCE_END) + EVIDENCE_END.length;
+    return `${body.slice(0, start)}${block}${body.slice(end)}\n`;
+  }
+
+  const lines = [];
+  if (body) {
+    lines.push(body, '');
+  }
+  lines.push('---');
+  lines.push('');
+  lines.push(block);
   return `${lines.join('\n')}\n`;
 }
 
@@ -201,26 +276,36 @@ export async function collectRecoveryEvidence({
   fetchImpl = globalThis.fetch,
   allowRunning = false,
 }) {
-  const [pr, checkRuns, status, run] = await Promise.all([
+  const [pr, checkRuns, status] = await Promise.all([
     getPullRequest({ owner, repo, pullNumber, token, fetchImpl }),
     getCheckRuns({ owner, repo, ref: targetSha, token, fetchImpl }),
     getCombinedStatus({ owner, repo, ref: targetSha, token, fetchImpl }),
-    runId
-      ? getWorkflowRun({ owner, repo, runId, token, fetchImpl })
-      : getWorkflowRunsForWorkflow({
-          owner,
-          repo,
-          workflow,
-          token,
-          fetchImpl,
-        }).then((response) => latestSuccessfulRun(response?.workflow_runs)),
   ]);
+
+  const statuses = status?.statuses ?? [];
+  const linkedRun = findRecoveryRunLink(statuses);
+  const resolvedRunId = runId || linkedRun?.id || null;
+  const run = resolvedRunId
+    ? await getWorkflowRun({
+        owner,
+        repo,
+        runId: resolvedRunId,
+        token,
+        fetchImpl,
+      })
+    : await getWorkflowRunsForWorkflow({
+        owner,
+        repo,
+        workflow,
+        token,
+        fetchImpl,
+      }).then((response) => latestSuccessfulRun(response?.workflow_runs));
 
   return summarizeRecoveryEvidence({
     pr,
     run,
     checkRuns: checkRuns?.check_runs ?? [],
-    statuses: status?.statuses ?? [],
+    statuses,
     targetSha,
     expectedWorkflowPath: workflow,
     allowRunning,

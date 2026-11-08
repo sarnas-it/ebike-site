@@ -124,6 +124,7 @@ export async function dispatchWorkflow({
   repo,
   workflow,
   ref,
+  inputs = null,
   token,
   fetchImpl = globalThis.fetch,
 }) {
@@ -132,10 +133,11 @@ export async function dispatchWorkflow({
     repo,
     `/actions/workflows/${encodeURIComponent(workflow)}/dispatches`,
   );
+  const payload = inputs ? { ref, inputs } : { ref };
   return requestJson(fetchImpl, url, {
     method: 'POST',
     headers: { ...headers(token), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ref }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -339,7 +341,7 @@ export async function repairPrChecks({
   token,
   fetchImpl = globalThis.fetch,
   workflowContent = null,
-  commitMessage = 'ci: run checks on pull request head (TESTEB-63)',
+  commitMessage = 'ci: run checks on pull request head (TESTEB-63, TESTEB-67)',
   log = () => {},
 }) {
   const pr = await getPullRequest({

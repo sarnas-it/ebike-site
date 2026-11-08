@@ -83,6 +83,8 @@ function velotok_core_accounts_contract() {
 			'password_storage'            => 'password_hash',
 			'duplicate_account'           => false,
 			'existing_email_strategy'     => 'login',
+			'existing_email_next_step'    => 'login',
+			'existing_email_creates_account' => false,
 			'auto_login'                  => false,
 			'persistent'                  => true,
 			'mocked'                      => false,
@@ -105,6 +107,7 @@ function velotok_core_accounts_contract() {
 			'unconfirmed_access'            => false,
 			'invalid_credentials_code'      => 'ACCOUNT_INVALID_CREDENTIALS',
 			'reveals_account_existence'     => false,
+			'target_url'                    => '/account/login/',
 			'mocked'                        => false,
 			'source'                        => 'wordpress',
 		),
@@ -308,7 +311,7 @@ function velotok_core_account_public_user( $user ) {
 		return array();
 	}
 
-	unset( $user['password_hash'], $user['confirmation_token'] );
+	unset( $user['password_hash'], $user['confirmation_token'], $user['pending_guest_cart'], $user['pending_user_cart'] );
 
 	$user['authenticated'] = true;
 	$user['guest']         = false;
@@ -471,6 +474,35 @@ function velotok_core_account_failure( $code, $contract ) {
 }
 
 /**
+ * Remove caller-supplied confirmation state from registration options.
+ *
+ * Registration always starts unconfirmed. Callers may provide a token for
+ * deterministic tests, but they must not be able to mark the account as
+ * confirmed, active or authenticated while registering.
+ *
+ * @param mixed $options Raw registration options.
+ * @return array<string,mixed>
+ */
+function velotok_core_account_registration_options( $options ) {
+	if ( ! is_array( $options ) ) {
+		return array();
+	}
+
+	unset(
+		$options['email_confirmed'],
+		$options['email_verified'],
+		$options['confirmed'],
+		$options['status'],
+		$options['account_status'],
+		$options['authenticated'],
+		$options['logged_in'],
+		$options['session_token']
+	);
+
+	return $options;
+}
+
+/**
  * Register a user by email and password.
  *
  * Registration creates a pending account that cannot log in until the email is
@@ -495,11 +527,21 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		$email    = isset( $request['email'] ) ? $request['email'] : '';
 		$password = isset( $request['password'] ) ? $request['password'] : '';
 		$options  = isset( $request['options'] ) && is_array( $request['options'] ) ? $request['options'] : $options;
+
+		if ( ! is_array( $options ) ) {
+			$options = array();
+		}
+
+		if ( isset( $request['guest_cart'] ) ) {
+			$options['guest_cart'] = $request['guest_cart'];
+		}
+
+		if ( isset( $request['user_cart'] ) ) {
+			$options['user_cart'] = $request['user_cart'];
+		}
 	}
 
-	if ( ! is_array( $options ) ) {
-		$options = array();
-	}
+	$options = velotok_core_account_registration_options( $options );
 
 	$email    = is_scalar( $email ) ? trim( (string) $email ) : '';
 	$password = is_scalar( $password ) ? (string) $password : '';
@@ -520,6 +562,10 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		'status'                => null,
 		'confirmation_token'    => null,
 		'next_step'             => null,
+		'login_url'             => '',
+		'redirect_url'          => '',
+		'redirected'            => false,
+		'existing_email_strategy' => 'login',
 		'code'                  => null,
 		'error'                 => null,
 		'message'               => '',
@@ -547,12 +593,22 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 	}
 
 	if ( isset( $state['users'][ $key ] ) ) {
-		$result['valid']          = true;
-		$result['existing_user']  = true;
-		$result['login_required'] = true;
-		$result['email_sent']     = true;
-		$result['next_step']      = 'login';
-		$result['message']        = $contract['privacy']['generic_registration_message'];
+		$login_url = isset( $contract['login']['target_url'] ) ? (string) $contract['login']['target_url'] : '/account/login/';
+
+		$result['valid']                 = true;
+		$result['registered']            = false;
+		$result['existing_user']         = true;
+		$result['login_required']        = true;
+		$result['confirmation_required'] = false;
+		$result['email_sent']            = true;
+		$result['next_step']             = 'login';
+		$result['login_url']             = $login_url;
+		$result['redirect_url']          = $login_url;
+		$result['redirected']            = false;
+		$result['existing_email_strategy'] = 'login';
+		$result['message']               = $contract['privacy']['generic_registration_message'];
+		$result['user_id']               = (int) $state['users'][ $key ]['user_id'];
+		$result['status']                = isset( $state['users'][ $key ]['status'] ) ? $state['users'][ $key ]['status'] : null;
 
 		return $result;
 	}
@@ -567,6 +623,9 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		$state['next_id'] = $user_id + 1;
 	}
 
+	$pending_guest_cart = isset( $options['guest_cart'] ) && is_array( $options['guest_cart'] ) ? $options['guest_cart'] : array();
+	$pending_user_cart  = isset( $options['user_cart'] ) && is_array( $options['user_cart'] ) ? $options['user_cart'] : array();
+
 	$user = array(
 		'user_id'            => $user_id,
 		'email'              => $email,
@@ -576,6 +635,8 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		'confirmation_token' => $token,
 		'password_hash'      => velotok_core_account_hash_password( $password ),
 		'registered'         => true,
+		'pending_guest_cart' => $pending_guest_cart,
+		'pending_user_cart'  => $pending_user_cart,
 		'mocked'             => true,
 		'source'             => 'stub',
 		'provider'           => 'stub',
@@ -675,6 +736,20 @@ function velotok_core_account_confirm_email( $token_or_email = '', $token = '', 
 
 	$user = $state['users'][ $key ];
 
+	/*
+	 * The cart provided while registering is carried through the mandatory
+	 * email confirmation step. When the confirmation request does not repeat
+	 * the cart snapshot, the snapshot stored at registration is used so the
+	 * completed registration still transfers the guest cart to checkout.
+	 */
+	if ( empty( $guest_cart ) && isset( $user['pending_guest_cart'] ) && is_array( $user['pending_guest_cart'] ) ) {
+		$guest_cart = $user['pending_guest_cart'];
+	}
+
+	if ( empty( $user_cart ) && isset( $user['pending_user_cart'] ) && is_array( $user['pending_user_cart'] ) ) {
+		$user_cart = $user['pending_user_cart'];
+	}
+
 	$session_token = isset( $options['session_token'] ) && is_scalar( $options['session_token'] ) && '' !== (string) $options['session_token']
 		? (string) $options['session_token']
 		: velotok_core_account_new_token();
@@ -688,6 +763,8 @@ function velotok_core_account_confirm_email( $token_or_email = '', $token = '', 
 		$transfer = velotok_core_account_transfer_guest_cart( $guest_cart, $user_cart, $user );
 		$redirect = velotok_core_account_checkout_redirect( $transfer, $user, $options );
 	}
+
+	unset( $state['users'][ $key ]['pending_guest_cart'], $state['users'][ $key ]['pending_user_cart'] );
 
 	$result = array(
 		'valid'              => true,

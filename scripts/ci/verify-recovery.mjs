@@ -3,7 +3,10 @@ import process from 'node:process';
 import {
   RECOVERY_WORKFLOW_PATH,
   collectRecoveryEvidence,
+  recoveryWorkflowForPullRequest,
 } from './evidence.mjs';
+import { getPullRequest } from './lib.mjs';
+import { resolveTargetFromPullRequest } from './resolve-pr-target.mjs';
 
 const USAGE = `Usage:
   verify-recovery.mjs [options]
@@ -19,9 +22,10 @@ recovery workflow run that executed them.
 Options:
   --repo <owner/name>  Repository (default: $GITHUB_REPOSITORY or sarnas-it/ebike-site)
   --pr <number>        Pull request number (default: 62)
-  --sha <sha>          Exact commit under test (default: 578e87b5a8587d6078aade92d26bd449448dd1d3)
+  --sha <sha>          Pin the commit under test (default: the current PR head,
+                       so a moved head is verified instead of the stale incident SHA)
   --run-id <id>        Recovery workflow run to verify (default: latest successful)
-  --workflow <path>    Recovery workflow path (default: ${RECOVERY_WORKFLOW_PATH})
+  --workflow <path>    Recovery workflow path (default: per pull request, ${RECOVERY_WORKFLOW_PATH} otherwise)
   -h, --help           Show this help
 
 Authentication: set GITHUB_TOKEN (never printed); reading a public repository
@@ -32,9 +36,9 @@ function parseArgs(argv) {
   const options = {
     repo: process.env.GITHUB_REPOSITORY || 'sarnas-it/ebike-site',
     pr: 62,
-    sha: '578e87b5a8587d6078aade92d26bd449448dd1d3',
+    sha: null,
     runId: null,
-    workflow: RECOVERY_WORKFLOW_PATH,
+    workflow: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -68,18 +72,29 @@ async function main() {
     throw new Error(`invalid --repo value: ${options.repo}`);
   }
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+  const workflow = options.workflow || recoveryWorkflowForPullRequest(options.pr);
+  let targetSha = options.sha;
+  if (!targetSha) {
+    const pr = await getPullRequest({
+      owner,
+      repo,
+      pullNumber: options.pr,
+      token,
+    });
+    targetSha = resolveTargetFromPullRequest(pr).sha;
+  }
   const evidence = await collectRecoveryEvidence({
     owner,
     repo,
     pullNumber: options.pr,
-    targetSha: options.sha,
+    targetSha,
     runId: options.runId,
-    workflow: options.workflow,
+    workflow,
     token,
   });
 
   process.stdout.write(`pull request: #${options.pr}\n`);
-  process.stdout.write(`target sha:   ${options.sha}\n`);
+  process.stdout.write(`target sha:   ${targetSha}\n`);
   process.stdout.write(
     `workflow run: ${evidence.run ? `#${evidence.run.id} ${evidence.run.url}` : 'none'}\n`,
   );

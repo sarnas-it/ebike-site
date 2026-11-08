@@ -10,12 +10,12 @@ import {
 
 const OWNER = 'sarnas-it';
 const REPO = 'ebike-site';
-const PR_NUMBER = 62;
-const TARGET_SHA = '578e87b5a8587d6078aade92d26bd449448dd1d3';
+const PR_NUMBER = 73;
+const TARGET_SHA = '525b0d4803e03858cdb0bfce9cb90837bdf0473e';
 const MOVED_SHA = '1111111111111111111111111111111111111111';
 const MERGE_SHA = '2222222222222222222222222222222222222222';
 const API = 'https://api.github.com/repos';
-const MARKER = '<!-- testeb-63-recovery -->';
+const MARKER = '<!-- testeb-67-recovery -->';
 
 function response(status, body) {
   return {
@@ -143,6 +143,35 @@ async function testPublishesChecksOnTargetShaAndMerges() {
   assert.ok(comment, 'the recovery needs a confirmed comment on the pull request');
   assert.ok(comment.body.body.includes(MARKER));
   console.log('PASS: checks are published on the exact target commit and the PR is merged');
+}
+
+async function testMergesResolvedCurrentHeadAfterIncidentShaMoved() {
+  const { fetchImpl, calls } = makeFetch(
+    baseHandler({ pr: { head: { sha: MOVED_SHA } } }),
+  );
+
+  const result = await recoverPullRequest({
+    owner: OWNER,
+    repo: REPO,
+    pullNumber: PR_NUMBER,
+    targetSha: MOVED_SHA,
+    results: { 'php-lint': 'success', 'php-tests': 'success' },
+    token: 'test-token',
+    fetchImpl,
+  });
+
+  assert.strictEqual(result.merged, true);
+  assert.strictEqual(mergeCalls(calls).length, 1);
+  const created = calls.filter((call) => call.method === 'POST' && call.url.endsWith('/check-runs'));
+  assert.ok(
+    created.every((call) => call.body.head_sha === MOVED_SHA),
+    'a moved head is checked and merged as the current target, not skipped as stale',
+  );
+  assert.ok(
+    created.every((call) => call.body.head_sha !== TARGET_SHA),
+    'the stale incident SHA must not receive the new checks',
+  );
+  console.log('PASS: recovery checks and merges the resolved current head after head drift');
 }
 
 async function testRefusesMergeWhenHeadMoved() {
@@ -301,6 +330,7 @@ function testSummarizeRecovery() {
 
 async function main() {
   await testPublishesChecksOnTargetShaAndMerges();
+  await testMergesResolvedCurrentHeadAfterIncidentShaMoved();
   await testRefusesMergeWhenHeadMoved();
   await testFailedCheckPreventsMerge();
   await testSkipsAlreadyMergedPr();

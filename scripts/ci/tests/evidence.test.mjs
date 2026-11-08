@@ -2,7 +2,12 @@
 import assert from 'node:assert';
 import process from 'node:process';
 import {
+  EVIDENCE_END,
+  EVIDENCE_START,
   RECOVERY_WORKFLOW_PATH,
+  collectRecoveryEvidence,
+  recoveryWorkflowForPullRequest,
+  findRecoveryRunLink,
   publishRecoveryEvidence,
   renderEvidenceComment,
   summarizeRecoveryEvidence,
@@ -10,17 +15,18 @@ import {
 
 const OWNER = 'sarnas-it';
 const REPO = 'ebike-site';
-const PR_NUMBER = 62;
-const TARGET_SHA = '578e87b5a8587d6078aade92d26bd449448dd1d3';
-const RUN_ID = 42445204104;
+const PR_NUMBER = 73;
+const TARGET_SHA = '525b0d4803e03858cdb0bfce9cb90837bdf0473e';
+const RUN_ID = 51515151515;
 const RUN_URL = `https://github.com/sarnas-it/ebike-site/actions/runs/${RUN_ID}`;
-const MERGE_SHA = 'efe1bc4dac551dc870cec68aff16a973e095dd4f';
-const MARKER = '<!-- testeb-63-recovery -->';
+const MERGE_SHA = '89abcdef0123456789abcdef0123456789abcdef';
+const MARKER = '<!-- testeb-67-recovery -->';
 
 const GREEN_CHECKS = [
   { name: 'php-lint', conclusion: 'success', head_sha: TARGET_SHA },
   { name: 'php-tests', conclusion: 'success', head_sha: TARGET_SHA },
   { name: 'plugin-tests', conclusion: 'success', head_sha: TARGET_SHA },
+  { name: 'php-plugin-tests', conclusion: 'success', head_sha: TARGET_SHA },
 ];
 
 const SUCCESS_RUN = {
@@ -30,8 +36,8 @@ const SUCCESS_RUN = {
   event: 'push',
   status: 'completed',
   conclusion: 'success',
-  head_sha: 'e4b76df9c60653547c695419b040b6f5208657d1',
-  head_branch: 'feat/ebike-site-testeb-63',
+  head_sha: '0123456789abcdef0123456789abcdef01234567',
+  head_branch: 'feat/ebike-site-testeb-67',
 };
 
 const MERGED_PR = {
@@ -42,6 +48,15 @@ const MERGED_PR = {
   merged_at: '2026-11-08T04:03:25Z',
   head: { sha: TARGET_SHA },
 };
+
+const GREEN_STATUSES = [
+  {
+    context: 'ci/recover',
+    state: 'success',
+    target_url: RUN_URL,
+    description: 'Recovered checks passed for the pull request',
+  },
+];
 
 function response(status, body) {
   return {
@@ -82,7 +97,11 @@ function baseHandler({
       return response(200, { total_count: checkRuns.length, check_runs: checkRuns });
     }
     if (url.includes(`/commits/${TARGET_SHA}/status`) && method === 'GET') {
-      return response(200, { state: 'success', total_count: 1, statuses: [] });
+      return response(200, {
+        state: 'success',
+        total_count: GREEN_STATUSES.length,
+        statuses: GREEN_STATUSES,
+      });
     }
     if (url.includes(`/actions/runs/${RUN_ID}`) && method === 'GET') {
       return response(200, run);
@@ -105,7 +124,7 @@ function testGreenEvidenceIsReady() {
     pr: MERGED_PR,
     run: SUCCESS_RUN,
     checkRuns: GREEN_CHECKS,
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
   });
   assert.strictEqual(evidence.ready, true);
@@ -114,7 +133,12 @@ function testGreenEvidenceIsReady() {
   assert.strictEqual(evidence.pullRequest.mergeCommitSha, MERGE_SHA);
   assert.deepStrictEqual(
     evidence.checks.conclusions.map((check) => `${check.name}=${check.conclusion}`),
-    ['php-lint=success', 'php-tests=success', 'plugin-tests=success'],
+    [
+      'php-lint=success',
+      'php-tests=success',
+      'plugin-tests=success',
+      'php-plugin-tests=success',
+    ],
   );
   console.log('PASS: green checks backed by a successful recovery run are ready');
 }
@@ -124,7 +148,7 @@ function testSyntheticChecksWithoutRunAreRed() {
     pr: MERGED_PR,
     run: null,
     checkRuns: GREEN_CHECKS,
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
   });
   assert.strictEqual(evidence.ready, false);
@@ -140,7 +164,7 @@ function testFailedOrInProgressRunIsRed() {
     pr: MERGED_PR,
     run: { ...SUCCESS_RUN, conclusion: 'failure' },
     checkRuns: GREEN_CHECKS,
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
   });
   assert.strictEqual(failed.ready, false);
@@ -150,7 +174,7 @@ function testFailedOrInProgressRunIsRed() {
     pr: MERGED_PR,
     run: { ...SUCCESS_RUN, status: 'in_progress', conclusion: null },
     checkRuns: GREEN_CHECKS,
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
   });
   assert.strictEqual(running.ready, false);
@@ -160,7 +184,7 @@ function testFailedOrInProgressRunIsRed() {
     pr: MERGED_PR,
     run: { ...SUCCESS_RUN, status: 'in_progress', conclusion: null },
     checkRuns: GREEN_CHECKS,
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
     allowRunning: true,
   });
@@ -173,7 +197,7 @@ function testWrongWorkflowRunIsRed() {
     pr: MERGED_PR,
     run: { ...SUCCESS_RUN, path: '.github/workflows/ci.yml' },
     checkRuns: GREEN_CHECKS,
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
   });
   assert.strictEqual(evidence.ready, false);
@@ -186,7 +210,7 @@ function testUnmergedOrFailedChecksAreRed() {
     pr: { ...MERGED_PR, merged: false, merge_commit_sha: null },
     run: SUCCESS_RUN,
     checkRuns: GREEN_CHECKS,
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
   });
   assert.strictEqual(unmerged.ready, false);
@@ -196,7 +220,7 @@ function testUnmergedOrFailedChecksAreRed() {
     pr: MERGED_PR,
     run: SUCCESS_RUN,
     checkRuns: [{ name: 'php-lint', conclusion: 'failure' }],
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
   });
   assert.strictEqual(failedChecks.ready, false);
@@ -206,7 +230,7 @@ function testUnmergedOrFailedChecksAreRed() {
     pr: MERGED_PR,
     run: SUCCESS_RUN,
     checkRuns: [],
-    statuses: [],
+    statuses: GREEN_STATUSES,
     targetSha: TARGET_SHA,
   });
   assert.strictEqual(noChecks.ready, false);
@@ -227,7 +251,7 @@ function testUnmergedOrFailedChecksAreRed() {
   console.log('PASS: an unmerged PR or failed/missing checks are red');
 }
 
-function testRenderedCommentContainsRealEvidence() {
+function testGreenEvidenceWithoutLinkedStatusIsRed() {
   const evidence = summarizeRecoveryEvidence({
     pr: MERGED_PR,
     run: SUCCESS_RUN,
@@ -235,13 +259,141 @@ function testRenderedCommentContainsRealEvidence() {
     statuses: [],
     targetSha: TARGET_SHA,
   });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some((problem) =>
+      problem.includes('no successful ci/recover status'),
+    ),
+    'green checks must be linked to a recovery run through the ci/recover status',
+  );
+  console.log('PASS: green checks without a ci/recover link are red');
+}
+
+function testEvidenceForUnlinkedRunIsRed() {
+  const otherRunUrl =
+    'https://github.com/sarnas-it/ebike-site/actions/runs/999999';
+  const evidence = summarizeRecoveryEvidence({
+    pr: MERGED_PR,
+    run: SUCCESS_RUN,
+    checkRuns: GREEN_CHECKS,
+    statuses: [
+      { context: 'ci/recover', state: 'success', target_url: otherRunUrl },
+    ],
+    targetSha: TARGET_SHA,
+  });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some((problem) => problem.includes('not linked')),
+    'a run that did not publish the ci/recover status cannot prove the checks',
+  );
+  console.log('PASS: a recovery run not linked from the commit status is red');
+}
+
+async function testCollectUsesRunLinkedFromCommitStatus() {
+  const { fetchImpl, calls } = makeFetch((call) => {
+    const { url, method } = call;
+    if (url.endsWith(`/pulls/${PR_NUMBER}`) && method === 'GET') {
+      return response(200, MERGED_PR);
+    }
+    if (url.includes(`/commits/${TARGET_SHA}/check-runs`) && method === 'GET') {
+      return response(200, {
+        total_count: GREEN_CHECKS.length,
+        check_runs: GREEN_CHECKS,
+      });
+    }
+    if (url.includes(`/commits/${TARGET_SHA}/status`) && method === 'GET') {
+      return response(200, {
+        state: 'success',
+        total_count: GREEN_STATUSES.length,
+        statuses: GREEN_STATUSES,
+      });
+    }
+    if (url.includes(`/actions/runs/${RUN_ID}`) && method === 'GET') {
+      return response(200, SUCCESS_RUN);
+    }
+    if (url.includes('/actions/workflows/') && url.includes('/runs')) {
+      throw new Error(
+        'the exact linked run must be used instead of a latest-successful fallback',
+      );
+    }
+    throw new Error(`unexpected request: ${method} ${url}`);
+  });
+
+  const evidence = await collectRecoveryEvidence({
+    owner: OWNER,
+    repo: REPO,
+    pullNumber: PR_NUMBER,
+    targetSha: TARGET_SHA,
+    token: 'test-token',
+    fetchImpl,
+  });
+
+  assert.strictEqual(evidence.ready, true);
+  assert.strictEqual(evidence.run.id, RUN_ID);
+  assert.ok(
+    calls.some((call) => call.url.includes(`/actions/runs/${RUN_ID}`)),
+    'the run linked from the ci/recover status must be fetched by id',
+  );
+  assert.deepStrictEqual(findRecoveryRunLink(GREEN_STATUSES), {
+    id: RUN_ID,
+    url: RUN_URL,
+    state: 'success',
+  });
+  console.log(
+    'PASS: evidence resolves the exact recovery run linked from the checked commit',
+  );
+}
+
+function testRenderedCommentContainsRealEvidence() {
+  const evidence = summarizeRecoveryEvidence({
+    pr: MERGED_PR,
+    run: SUCCESS_RUN,
+    checkRuns: GREEN_CHECKS,
+    statuses: GREEN_STATUSES,
+    targetSha: TARGET_SHA,
+  });
   const body = renderEvidenceComment(`${MARKER}\nПричина`, evidence);
   assert.ok(body.includes(MARKER));
+  assert.ok(body.includes(EVIDENCE_START), 'evidence block must be delimited');
+  assert.ok(body.includes(EVIDENCE_END), 'evidence block must be delimited');
+  assert.ok(body.includes('Подтверждение из реального recovery-прогона'));
   assert.ok(body.includes(TARGET_SHA), 'comment must name the checked commit');
   assert.ok(body.includes(RUN_URL), 'comment must link the real workflow run');
+  assert.ok(body.includes('#51515151515'), 'comment must name the real run id');
   assert.ok(body.includes(MERGE_SHA), 'comment must record the merge commit');
+  assert.ok(body.includes('status=completed'));
+  assert.ok(body.includes('conclusion=success'));
   assert.ok(body.includes('php-lint=success'));
-  console.log('PASS: the comment contains the run URL, checks and merge commit');
+  assert.ok(
+    body.includes('php-plugin-tests=success'),
+    'the evidence must include the plugin PHP acceptance checks',
+  );
+  console.log('PASS: the comment contains the run URL/id, checks and merge commit');
+}
+
+function testRenderedCommentReplacesStaleEvidence() {
+  const evidence = summarizeRecoveryEvidence({
+    pr: MERGED_PR,
+    run: SUCCESS_RUN,
+    checkRuns: GREEN_CHECKS,
+    statuses: GREEN_STATUSES,
+    targetSha: TARGET_SHA,
+  });
+  const stale = [
+    MARKER,
+    'Причина',
+    '',
+    EVIDENCE_START,
+    '## Подтверждение из реального recovery-прогона',
+    '- Recovery workflow run: [#1](https://example.invalid/old) — status=in_progress',
+    EVIDENCE_END,
+  ].join('\n');
+  const body = renderEvidenceComment(stale, evidence);
+  assert.strictEqual(body.split(EVIDENCE_START).length - 1, 1, 'only one evidence block may exist');
+  assert.strictEqual(body.split(EVIDENCE_END).length - 1, 1, 'only one evidence block may exist');
+  assert.ok(body.includes(RUN_URL), 'stale evidence must be replaced with the real run');
+  assert.ok(!body.includes('example.invalid/old'), 'stale in-progress evidence must be removed');
+  console.log('PASS: stale evidence is replaced instead of being duplicated');
 }
 
 async function testPublishUpdatesExistingComment() {
@@ -317,13 +469,37 @@ async function testPublishRefusesWhenEvidenceIsRed() {
   console.log('PASS: red evidence is not published');
 }
 
+function testRecoveryWorkflowsResolvePerPullRequest() {
+  assert.strictEqual(
+    recoveryWorkflowForPullRequest(62),
+    '.github/workflows/recover-pr62.yml',
+    'PR #62 must use its own recovery workflow',
+  );
+  assert.strictEqual(
+    recoveryWorkflowForPullRequest(73),
+    '.github/workflows/recover-pr73.yml',
+    'PR #73 must use its own recovery workflow',
+  );
+  assert.strictEqual(
+    recoveryWorkflowForPullRequest(999),
+    RECOVERY_WORKFLOW_PATH,
+    'an unknown pull request falls back to the documented default workflow',
+  );
+  console.log('PASS: each pull request keeps its own recovery workflow');
+}
+
 async function main() {
   testGreenEvidenceIsReady();
   testSyntheticChecksWithoutRunAreRed();
   testFailedOrInProgressRunIsRed();
   testWrongWorkflowRunIsRed();
   testUnmergedOrFailedChecksAreRed();
+  testGreenEvidenceWithoutLinkedStatusIsRed();
+  testEvidenceForUnlinkedRunIsRed();
+  await testCollectUsesRunLinkedFromCommitStatus();
+  testRecoveryWorkflowsResolvePerPullRequest();
   testRenderedCommentContainsRealEvidence();
+  testRenderedCommentReplacesStaleEvidence();
   await testPublishUpdatesExistingComment();
   await testPublishCreatesCommentWithEvidence();
   await testPublishRefusesWhenEvidenceIsRed();

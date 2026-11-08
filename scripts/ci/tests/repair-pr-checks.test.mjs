@@ -11,11 +11,11 @@ import {
 
 const OWNER = 'sarnas-it';
 const REPO = 'ebike-site';
-const PR_NUMBER = 62;
-const OLD_SHA = '578e87b5a8587d6078aade92d26bd449448dd1d3';
+const PR_NUMBER = 73;
+const OLD_SHA = '525b0d4803e03858cdb0bfce9cb90837bdf0473e';
 const NEW_SHA = '1111111111111111111111111111111111111111';
-const HEAD_REF = 'feat/ebike-site-testeb-1';
-const FIX_BRANCH = 'feat/ebike-site-testeb-63';
+const HEAD_REF = 'feat/ebike-site-testeb-3';
+const FIX_BRANCH = 'feat/ebike-site-testeb-67';
 
 function response(status, body) {
   return {

@@ -5,6 +5,7 @@ import {
   RECOVERY_WORKFLOW_PATH,
   collectRecoveryEvidence,
   publishRecoveryEvidence,
+  recoveryWorkflowForPullRequest,
   renderEvidenceComment,
 } from './evidence.mjs';
 
@@ -24,7 +25,7 @@ Options:
   --pr <number>         Pull request number (required)
   --sha <sha>           Exact commit under test (required)
   --run-id <id>         Recovery workflow run to verify (default: latest successful)
-  --workflow <path>     Recovery workflow path (default: ${RECOVERY_WORKFLOW_PATH})
+  --workflow <path>     Recovery workflow path (default: per pull request, ${RECOVERY_WORKFLOW_PATH} otherwise)
   --comment-file <path> Markdown template to publish/update on the pull request
   --comment-marker <s>  Idempotency marker for the comment
   --allow-running       Accept the current run while it is still in progress
@@ -40,10 +41,13 @@ function parseArgs(argv) {
     repo: process.env.GITHUB_REPOSITORY || 'sarnas-it/ebike-site',
     pr: null,
     sha: null,
-    runId: process.env.GITHUB_RUN_ID || null,
-    workflow: RECOVERY_WORKFLOW_PATH,
+    // Default to the latest successful recovery run, as documented. Taking
+    // GITHUB_RUN_ID here would verify whatever workflow happens to invoke this
+    // script instead of the recovery run that produced the checks.
+    runId: null,
+    workflow: null,
     commentFile: null,
-    commentMarker: '<!-- testeb-63-recovery -->',
+    commentMarker: null,
     allowRunning: false,
     dryRun: false,
   };
@@ -92,6 +96,10 @@ async function main() {
   if (!owner || !repo) {
     throw new Error(`invalid --repo value: ${options.repo}`);
   }
+  const workflow = options.workflow || recoveryWorkflowForPullRequest(options.pr);
+  const commentMarker =
+    options.commentMarker ||
+    (options.pr === 62 ? '<!-- testeb-63-recovery -->' : '<!-- testeb-67-recovery -->');
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 
   let template = '';
@@ -105,7 +113,7 @@ async function main() {
     pullNumber: options.pr,
     targetSha: options.sha,
     runId: options.runId,
-    workflow: options.workflow,
+    workflow,
     token,
     allowRunning: options.allowRunning,
   };
@@ -125,7 +133,7 @@ async function main() {
   const result = await publishRecoveryEvidence({
     ...shared,
     template,
-    marker: options.commentFile ? options.commentMarker : null,
+    marker: options.commentFile ? commentMarker : null,
   });
 
   process.stdout.write(`${result.body.trimEnd()}\n`);
