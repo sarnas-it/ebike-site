@@ -1,0 +1,53 @@
+/*
+ * Вариант дизайна «Высокий контраст».
+ * Подключается только когда манифест выбирает вариант contrast.
+ */
+
+body.design-variant-contrast {
+	--ink: #000;
+	--ink-2: #111;
+	--paper: #fff;
+	--card: #fff;
+	--muted: #2b2b2b;
+	--line: #000;
+	--lime: #ffdf00;
+	--lime-soft: #fff4a3;
+	--orange: #9c2500;
+}
+
+body.design-variant-contrast .site-header {
+	background: #fff;
+}
+
+body.design-variant-contrast .topbar {
+	background: #000;
+	color: #fff;
+}
+
+body.design-variant-contrast .topbar a,
+body.design-variant-contrast .topbar-right span {
+	color: #fff;
+}
+
+body.design-variant-contrast .btn-primary,
+body.design-variant-contrast .btn-dark,
+body.design-variant-contrast .chip[aria-pressed="true"] {
+	border-color: #000;
+}
+
+body.design-variant-contrast :focus-visible {
+	outline: 3px solid #000;
+	outline-offset: 3px;
+}
+
+body.design-variant-contrast .section--dark :focus-visible,
+body.design-variant-contrast .hero :focus-visible {
+	outline-color: #ffdf00;
+}
+
+body.design-variant-contrast .model-card,
+body.design-variant-contrast .cat-card,
+body.design-variant-contrast .review-card,
+body.design-variant-contrast .post-card {
+	border-width: 2px;
+}
