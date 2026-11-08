@@ -84,6 +84,141 @@ if ( function_exists( 'add_filter' ) ) {
 	add_filter( 'woocommerce_shipping_methods', 'velotok_core_delivery_register_shipping_methods' );
 }
 
+if ( ! function_exists( 'velotok_core_delivery_rate_method_id' ) ) {
+	/**
+	 * Resolve the shipping method identifier from a WooCommerce rate.
+	 *
+	 * @param mixed $rate Rate object or array.
+	 * @return string
+	 */
+	function velotok_core_delivery_rate_method_id( $rate ) {
+		if ( is_object( $rate ) ) {
+			if ( method_exists( $rate, 'get_method_id' ) ) {
+				return (string) $rate->get_method_id();
+			}
+
+			return (string) velotok_core_delivery_zones_value( $rate, array( 'method_id', 'id' ), '' );
+		}
+
+		if ( is_array( $rate ) ) {
+			return (string) velotok_core_delivery_zones_value( $rate, array( 'method_id', 'id' ), '' );
+		}
+
+		return '';
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_package_country' ) ) {
+	/**
+	 * Resolve the destination country from a WooCommerce package.
+	 *
+	 * @param array $package Shipping package.
+	 * @return string
+	 */
+	function velotok_core_delivery_package_country( $package = array() ) {
+		$package     = is_array( $package ) ? $package : array();
+		$destination = velotok_core_delivery_zones_value( $package, array( 'destination' ), $package );
+
+		return strtoupper(
+			trim(
+				velotok_core_delivery_zones_scalar(
+					velotok_core_delivery_zones_value( $destination, array( 'country', 'country_code' ), '' )
+				)
+			)
+		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_add_pickup_rate' ) ) {
+	/**
+	 * Add the pickup rate to a package independently of shipping zones.
+	 *
+	 * Pickup is offered for Russia even when no WooCommerce zone matched the
+	 * address (or the address is ambiguous). Outside Russia it is not shown.
+	 * An existing pickup rate is left untouched, so the zone-configured method
+	 * and the zone-independent fallback never duplicate each other.
+	 *
+	 * @param mixed $rates   Shipping rates keyed by rate id.
+	 * @param array $package Shipping package.
+	 * @return mixed
+	 */
+	function velotok_core_delivery_add_pickup_rate( $rates, $package = array() ) {
+		$contract = velotok_core_delivery_zones_contract();
+
+		if ( empty( $contract['pickup']['enabled'] ) ) {
+			return $rates;
+		}
+
+		$package     = is_array( $package ) ? $package : array();
+		$destination = velotok_core_delivery_zones_value( $package, array( 'destination' ), $package );
+		$destination = ( is_array( $destination ) || is_object( $destination ) ) ? $destination : array();
+		$country     = velotok_core_delivery_package_country( $package );
+		$pickup_id   = (string) $contract['pickup']['method_id'];
+
+		if ( '' !== $country && $contract['pickup']['country'] !== $country ) {
+			return $rates;
+		}
+
+		$rates = is_array( $rates ) ? $rates : array();
+
+		foreach ( $rates as $rate ) {
+			$method_id = velotok_core_delivery_rate_method_id( $rate );
+
+			if ( $pickup_id === $method_id || 'local_pickup' === $method_id ) {
+				return $rates;
+			}
+		}
+
+		$order   = velotok_core_delivery_package_order( $package );
+		$context = array(
+			'order'     => $order,
+			'address'   => $destination,
+			'test_mode' => velotok_core_delivery_test_mode_enabled(),
+		);
+		$option  = velotok_core_delivery_zones_pickup_option( $context );
+
+		if ( empty( $option['available'] ) ) {
+			return $rates;
+		}
+
+		$meta = array(
+			'_velotok_delivery_provider'       => 'pickup',
+			'_velotok_delivery_method'         => $pickup_id,
+			'_velotok_delivery_independent_of_zone' => 'yes',
+			'_velotok_delivery_zone_required'  => 'no',
+			'_velotok_eta_min_days'            => $option['eta_min_days'],
+			'_velotok_eta_max_days'            => $option['eta_max_days'],
+			'_velotok_eta_label'               => $option['eta_label'],
+			'_velotok_eta_range'               => $option['eta'],
+			'_velotok_pickup_points'           => isset( $option['pickup_points'] ) ? $option['pickup_points'] : array(),
+			'_velotok_pickup_points_code'      => isset( $option['pickup_points_code'] ) ? $option['pickup_points_code'] : '',
+			'_velotok_pickup_points_message'   => isset( $option['pickup_points_message'] ) ? $option['pickup_points_message'] : '',
+			'_velotok_pickup_points_ok'        => ! empty( $option['pickup_points_ok'] ),
+			'_velotok_pickup_points_available' => ! empty( $option['pickup_points_available'] ),
+			'_velotok_pickup_points_errors'    => isset( $option['pickup_points_errors'] ) ? $option['pickup_points_errors'] : array(),
+			'_velotok_pickup_points_explicit_failure' => true,
+			'_velotok_test_mode'               => $context['test_mode'] ? 'yes' : 'no',
+		);
+
+		$rate = class_exists( 'WC_Shipping_Rate' )
+			? new WC_Shipping_Rate( $pickup_id, $option['label'], (float) $option['cost'], $meta, $pickup_id )
+			: array(
+				'id'        => $pickup_id,
+				'label'     => $option['label'],
+				'cost'      => (float) $option['cost'],
+				'method_id' => $pickup_id,
+				'meta_data' => $meta,
+			);
+
+		$rates[ $pickup_id ] = $rate;
+
+		return $rates;
+	}
+}
+if ( function_exists( 'add_filter' ) ) {
+	add_filter( 'woocommerce_package_rates', 'velotok_core_delivery_add_pickup_rate', 10, 2 );
+}
+
 if ( ! function_exists( 'velotok_core_delivery_provider_rate_adapter' ) ) {
 	/**
 	 * Resolve the provider adapter behind the shipping method.
