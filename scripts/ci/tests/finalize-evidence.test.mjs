@@ -12,12 +12,12 @@ import {
 
 const OWNER = 'sarnas-it';
 const REPO = 'ebike-site';
-const PR_NUMBER = 68;
-const TARGET_SHA = '766eade4e49a86d4c14791da8d33e735948cfadb';
+const PR_NUMBER = 73;
+const TARGET_SHA = '525b0d4803e03858cdb0bfce9cb90837bdf0473e';
 const RUN_ID = 52525252525;
 const RUN_URL = `https://github.com/sarnas-it/ebike-site/actions/runs/${RUN_ID}`;
 const MERGE_SHA = '3333333333333333333333333333333333333333';
-const MARKER = '<!-- testeb-65-recovery -->';
+const MARKER = '<!-- testeb-67-recovery -->';
 
 const GREEN_CHECKS = [
   { name: 'php-lint', conclusion: 'success' },
@@ -29,12 +29,12 @@ const GREEN_CHECKS = [
 const SUCCESS_RUN = {
   id: RUN_ID,
   html_url: RUN_URL,
-  path: '.github/workflows/recover-pr68.yml',
+  path: '.github/workflows/recover-pr73.yml',
   event: 'push',
   status: 'completed',
   conclusion: 'success',
   head_sha: '0123456789abcdef0123456789abcdef01234567',
-  head_branch: 'feat/ebike-site-testeb-65',
+  head_branch: 'feat/ebike-site-testeb-67',
 };
 
 const MERGED_PR = {
@@ -156,7 +156,7 @@ async function testCompletedRunPublishesFinalEvidence() {
     '',
     EVIDENCE_START,
     '- Recovery workflow run: [#1](https://example.invalid/old) — status=in_progress',
-    '<!-- testeb-65-evidence:end -->',
+    '<!-- testeb-67-evidence:end -->',
   ].join('\n');
 
   const { fetchImpl, calls } = makeFetch((call) => {
@@ -222,14 +222,14 @@ async function testCompletedRunPublishesFinalEvidence() {
 async function testDiscoversRecoveryRunForTriggerSha() {
   const finalizerRun = {
     id: 777,
-    path: '.github/workflows/finalize-pr68-evidence.yml',
+    path: '.github/workflows/finalize-pr73-evidence.yml',
     status: 'in_progress',
     conclusion: null,
     created_at: '2026-11-08T00:00:01Z',
   };
   const recoveryRun = {
     id: 778,
-    path: '.github/workflows/recover-pr68.yml',
+    path: '.github/workflows/recover-pr73.yml',
     status: 'in_progress',
     conclusion: null,
     created_at: '2026-11-08T00:00:00Z',
@@ -253,7 +253,7 @@ async function testDiscoversRecoveryRunForTriggerSha() {
   assert.strictEqual(run.id, recoveryRun.id);
   assert.strictEqual(
     run.path,
-    '.github/workflows/recover-pr68.yml',
+    '.github/workflows/recover-pr73.yml',
     'the finalizer must never mistake its own run for the recovery run',
   );
   console.log('PASS: the finalizer discovers the matching recovery run by trigger sha');
@@ -266,7 +266,7 @@ async function testMissingRecoveryRunIsNotInvented() {
         workflow_runs: [
           {
             id: 779,
-            path: '.github/workflows/finalize-pr68-evidence.yml',
+            path: '.github/workflows/finalize-pr73-evidence.yml',
             status: 'completed',
             conclusion: 'success',
           },
@@ -330,7 +330,7 @@ function testTriggerShaIgnoresFinalizerRunIdEnv() {
 async function testFinalizerFollowsTriggerShaInsteadOfItself() {
   const finalizerRun = {
     id: 9001,
-    path: '.github/workflows/finalize-pr68-evidence.yml',
+    path: '.github/workflows/finalize-pr73-evidence.yml',
     event: 'push',
     status: 'in_progress',
     conclusion: null,

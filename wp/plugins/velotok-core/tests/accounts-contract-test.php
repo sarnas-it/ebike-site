@@ -248,6 +248,88 @@ velotok_accounts_assert( is_array( velotok_accounts_value( $login_with_cart, 'tr
 velotok_accounts_assert( '/checkout/' === velotok_accounts_value( $login_with_cart, 'redirect_url' ), 'После входа с корзиной должен быть переход к оформлению.' );
 velotok_accounts_assert( 1 === velotok_core_cart_unique_count( velotok_accounts_value( $login_with_cart, 'transfer' ) ), 'При входе в корзину должна перенестись позиция.' );
 
+/*
+ * Real WordPress/WooCommerce path.
+ *
+ * The in-memory contract above is useful, but the requirement must also be
+ * observable in the integration that persists customers. The harness stubs the
+ * small WordPress surface and loads includes/accounts-wordpress.php, so the
+ * mandatory command exercises the same code the live site uses: registration
+ * must store a pending customer, send the confirmation email and block login
+ * until the emailed token is confirmed.
+ */
+require_once __DIR__ . '/helpers/accounts-wordpress-harness.php';
+
+velotok_test_load_accounts_integration( dirname( __DIR__ ) . '/includes/accounts-wordpress.php' );
+velotok_test_reset_store();
+
+$wp_email    = 'wp-confirm@example.com';
+$wp_password = 'WpSecretPass1';
+$wp_token    = 'contract-wp-confirmation-token';
+
+$wp_registration = velotok_core_account_register(
+	$wp_email,
+	$wp_password,
+	array(
+		'confirmation_token' => $wp_token,
+		// Even if a caller passes a confirmed state, registration must keep the
+		// account pending until the email token is used.
+		'email_confirmed'    => true,
+		'status'             => 'active',
+		'authenticated'      => true,
+	)
+);
+
+velotok_accounts_assert( true === velotok_accounts_value( $wp_registration, 'valid' ), 'WP-регистрация должна быть успешной.' );
+velotok_accounts_assert( true === velotok_accounts_value( $wp_registration, 'registered' ), 'WP-регистрация должна создавать аккаунт.' );
+velotok_accounts_assert( true === velotok_accounts_value( $wp_registration, 'confirmation_required' ), 'WP-регистрация должна требовать подтверждения email.' );
+velotok_accounts_assert( false === velotok_accounts_value( $wp_registration, 'authenticated' ), 'WP-регистрация не должна авторизовывать до подтверждения.' );
+velotok_accounts_assert( 'pending' === velotok_accounts_value( $wp_registration, 'status' ), 'WP-аккаунт должен быть pending до подтверждения.' );
+velotok_accounts_assert( 'confirm_email' === velotok_accounts_value( $wp_registration, 'next_step' ), 'WP-регистрация должна вести на подтверждение email.' );
+velotok_accounts_assert( $wp_token === velotok_accounts_value( $wp_registration, 'confirmation_token' ), 'WP-регистрация должна выдать токен подтверждения.' );
+velotok_accounts_assert( true === velotok_accounts_value( $wp_registration, 'email_sent' ), 'WP-регистрация должна отправить письмо подтверждения.' );
+velotok_accounts_assert( in_array( 'wc_create_new_customer', $GLOBALS['velotok_test_created_via'], true ), 'WP-аккаунт должен создаваться через wc_create_new_customer().' );
+
+$wp_user_id = (int) velotok_accounts_value( $wp_registration, 'user_id', 0 );
+
+velotok_accounts_assert( $wp_user_id > 0, 'WP-пользователь должен получить id.' );
+velotok_accounts_assert( '0' === (string) get_user_meta( $wp_user_id, VELOTOK_ACCOUNT_CONFIRMED_META, true ), 'WP-мета подтверждения должна быть unconfirmed после регистрации.' );
+velotok_accounts_assert( 'pending' === (string) get_user_meta( $wp_user_id, VELOTOK_ACCOUNT_STATUS_META, true ), 'WP-статус должен быть pending после регистрации.' );
+velotok_accounts_assert( $wp_token === (string) get_user_meta( $wp_user_id, VELOTOK_ACCOUNT_TOKEN_META, true ), 'WP-токен подтверждения должен сохраняться в user meta.' );
+velotok_accounts_assert( 1 === count( $GLOBALS['velotok_test_mail'] ), 'WP-регистрация должна отправлять одно письмо подтверждения.' );
+velotok_accounts_assert( false !== strpos( $GLOBALS['velotok_test_mail'][0]['message'], $wp_token ), 'Письмо должно содержать ссылку с токеном подтверждения.' );
+
+$wp_pending_login = velotok_core_account_login( $wp_email, $wp_password );
+
+velotok_accounts_assert( false === velotok_accounts_value( $wp_pending_login, 'authenticated' ), 'WP: неподтверждённый пользователь не должен входить.' );
+velotok_accounts_assert( 'ACCOUNT_EMAIL_NOT_CONFIRMED' === velotok_accounts_value( $wp_pending_login, 'code' ), 'WP: вход без подтверждения должен возвращать ACCOUNT_EMAIL_NOT_CONFIRMED.' );
+velotok_accounts_assert( 0 === (int) $GLOBALS['velotok_test_signon_calls'], 'WP: wp_signon() не должен вызываться до подтверждения.' );
+
+$wp_pending_access = velotok_core_account_can_access( $wp_user_id );
+
+velotok_accounts_assert( false === velotok_accounts_value( $wp_pending_access, 'allowed' ), 'WP: неподтверждённый пользователь не должен иметь доступ к кабинету.' );
+velotok_accounts_assert( 'ACCOUNT_ACCESS_DENIED' === velotok_accounts_value( $wp_pending_access, 'code' ), 'WP: доступ без подтверждения должен запрещаться.' );
+
+$wp_invalid = velotok_core_account_confirm_email( 'wrong-wp-token' );
+
+velotok_accounts_assert( false === velotok_accounts_value( $wp_invalid, 'confirmed' ), 'WP: неверный токен не должен подтверждать email.' );
+velotok_accounts_assert( 'ACCOUNT_CONFIRMATION_INVALID' === velotok_accounts_value( $wp_invalid, 'code' ), 'WP: неверный токен должен возвращать ACCOUNT_CONFIRMATION_INVALID.' );
+
+$wp_confirmed = velotok_core_account_confirm_email( $wp_token );
+
+velotok_accounts_assert( true === velotok_accounts_value( $wp_confirmed, 'confirmed' ), 'WP: переход по токену должен подтверждать email.' );
+velotok_accounts_assert( 'active' === velotok_accounts_value( $wp_confirmed, 'status' ), 'WP: после подтверждения статус должен быть active.' );
+velotok_accounts_assert( '1' === (string) get_user_meta( $wp_user_id, VELOTOK_ACCOUNT_CONFIRMED_META, true ), 'WP: мета подтверждения должна обновиться.' );
+velotok_accounts_assert( 'active' === (string) get_user_meta( $wp_user_id, VELOTOK_ACCOUNT_STATUS_META, true ), 'WP: статус должен стать active.' );
+velotok_accounts_assert( '' === (string) get_user_meta( $wp_user_id, VELOTOK_ACCOUNT_TOKEN_META, true ), 'WP: токен должен удаляться после подтверждения.' );
+velotok_accounts_assert( in_array( $wp_user_id, $GLOBALS['velotok_test_auth_cookie'], true ), 'WP: после подтверждения должна ставиться auth cookie.' );
+
+$GLOBALS['velotok_test_current_user'] = 0;
+$wp_login                             = velotok_core_account_login( $wp_email, $wp_password );
+
+velotok_accounts_assert( true === velotok_accounts_value( $wp_login, 'authenticated' ), 'WP: подтверждённый пользователь должен входить.' );
+velotok_accounts_assert( 1 === (int) $GLOBALS['velotok_test_signon_calls'], 'WP: подтверждённый вход должен выполняться через wp_signon().' );
+
 if ( array() !== $failures ) {
 	foreach ( $failures as $failure ) {
 		fwrite( STDERR, 'FAIL: ' . $failure . PHP_EOL );

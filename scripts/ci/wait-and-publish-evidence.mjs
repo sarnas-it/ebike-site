@@ -6,6 +6,7 @@ import { getWorkflowRun, getWorkflowRuns } from './lib.mjs';
 import {
   RECOVERY_WORKFLOW_PATH,
   publishRecoveryEvidence,
+  recoveryWorkflowForPullRequest,
 } from './evidence.mjs';
 
 const USAGE = `Usage:
@@ -27,7 +28,7 @@ Options:
   --run-id <id>          Recovery workflow run to wait for (optional)
   --trigger-sha <sha>    Head SHA that triggered recovery; used to discover the
                          matching recovery run when --run-id is absent
-  --workflow <path>      Recovery workflow path (default: ${RECOVERY_WORKFLOW_PATH})
+  --workflow <path>      Recovery workflow path (default: the workflow for the PR)
   --comment-file <path>  Markdown template to publish/update on the pull request
   --comment-marker <s>   Idempotency marker for the comment
   --timeout-ms <ms>      Wait timeout (default: 2400000 = 40m)
@@ -126,7 +127,7 @@ export async function finalizeRecoveryEvidence({
   targetSha,
   runId = null,
   triggerSha = null,
-  workflow = RECOVERY_WORKFLOW_PATH,
+  workflow = null,
   template = '',
   marker = null,
   token,
@@ -137,6 +138,7 @@ export async function finalizeRecoveryEvidence({
   sleep,
   log = () => {},
 }) {
+  const workflowPath = workflow || recoveryWorkflowForPullRequest(pullNumber);
   let resolvedRunId = runId;
   if (!resolvedRunId) {
     if (!triggerSha) {
@@ -146,7 +148,7 @@ export async function finalizeRecoveryEvidence({
       owner,
       repo,
       triggerSha,
-      workflow,
+      workflow: workflowPath,
       token,
       fetchImpl,
       timeoutMs,
@@ -199,7 +201,7 @@ export async function finalizeRecoveryEvidence({
     pullNumber,
     targetSha,
     runId: resolvedRunId,
-    workflow,
+    workflow: workflowPath,
     template,
     marker,
     token,
@@ -220,9 +222,9 @@ export function parseArgs(argv) {
     // therefore selected explicitly: --run-id, or --trigger-sha discovery.
     runId: null,
     triggerSha: null,
-    workflow: RECOVERY_WORKFLOW_PATH,
+    workflow: null,
     commentFile: null,
-    commentMarker: '<!-- testeb-65-recovery -->',
+    commentMarker: '<!-- testeb-67-recovery -->',
     timeoutMs: 40 * 60 * 1000,
     intervalMs: 15 * 1000,
     dryRun: false,
@@ -288,6 +290,8 @@ async function main() {
   }
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
   const log = (message) => process.stdout.write(`${message}\n`);
+  const workflow =
+    options.workflow || recoveryWorkflowForPullRequest(options.pr);
 
   let template = '';
   if (options.commentFile) {
@@ -301,7 +305,7 @@ async function main() {
         owner,
         repo,
         triggerSha: options.triggerSha,
-        workflow: options.workflow,
+        workflow,
         token,
         timeoutMs: options.timeoutMs,
         intervalMs: options.intervalMs,
@@ -337,7 +341,7 @@ async function main() {
     targetSha: options.sha,
     runId: options.runId,
     triggerSha: options.triggerSha,
-    workflow: options.workflow,
+    workflow,
     template,
     marker: options.commentFile ? options.commentMarker : null,
     token,

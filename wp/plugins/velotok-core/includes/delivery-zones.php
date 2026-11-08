@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -47,22 +47,45 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			),
 			'supported_providers'     => array( 'cdek', 'russian_post' ),
 			'eta'                     => array(
+				'requirement'=> 'TESTEB-31',
 				'format'    => 'range',
 				'min_key'   => 'min_days',
 				'max_key'   => 'max_days',
+				'min_keys'  => array( 'min_days', 'min', 'from', 'delivery_min_days', 'eta_min_days' ),
+				'max_keys'  => array( 'max_days', 'max', 'to', 'delivery_max_days', 'eta_max_days' ),
 				'label'     => '{min}–{max} дн.',
 				'min_label' => '{min} дн.',
 				'max_label' => '{max} дн.',
+				'order_meta'=> array(
+					'range' => '_velotok_delivery_eta',
+					'min'   => '_velotok_delivery_eta_min_days',
+					'max'   => '_velotok_delivery_eta_max_days',
+					'label' => '_velotok_delivery_eta_label',
+				),
 			),
 			'weight'                  => array(
+				'requirement'    => 'TESTEB-30',
 				'unit'           => 'kg',
 				'source'         => 'order.weight',
+				'fallback_source'=> 'items',
+				'sources'        => array( 'order.weight', 'items', 'empty_order' ),
+				'keys'           => array( 'weight', 'order_weight', 'total_weight' ),
+				'item_keys'      => array( 'weight', 'product_weight' ),
+				'quantity_keys'  => array( 'quantity', 'qty' ),
 				'rounding'       => 'ceil',
 				'ambiguous_code' => 'DELIVERY_WEIGHT_AMBIGUOUS',
 			),
 			'free_shipping'           => array(
 				'threshold_key' => 'free_from',
 				'rule'          => 'subtotal >= free_from',
+			),
+			'cost'                    => array(
+				'requirement'            => 'TESTEB-29',
+				'tariff'                 => 'base + per_kg * ceil(weight)',
+				'provider_tariff'        => 'provider',
+				'threshold_applies_to'   => 'subtotal',
+				'threshold_applies_to_provider' => true,
+				'fallback_tariff'        => false,
 			),
 			'pickup'                  => array(
 				'enabled'             => true,
@@ -617,9 +640,84 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_id' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_zones_eta_parse' ) ) {
+	/**
+	 * Parse an ETA range written as text.
+	 *
+	 * Accepts values such as «1–3», «1-3 дн.», «от 2 до 5 дней» or a single
+	 * value such as «3 дн.». Numeric scalars are handled by the caller.
+	 *
+	 * @param mixed $value Raw ETA value.
+	 * @return array<string,int|null>
+	 */
+	function velotok_core_delivery_zones_eta_parse( $value ) {
+		$parsed = array(
+			'min' => null,
+			'max' => null,
+		);
+
+		if ( ! is_scalar( $value ) ) {
+			return $parsed;
+		}
+
+		$text = trim( (string) $value );
+
+		if ( '' === $text ) {
+			return $parsed;
+		}
+
+		if ( preg_match( '/^(?:\s*от\s*)?(\d+)\s*(?:[-–—]|\.\.|\s+до\s+)\s*(\d+)/iu', $text, $matches ) ) {
+			$parsed['min'] = (int) $matches[1];
+			$parsed['max'] = (int) $matches[2];
+
+			return $parsed;
+		}
+
+		if ( ! is_numeric( $text ) && preg_match( '/(\d+)/u', $text, $matches ) ) {
+			$parsed['min'] = (int) $matches[1];
+			$parsed['max'] = (int) $matches[1];
+		}
+
+		return $parsed;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_eta_label' ) ) {
+	/**
+	 * Format an ETA range using the delivery contract labels.
+	 *
+	 * @param int|null $min Minimum days.
+	 * @param int|null $max Maximum days.
+	 * @return string
+	 */
+	function velotok_core_delivery_zones_eta_label( $min = null, $max = null ) {
+		$contract = velotok_core_delivery_zones_contract();
+
+		if ( null !== $min && null !== $max ) {
+			return $min === $max
+				? str_replace( '{min}', (string) $min, $contract['eta']['min_label'] )
+				: str_replace( array( '{min}', '{max}' ), array( (string) $min, (string) $max ), $contract['eta']['label'] );
+		}
+
+		if ( null !== $min ) {
+			return str_replace( '{min}', (string) $min, $contract['eta']['min_label'] );
+		}
+
+		if ( null !== $max ) {
+			return str_replace( '{max}', (string) $max, $contract['eta']['max_label'] );
+		}
+
+		return '';
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 	/**
 	 * Return a delivery ETA range.
+	 *
+	 * The range is stored and returned as both boundaries (min/max), never as
+	 * an unordered or single-sided value. Configured text ranges such as
+	 * «1–3» are parsed as well.
 	 *
 	 * @param mixed $method Method data.
 	 * @return array<string,mixed>
@@ -627,29 +725,114 @@ if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 	function velotok_core_delivery_zones_eta_range( $method ) {
 		$contract = velotok_core_delivery_zones_contract();
 		$settings = velotok_core_delivery_zones_settings( $method );
-		$eta      = velotok_core_delivery_zones_value( $method, array( 'eta', 'eta_range', 'delivery_time' ), array() );
+		$sentinel = new \stdClass();
 
-		$min = velotok_core_delivery_zones_value(
-			$eta,
-			array( 'min_days', 'min', 'from' ),
-			velotok_core_delivery_zones_value(
-				$method,
-				array( 'eta_min_days', 'min_days' ),
-				isset( $settings['eta_min_days'] ) ? $settings['eta_min_days'] : null
-			)
-		);
-		$max = velotok_core_delivery_zones_value(
-			$eta,
-			array( 'max_days', 'max', 'to' ),
-			velotok_core_delivery_zones_value(
-				$method,
-				array( 'eta_max_days', 'max_days' ),
-				isset( $settings['eta_max_days'] ) ? $settings['eta_max_days'] : null
-			)
+		$min_keys = $contract['eta']['min_keys'];
+		$max_keys = $contract['eta']['max_keys'];
+		$sources  = array();
+		$eta      = velotok_core_delivery_zones_value(
+			$method,
+			array( 'eta', 'eta_range', 'delivery_eta' ),
+			$sentinel
 		);
 
-		$min = is_numeric( $min ) ? (int) ceil( (float) $min ) : null;
-		$max = is_numeric( $max ) ? (int) ceil( (float) $max ) : null;
+		if ( $eta !== $sentinel && null !== $eta ) {
+			$sources[] = $eta;
+		}
+
+		$sources[] = $method;
+		$sources[] = $settings;
+
+		$pick = function ( $source, $keys ) use ( $sentinel ) {
+			foreach ( (array) $keys as $key ) {
+				$value = velotok_core_delivery_zones_value( $source, array( $key ), $sentinel );
+
+				if ( $value === $sentinel || null === $value || ! is_scalar( $value ) ) {
+					continue;
+				}
+
+				if ( '' !== trim( (string) $value ) ) {
+					return $value;
+				}
+			}
+
+			return $sentinel;
+		};
+
+		$normalize = function ( $value ) {
+			if ( ! is_scalar( $value ) ) {
+				return null;
+			}
+
+			$value = trim( (string) $value );
+
+			if ( '' === $value ) {
+				return null;
+			}
+
+			if ( false !== strpos( $value, ',' ) && false === strpos( $value, '.' ) ) {
+				$value = str_replace( ',', '.', $value );
+			}
+
+			return is_numeric( $value ) ? max( 0, (int) ceil( (float) $value ) ) : null;
+		};
+
+		$min = null;
+		$max = null;
+
+		foreach ( $sources as $source ) {
+			if ( null === $min ) {
+				$candidate = $pick( $source, $min_keys );
+
+				if ( $candidate !== $sentinel ) {
+					$min = $normalize( $candidate );
+				}
+			}
+
+			if ( null === $max ) {
+				$candidate = $pick( $source, $max_keys );
+
+				if ( $candidate !== $sentinel ) {
+					$max = $normalize( $candidate );
+				}
+			}
+		}
+
+		$label_keys = array( 'label', 'delivery_time', 'eta_label', 'text', 'range' );
+
+		foreach ( $sources as $source ) {
+			if ( is_scalar( $source ) ) {
+				$parsed = velotok_core_delivery_zones_eta_parse( $source );
+
+				if ( null !== $parsed['min'] && null === $min ) {
+					$min = $parsed['min'];
+				}
+
+				if ( null !== $parsed['max'] && null === $max ) {
+					$max = $parsed['max'];
+				}
+
+				continue;
+			}
+
+			foreach ( $label_keys as $label_key ) {
+				$value = velotok_core_delivery_zones_value( $source, array( $label_key ), $sentinel );
+
+				if ( $value === $sentinel || null === $value || ! is_scalar( $value ) ) {
+					continue;
+				}
+
+				$parsed = velotok_core_delivery_zones_eta_parse( $value );
+
+				if ( null !== $parsed['min'] && null === $min ) {
+					$min = $parsed['min'];
+				}
+
+				if ( null !== $parsed['max'] && null === $max ) {
+					$max = $parsed['max'];
+				}
+			}
+		}
 
 		if ( null !== $min && null !== $max && $min > $max ) {
 			$swap = $min;
@@ -657,17 +840,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 			$max  = $swap;
 		}
 
-		$label = '';
-
-		if ( null !== $min && null !== $max ) {
-			$label = $min === $max
-				? str_replace( '{min}', (string) $min, $contract['eta']['min_label'] )
-				: str_replace( array( '{min}', '{max}' ), array( (string) $min, (string) $max ), $contract['eta']['label'] );
-		} elseif ( null !== $min ) {
-			$label = str_replace( '{min}', (string) $min, $contract['eta']['min_label'] );
-		} elseif ( null !== $max ) {
-			$label = str_replace( '{max}', (string) $max, $contract['eta']['max_label'] );
-		}
+		$label = velotok_core_delivery_zones_eta_label( $min, $max );
 
 		return array(
 			'min_days' => $min,
@@ -676,7 +849,107 @@ if ( ! function_exists( 'velotok_core_delivery_zones_eta_range' ) ) {
 			'max'      => $max,
 			'range'    => array( 'min' => $min, 'max' => $max ),
 			'label'    => $label,
+			'text'     => $label,
 		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_weight_number' ) ) {
+	/**
+	 * Normalize a numeric weight value.
+	 *
+	 * Accepts numbers and numeric strings. A decimal comma is normalized so
+	 * the same order never yields two different weights depending on how the
+	 * value was formatted.
+	 *
+	 * @param mixed $value Weight value.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_zones_weight_number( $value ) {
+		if ( is_int( $value ) || is_float( $value ) ) {
+			$number = (float) $value;
+
+			return is_finite( $number ) ? $number : null;
+		}
+
+		if ( ! is_string( $value ) ) {
+			return null;
+		}
+
+		$value = trim( $value );
+
+		if ( '' === $value ) {
+			return null;
+		}
+
+		if ( false !== strpos( $value, ',' ) && false === strpos( $value, '.' ) ) {
+			$value = str_replace( ',', '.', $value );
+		}
+
+		$number = is_numeric( $value ) ? (float) $value : null;
+
+		return null !== $number && is_finite( $number ) ? $number : null;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_zones_item_weight' ) ) {
+	/**
+	 * Resolve the weight of one order line without guessing.
+	 *
+	 * Supports plain item arrays, WooCommerce-like line item objects and the
+	 * product object stored inside a line item. The stored product weight is
+	 * used as a fallback for the shop's own kilogram meta field.
+	 *
+	 * @param mixed $item Order line item.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_zones_item_weight( $item ) {
+		$contract = velotok_core_delivery_zones_contract();
+		$direct   = velotok_core_delivery_zones_weight_number(
+			velotok_core_delivery_zones_value( $item, $contract['weight']['item_keys'], null )
+		);
+
+		if ( null !== $direct ) {
+			return $direct;
+		}
+
+		$product = null;
+
+		if ( is_object( $item ) && method_exists( $item, 'get_product' ) ) {
+			$product = $item->get_product();
+		} else {
+			$product = velotok_core_delivery_zones_value( $item, array( 'product', 'data', 'variation' ), null );
+		}
+
+		if ( null === $product || $product === $item ) {
+			return null;
+		}
+
+		$product_weight = velotok_core_delivery_zones_weight_number(
+			velotok_core_delivery_zones_value( $product, $contract['weight']['item_keys'], null )
+		);
+
+		if ( null !== $product_weight ) {
+			return $product_weight;
+		}
+
+		if ( function_exists( 'get_post_meta' ) ) {
+			$product_id = (int) velotok_core_delivery_zones_number(
+				velotok_core_delivery_zones_value( $product, array( 'id', 'product_id' ), 0 )
+			);
+
+			if ( $product_id > 0 ) {
+				$meta_weight = velotok_core_delivery_zones_weight_number(
+					get_post_meta( $product_id, '_velotok_weight_kg', true )
+				);
+
+				if ( null !== $meta_weight ) {
+					return $meta_weight;
+				}
+			}
+		}
+
+		return null;
 	}
 }
 
@@ -684,17 +957,67 @@ if ( ! function_exists( 'velotok_core_delivery_zones_order_weight' ) ) {
 	/**
 	 * Resolve order weight without ambiguity.
 	 *
+	 * The order weight is authoritative when present. If it is absent, the
+	 * weight is summed from the order lines; a line without a numeric weight
+	 * makes the whole result ambiguous instead of silently becoming zero.
+	 *
 	 * @param mixed $order Order data.
 	 * @return array<string,mixed>
 	 */
 	function velotok_core_delivery_zones_order_weight( $order = array() ) {
-		$contract = velotok_core_delivery_zones_contract();
-		$weight   = velotok_core_delivery_zones_value( $order, array( 'weight', 'order_weight' ), null );
+		$contract         = velotok_core_delivery_zones_contract();
+		$weight           = null;
+		$invalid_explicit = false;
+		$sentinel         = new \stdClass();
 
-		if ( is_numeric( $weight ) ) {
+		foreach ( (array) $contract['weight']['keys'] as $weight_key ) {
+			$raw_weight = velotok_core_delivery_zones_value( $order, array( $weight_key ), $sentinel );
+
+			if ( $raw_weight === $sentinel || null === $raw_weight ) {
+				continue;
+			}
+
+			if ( is_string( $raw_weight ) && '' === trim( $raw_weight ) ) {
+				continue;
+			}
+
+			$normalized = velotok_core_delivery_zones_weight_number( $raw_weight );
+
+			if ( null === $normalized ) {
+				$invalid_explicit = true;
+				continue;
+			}
+
+			$weight = $normalized;
+			break;
+		}
+
+		if ( null === $weight && $invalid_explicit ) {
+			return array(
+				'ok'     => false,
+				'weight' => null,
+				'source' => 'order.weight',
+				'unit'   => $contract['weight']['unit'],
+				'code'   => $contract['weight']['ambiguous_code'],
+				'error'  => 'Вес заказа задан некорректно.',
+			);
+		}
+
+		if ( null !== $weight ) {
+			if ( $weight < 0 ) {
+				return array(
+					'ok'     => false,
+					'weight' => null,
+					'source' => 'order.weight',
+					'unit'   => $contract['weight']['unit'],
+					'code'   => $contract['weight']['ambiguous_code'],
+					'error'  => 'Вес заказа не может быть отрицательным.',
+				);
+			}
+
 			return array(
 				'ok'     => true,
-				'weight' => (float) $weight,
+				'weight' => $weight,
 				'source' => 'order.weight',
 				'unit'   => $contract['weight']['unit'],
 			);
@@ -714,23 +1037,25 @@ if ( ! function_exists( 'velotok_core_delivery_zones_order_weight' ) ) {
 		$total = 0.0;
 
 		foreach ( $items as $item ) {
-			$item_weight = velotok_core_delivery_zones_value( $item, array( 'weight', 'product_weight' ), null );
+			$item_weight = velotok_core_delivery_zones_item_weight( $item );
 
-			if ( ! is_numeric( $item_weight ) ) {
+			if ( null === $item_weight || $item_weight < 0 ) {
 				return array(
 					'ok'     => false,
 					'weight' => null,
 					'source' => 'items',
 					'unit'   => $contract['weight']['unit'],
 					'code'   => $contract['weight']['ambiguous_code'],
-					'error'  => 'Вес хотя бы одного товара не задан.',
+					'error'  => null === $item_weight
+						? 'Вес хотя бы одного товара не задан.'
+						: 'Вес товара не может быть отрицательным.',
 				);
 			}
 
-			$quantity = velotok_core_delivery_zones_value( $item, array( 'quantity', 'qty' ), 1 );
+			$quantity = velotok_core_delivery_zones_value( $item, $contract['weight']['quantity_keys'], 1 );
 			$quantity = is_numeric( $quantity ) ? max( 0, (float) $quantity ) : 1.0;
 
-			$total += (float) $item_weight * $quantity;
+			$total += $item_weight * $quantity;
 		}
 
 		return array(
@@ -852,9 +1177,40 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_zones_free_shipping_threshold' ) ) {
+	/**
+	 * Resolve the configured free-shipping threshold for a method.
+	 *
+	 * @param mixed $method Method data.
+	 * @return float|null
+	 */
+	function velotok_core_delivery_zones_free_shipping_threshold( $method ) {
+		$settings = velotok_core_delivery_zones_settings( $method );
+		$keys     = array( 'free_from', 'free_shipping_threshold', 'min_amount', 'minimum_amount' );
+		$value    = velotok_core_delivery_zones_value( $method, $keys, null );
+
+		if ( ! is_numeric( $value ) ) {
+			$value = null;
+
+			foreach ( $keys as $key ) {
+				if ( isset( $settings[ $key ] ) && is_numeric( $settings[ $key ] ) ) {
+					$value = $settings[ $key ];
+					break;
+				}
+			}
+		}
+
+		return is_numeric( $value ) ? (float) $value : null;
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 	/**
 	 * Calculate a method cost from the provider or the configured tariff.
+	 *
+	 * The configured free-shipping threshold applies to both the provider
+	 * tariff and the fallback tariff, so the customer is never charged above
+	 * the store's free-delivery threshold.
 	 *
 	 * @param mixed $method  Method data.
 	 * @param mixed $order   Order data.
@@ -875,54 +1231,81 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 			);
 		}
 
-		if ( 'free_shipping' === velotok_core_delivery_zones_method_id( $method ) ) {
-			return array(
-				'ok'         => true,
-				'amount'     => 0.0,
-				'cost'       => 0.0,
-				'currency'   => 'RUB',
-				'free'       => true,
-				'weight'     => $weight['weight'],
-				'weight_kg'  => $weight['weight'],
-				'source'     => 'free_shipping',
-				'calculated' => true,
-			);
-		}
-
-		$provider = velotok_core_delivery_zones_provider_rate( $method, $order, $context );
-
-		if ( ! empty( $provider['ok'] ) ) {
-			return array(
-				'ok'         => true,
-				'amount'     => $provider['amount'],
-				'cost'       => $provider['amount'],
-				'currency'   => $provider['currency'],
-				'free'       => 0.0 === (float) $provider['amount'],
-				'weight'     => $weight['weight'],
-				'weight_kg'  => $weight['weight'],
-				'source'     => 'provider',
-				'calculated' => true,
-			);
-		}
-
-		if ( true === $provider['configured'] && empty( $provider['ok'] ) ) {
-			return array(
-				'ok'         => false,
-				'code'       => $provider['code'],
-				'error'      => $provider['error'],
-				'amount'     => null,
-				'weight'     => $weight['weight'],
-				'visible'    => true,
-				'calculated' => false,
-			);
-		}
-
 		$subtotal = velotok_core_delivery_zones_number(
 			velotok_core_delivery_zones_value( $order, array( 'subtotal', 'cart_subtotal' ), 0 )
 		);
 		$total    = velotok_core_delivery_zones_number(
 			velotok_core_delivery_zones_value( $order, array( 'total', 'cart_total' ), $subtotal )
 		);
+		$base_total = $subtotal > 0 ? $subtotal : $total;
+		$free_from  = velotok_core_delivery_zones_free_shipping_threshold( $method );
+		$free       = null !== $free_from && $base_total >= $free_from;
+		$round_weight = 'ceil' === $contract['weight']['rounding'] ? ceil( $weight['weight'] ) : $weight['weight'];
+		$weight_info = array(
+			'weight'                  => $weight['weight'],
+			'weight_kg'               => $weight['weight'],
+			'billable_weight'         => $round_weight,
+			'subtotal'                => $base_total,
+			'free_from'               => $free_from,
+			'free_shipping_threshold' => $free_from,
+		);
+
+		if ( 'free_shipping' === velotok_core_delivery_zones_method_id( $method ) ) {
+			return array_merge(
+				array(
+					'ok'         => true,
+					'amount'     => 0.0,
+					'cost'       => 0.0,
+					'currency'   => 'RUB',
+					'free'       => true,
+					'source'     => 'free_shipping',
+					'calculated' => true,
+				),
+				$weight_info
+			);
+		}
+
+		$provider_order = $order;
+
+		if ( is_array( $provider_order ) ) {
+			$provider_order['weight'] = $weight['weight'];
+		}
+
+		$provider = velotok_core_delivery_zones_provider_rate( $method, $provider_order, $context );
+
+		if ( ! empty( $provider['ok'] ) ) {
+			$provider_amount = (float) $provider['amount'];
+			$amount          = $free ? 0.0 : $provider_amount;
+
+			return array_merge(
+				array(
+					'ok'              => true,
+					'amount'          => $amount,
+					'cost'            => $amount,
+					'currency'        => $provider['currency'],
+					'free'            => $free || 0.0 === $provider_amount,
+					'provider_amount' => $provider_amount,
+					'source'          => 'provider',
+					'calculated'      => true,
+				),
+				$weight_info
+			);
+		}
+
+		if ( true === $provider['configured'] && empty( $provider['ok'] ) ) {
+			return array_merge(
+				array(
+					'ok'         => false,
+					'code'       => $provider['code'],
+					'error'      => $provider['error'],
+					'amount'     => null,
+					'visible'    => true,
+					'calculated' => false,
+				),
+				$weight_info
+			);
+		}
+
 		$base = velotok_core_delivery_zones_number(
 			velotok_core_delivery_zones_value(
 				$method,
@@ -937,40 +1320,26 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 				isset( $settings['per_kg'] ) ? $settings['per_kg'] : 0
 			)
 		);
-		$free_from = velotok_core_delivery_zones_value(
-			$method,
-			array( 'free_from', 'free_shipping_threshold', 'min_amount', 'minimum_amount' ),
-			isset( $settings['free_from'] )
-				? $settings['free_from']
-				: ( isset( $settings['min_amount'] )
-					? $settings['min_amount']
-					: ( isset( $settings['minimum_amount'] ) ? $settings['minimum_amount'] : null ) )
-		);
-		$free_from = is_numeric( $free_from ) ? (float) $free_from : null;
-		$base_total = $subtotal > 0 ? $subtotal : $total;
-		$round_weight = 'ceil' === $contract['weight']['rounding'] ? ceil( $weight['weight'] ) : $weight['weight'];
 		$amount = $base + $per_kg * $round_weight;
-		$free   = null !== $free_from && $base_total >= $free_from;
 
 		if ( $free ) {
 			$amount = 0.0;
 		}
 
-		return array(
-			'ok'                   => true,
-			'amount'               => round( $amount, 2 ),
-			'cost'                 => round( $amount, 2 ),
-			'currency'             => 'RUB',
-			'free'                 => $free,
-			'weight'               => $weight['weight'],
-			'weight_kg'            => $weight['weight'],
-			'billable_weight'      => $round_weight,
-			'base'                 => $base,
-			'per_kg'               => $per_kg,
-			'free_from'            => $free_from,
-			'free_shipping_threshold' => $free_from,
-			'source'               => 'tariff',
-			'calculated'           => true,
+		return array_merge(
+			array(
+				'ok'         => true,
+				'amount'     => round( $amount, 2 ),
+				'cost'       => round( $amount, 2 ),
+				'currency'   => 'RUB',
+				'free'       => $free,
+				'billable_weight' => $round_weight,
+				'base'       => $base,
+				'per_kg'     => $per_kg,
+				'source'     => 'tariff',
+				'calculated' => true,
+			),
+			$weight_info
 		);
 	}
 }
@@ -1029,6 +1398,8 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 			'mocked'         => false,
 			'test_mode'      => isset( $context['test_mode'] ) ? (bool) $context['test_mode'] : false,
 			'weight'         => null,
+			'weight_kg'      => null,
+			'billable_weight'=> null,
 			'settings'       => $settings,
 		);
 
@@ -1040,8 +1411,10 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 				$option['amount']   = $cost['amount'];
 				$option['currency'] = $cost['currency'];
 				$option['free']     = $cost['free'];
-				$option['weight']   = $cost['weight'];
-				$option['tariff']   = $cost;
+				$option['weight']          = $cost['weight'];
+				$option['weight_kg']       = $cost['weight'];
+				$option['billable_weight'] = isset( $cost['billable_weight'] ) ? $cost['billable_weight'] : null;
+				$option['tariff']          = $cost;
 			} else {
 				$option['available'] = false;
 				$option['error']     = $cost['error'];

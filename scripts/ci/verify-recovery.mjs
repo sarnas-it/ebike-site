@@ -3,6 +3,7 @@ import process from 'node:process';
 import {
   RECOVERY_WORKFLOW_PATH,
   collectRecoveryEvidence,
+  recoveryWorkflowForPullRequest,
 } from './evidence.mjs';
 import { getPullRequest } from './lib.mjs';
 import { resolveTargetFromPullRequest } from './resolve-pr-target.mjs';
@@ -20,11 +21,11 @@ recovery workflow run that executed them.
 
 Options:
   --repo <owner/name>  Repository (default: $GITHUB_REPOSITORY or sarnas-it/ebike-site)
-  --pr <number>        Pull request number (default: 68)
+  --pr <number>        Pull request number (default: 73)
   --sha <sha>          Pin the commit under test (default: the current PR head,
                        so a moved head is verified instead of the stale incident SHA)
   --run-id <id>        Recovery workflow run to verify (default: latest successful)
-  --workflow <path>    Recovery workflow path (default: ${RECOVERY_WORKFLOW_PATH})
+  --workflow <path>    Recovery workflow path (default: the workflow for the PR)
   -h, --help           Show this help
 
 Authentication: set GITHUB_TOKEN (never printed); reading a public repository
@@ -34,10 +35,10 @@ works without one.
 function parseArgs(argv) {
   const options = {
     repo: process.env.GITHUB_REPOSITORY || 'sarnas-it/ebike-site',
-    pr: 68,
+    pr: 73,
     sha: null,
     runId: null,
-    workflow: RECOVERY_WORKFLOW_PATH,
+    workflow: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -71,6 +72,8 @@ async function main() {
     throw new Error(`invalid --repo value: ${options.repo}`);
   }
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+  const workflow =
+    options.workflow || recoveryWorkflowForPullRequest(options.pr);
   let targetSha = options.sha;
   if (!targetSha) {
     const pr = await getPullRequest({
@@ -87,7 +90,7 @@ async function main() {
     pullNumber: options.pr,
     targetSha,
     runId: options.runId,
-    workflow: options.workflow,
+    workflow,
     token,
   });
 
