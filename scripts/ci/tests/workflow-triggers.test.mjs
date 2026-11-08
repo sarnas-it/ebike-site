@@ -272,6 +272,10 @@ function testRolloutVerificationWorkflowIsWired() {
     analysis.triggers.includes('workflow_dispatch'),
     'rollout verification must be manually dispatchable',
   );
+  assert.ok(
+    analysis.triggers.includes('pull_request'),
+    'rollout verification must run on the fix pull request itself, otherwise the real head is never checked',
+  );
   assert.strictEqual(
     analysis.hasPathsFilter,
     false,
@@ -282,10 +286,22 @@ function testRolloutVerificationWorkflowIsWired() {
     'rollout verification must run on the base branch',
   );
   assert.ok(
+    /github\.event\.pull_request\.number\s*==\s*65/.test(text),
+    'the pull_request run must target PR #65 so it attaches a normal check run to the real head',
+  );
+  assert.ok(
     text.includes('scripts/ci/verify-rollout.mjs'),
     'rollout verification must call the red-green gate',
   );
-  console.log('PASS: rollout verification runs on push to main and manually');
+  assert.ok(
+    text.includes('scripts/ci/publish-rollout-evidence.mjs'),
+    'rollout verification must publish the verified head run as evidence on PR #65',
+  );
+  assert.ok(
+    /pull-requests:\s*write/.test(text),
+    'publishing the evidence comment requires pull-requests: write',
+  );
+  console.log('PASS: rollout verification runs on PR #65, push to main and manually');
 }
 
 function testCiWorkflowKeepsTheVerifiedJobSet() {

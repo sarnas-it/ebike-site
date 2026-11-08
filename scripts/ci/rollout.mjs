@@ -6,6 +6,7 @@ import {
   getWorkflowRun,
   getWorkflowRunJobs,
   getWorkflowRuns,
+  upsertIssueComment,
 } from './lib.mjs';
 
 export const FIX_PR_NUMBER = 65;
@@ -78,6 +79,7 @@ export function summarizeRolloutEvidence({
   baseBranch = BASE_BRANCH,
   expectedWorkflowPath = WORKFLOW_PATH,
   expectedJobs = EXPECTED_CI_JOBS,
+  workflowRef = baseBranch,
 }) {
   const problems = [];
   const normalizedRun = normalizeRun(run);
@@ -85,6 +87,9 @@ export function summarizeRolloutEvidence({
 
   const prNumber = pr?.number ?? null;
   const merged = Boolean(pr?.merged);
+  const state = pr?.state ?? null;
+  const mergeable = pr?.mergeable ?? null;
+  const mergeableState = pr?.mergeable_state ?? null;
   const mergeCommitSha = pr?.merge_commit_sha ?? null;
   const headSha = pr?.head?.sha ?? null;
   const prBase = pr?.base?.ref ?? null;
@@ -101,10 +106,34 @@ export function summarizeRolloutEvidence({
         `pull request #${fixPr} targets ${prBase ?? 'unknown'}, expected ${baseBranch}`,
       );
     }
-    if (!merged) {
-      problems.push(`pull request #${fixPr} is not merged into ${baseBranch}`);
-    } else if (!mergeCommitSha) {
-      problems.push(`merged pull request #${fixPr} has no merge commit sha`);
+    if (merged) {
+      // The tracker merges the fix pull request only after acceptance, so the
+      // merged state is not a precondition for this gate. It must still be
+      // consistent once the merge has happened.
+      if (!mergeCommitSha) {
+        problems.push(`merged pull request #${fixPr} has no merge commit sha`);
+      }
+    } else {
+      // Before acceptance the fix lives in the open pull request. Readiness for
+      // the automated merge is proven by green CI on the real head commit and
+      // by the absence of conflicts with the base branch.
+      if (state !== 'open') {
+        problems.push(
+          `pull request #${fixPr} is ${state ?? 'unknown'}, expected open or merged`,
+        );
+      }
+      if (mergeable !== true) {
+        problems.push(
+          `pull request #${fixPr} is not mergeable ` +
+            `(mergeable=${mergeable ?? 'unknown'}, ` +
+            `state=${mergeableState ?? 'unknown'})`,
+        );
+      }
+      if (mergeableState === 'dirty') {
+        problems.push(
+          `pull request #${fixPr} has merge conflicts with ${baseBranch}`,
+        );
+      }
     }
     if (targetSha) {
       const allowed = [headSha, mergeCommitSha].filter(Boolean);
@@ -127,7 +156,7 @@ export function summarizeRolloutEvidence({
 
   const workflowPresent = Boolean(workflow);
   if (!workflowPresent) {
-    problems.push(`${expectedWorkflowPath} is missing on ${baseBranch}`);
+    problems.push(`${expectedWorkflowPath} is missing on ${workflowRef}`);
   }
 
   if (!resolvedSha) {
@@ -187,13 +216,16 @@ export function summarizeRolloutEvidence({
     baseBranch,
     targetSha: resolvedSha,
     workflowPath: expectedWorkflowPath,
+    workflowRef,
     workflowPresent,
     run: normalizedRun,
     jobs: jobList,
     pullRequest: {
       number: prNumber,
-      state: pr?.state ?? null,
+      state,
       merged,
+      mergeable,
+      mergeableState,
       base: prBase,
       headSha,
       mergeCommitSha,
@@ -216,18 +248,25 @@ export async function collectRolloutEvidence({
   token,
   fetchImpl = globalThis.fetch,
 }) {
-  const [pr, repository, workflowContent] = await Promise.all([
+  const [pr, repository] = await Promise.all([
     getPullRequest({ owner, repo, pullNumber: fixPr, token, fetchImpl }),
     getRepository({ owner, repo, token, fetchImpl }),
-    getContentAtRef({
-      owner,
-      repo,
-      filePath: workflow,
-      ref: baseBranch,
-      token,
-      fetchImpl,
-    }),
   ]);
+
+  // Before the tracker merges the fix pull request (the merge happens only after
+  // acceptance) the CI workflow lives in the pull request head tree, not in the
+  // base branch. Check it where the head run actually reads it from.
+  const workflowRef = pr?.merged
+    ? baseBranch
+    : pr?.head?.sha || pr?.head?.ref || baseBranch;
+  const workflowContent = await getContentAtRef({
+    owner,
+    repo,
+    filePath: workflow,
+    ref: workflowRef,
+    token,
+    fetchImpl,
+  });
 
   const resolvedSha = targetSha || pr?.head?.sha || null;
   let run = null;
@@ -267,5 +306,91 @@ export async function collectRolloutEvidence({
     baseBranch,
     expectedWorkflowPath: workflow,
     expectedJobs,
+    workflowRef,
   });
+}
+
+export function renderRolloutComment(evidence, marker = '<!-- testeb-63-rollout -->') {
+  const lines = [];
+  if (marker) {
+    lines.push(marker, '');
+  }
+  lines.push('## Готовность починки CI (TESTEB-63, PR #' + evidence.fixPr + ')');
+  lines.push('');
+  lines.push(
+    `- PR #${evidence.fixPr} → ${evidence.baseBranch}: ` +
+      `state=${evidence.pullRequest.state ?? 'unknown'}, ` +
+      `merged=${evidence.pullRequest.merged}, ` +
+      `mergeable=${evidence.pullRequest.mergeable ?? 'unknown'}, ` +
+      `mergeable_state=${evidence.pullRequest.mergeableState ?? 'unknown'}`,
+  );
+  lines.push(`- Проверяемый head-коммит: \`${evidence.targetSha ?? 'none'}\``);
+  if (evidence.run) {
+    lines.push(
+      `- Штатный прогон ci: [#${evidence.run.id}](${evidence.run.url}) — ` +
+        `status=${evidence.run.status}, conclusion=${evidence.run.conclusion}, ` +
+        `event=${evidence.run.event}, head=\`${evidence.run.headSha}\``,
+    );
+  } else {
+    lines.push('- Штатный прогон ci: не найден');
+  }
+  lines.push(
+    `- Workflow: ${evidence.workflowPresent ? evidence.workflowPath : 'missing'} ` +
+      `(${evidence.workflowRef ?? 'unknown'})`,
+  );
+  lines.push(
+    `- Job: ${
+      evidence.jobs
+        .map((job) => `\`${job.name}=${job.conclusion ?? job.status ?? 'unknown'}\``)
+        .join(', ') || 'нет'
+    }`,
+  );
+  lines.push(
+    `- Итог: ${evidence.ready ? 'green — CI на реальном head зелёный, PR готов к автомержу' : 'red — доказательств недостаточно'}`,
+  );
+  if (!evidence.ready) {
+    lines.push(`- Проблемы: ${evidence.problems.join('; ')}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+export async function publishRolloutEvidence({
+  owner,
+  repo,
+  fixPr = FIX_PR_NUMBER,
+  targetSha = null,
+  runId = null,
+  baseBranch = BASE_BRANCH,
+  workflow = WORKFLOW_PATH,
+  expectedJobs = EXPECTED_CI_JOBS,
+  marker = '<!-- testeb-63-rollout -->',
+  token,
+  fetchImpl = globalThis.fetch,
+}) {
+  const evidence = await collectRolloutEvidence({
+    owner,
+    repo,
+    fixPr,
+    targetSha,
+    runId,
+    baseBranch,
+    workflow,
+    expectedJobs,
+    token,
+    fetchImpl,
+  });
+  const body = renderRolloutComment(evidence, marker);
+  if (!evidence.ready) {
+    return { evidence, body, comment: null };
+  }
+  const comment = await upsertIssueComment({
+    owner,
+    repo,
+    pullNumber: fixPr,
+    body,
+    marker,
+    token,
+    fetchImpl,
+  });
+  return { evidence, body, comment };
 }

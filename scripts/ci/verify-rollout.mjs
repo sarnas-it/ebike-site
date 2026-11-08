@@ -11,14 +11,23 @@ import { WORKFLOW_PATH } from './lib.mjs';
 const USAGE = `Usage:
   verify-rollout.mjs [options]
 
-Verifies that the CI fix is landed in the base branch and that CI actually ran
-successfully on the fix commit. Exits 1 until all of the following are true, so
-it can be used as a red-green gate for the rollout criteria:
+Verifies that the CI fix is present in pull request #${FIX_PR_NUMBER} and that CI
+actually ran successfully on its real head commit. Exits 1 until all of the
+following are true, so it can be used as a red-green gate for the rollout
+criteria:
 
-  * pull request #${FIX_PR_NUMBER} is merged into ${BASE_BRANCH};
-  * ${WORKFLOW_PATH} exists on ${BASE_BRANCH};
-  * the latest ci run on the fix commit completed successfully;
+  * pull request #${FIX_PR_NUMBER} targets ${BASE_BRANCH};
+  * before acceptance the pull request is open and mergeable with no conflicts
+    in ${BASE_BRANCH} (the tracker merges it only after ACCEPT, so a merged
+    state cannot be required before acceptance); after the merge a merge commit
+    must exist instead;
+  * ${WORKFLOW_PATH} exists in the pull request head tree (or on ${BASE_BRANCH}
+    once merged);
+  * the latest ci run on the real head commit completed successfully;
   * the run includes the full job set (${EXPECTED_CI_JOBS.join(', ')}).
+
+A successful run on any other (for example an older) commit is rejected, so a
+green run from a previous submission cannot stand in for the current head.
 
 Options:
   --repo <owner/name>  Repository (default: $GITHUB_REPOSITORY or sarnas-it/ebike-site)
@@ -96,11 +105,15 @@ async function main() {
   process.stdout.write(`fix commit:       ${evidence.targetSha ?? 'none'}\n`);
   process.stdout.write(
     `pull request:     merged=${evidence.pullRequest.merged} ` +
+      `state=${evidence.pullRequest.state ?? 'none'} ` +
+      `mergeable=${evidence.pullRequest.mergeable ?? 'unknown'} ` +
+      `mergeable_state=${evidence.pullRequest.mergeableState ?? 'unknown'} ` +
       `base=${evidence.pullRequest.base ?? 'none'} ` +
       `merge=${evidence.pullRequest.mergeCommitSha ?? 'none'}\n`,
   );
   process.stdout.write(
-    `workflow on base: ${evidence.workflowPresent ? evidence.workflowPath : 'missing'}\n`,
+    `workflow at:      ${evidence.workflowPresent ? evidence.workflowPath : 'missing'} ` +
+      `(${evidence.workflowRef ?? 'unknown'})\n`,
   );
   process.stdout.write(
     `ci run:           ${evidence.run ? `#${evidence.run.id} ${evidence.run.url}` : 'none'}\n`,

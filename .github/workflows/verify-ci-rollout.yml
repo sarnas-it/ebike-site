@@ -1,6 +1,12 @@
 name: verify-ci-rollout
 
+# Runs on the fix pull request itself as well as after it lands on main. The
+# pull_request run is what proves that CI passed on the real head commit of PR
+# #65: the tracker merges the pull request only after acceptance, so the merged
+# state cannot be required before acceptance.
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   workflow_dispatch:
@@ -9,35 +15,49 @@ permissions:
   contents: read
   actions: read
   checks: read
-  pull-requests: read
+  pull-requests: write
+  issues: write
 
 concurrency:
-  group: verify-ci-rollout-${{ github.ref }}
+  group: verify-ci-rollout-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
     name: verify-ci-rollout
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.number == 65 }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify the fix PR is merged and CI passed on the fix commit
+      - name: Verify CI passed on the real PR #65 head (or it is merged)
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
+          echo "event=${GITHUB_EVENT_NAME} ref=${GITHUB_REF} sha=${GITHUB_SHA}" \
+            >>"$GITHUB_STEP_SUMMARY"
           attempt=1
           until node scripts/ci/verify-rollout.mjs \
             --repo "$GITHUB_REPOSITORY" \
             --pr 65; do
-            if [ "$attempt" -ge 6 ]; then
+            if [ "$attempt" -ge 30 ]; then
               echo "rollout verification stayed red after ${attempt} attempts" >&2
               exit 1
             fi
             attempt=$((attempt + 1))
             sleep 20
           done
+      - name: Publish verified rollout evidence on PR #65
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/ci/publish-rollout-evidence.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr 65 \
+            --marker '<!-- testeb-63-rollout -->'

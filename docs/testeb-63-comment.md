@@ -20,16 +20,36 @@
 allow-list интеграции содержит `sarnas-it/ebike-site`.
 
 Исправление: PR [#65](https://github.com/sarnas-it/ebike-site/pull/65) добавляет
-`.github/workflows/ci.yml` в базовую ветку, поэтому новые PR получают реальные
-прогоны на каждом `pull_request`, `push` в `main` и по `workflow_dispatch`.
-CI на коммите починки `7052bf2` уже прошёл успешно:
-[run #42467339807](https://github.com/sarnas-it/ebike-site/actions/runs/42467339807),
-все job (`php-lint`, `php-tests`, `plugin-tests`, `ci-repair-tests`) зелёные.
-Факт мержа PR #65 в `main` и успешный прогон CI именно на коммите починки
-проверяются red-green гейтом `scripts/ci/verify-rollout.mjs`, который запускает
-workflow `verify-ci-rollout` на каждый `push` в `main`: гейт возвращает код 1,
-пока PR не смержен, workflow отсутствует в `main` или прогон CI на head-коммите
-починки не зелёный.
+`.github/workflows/ci.yml`, поэтому новые PR получают реальные прогоны на
+каждом `pull_request`, `push` в `main` и по `workflow_dispatch`.
+
+Критерий «CI на актуальном head PR #65 успешен» подтверждается штатным прогоном
+`ci` на реальном head-коммите PR #65, а не ссылкой на прогон прошлой сдачи.
+Workflow `verify-ci-rollout` теперь запускается на самом PR #65
+(`pull_request`) и на каждый `push` в `main`; гейт
+`scripts/ci/verify-rollout.mjs` сверяет SHA прогона с текущим head и возвращает
+код 1, пока:
+
+* PR #65 не нацелен в `main` или не готов к автомержу (конфликты,
+  `mergeable=false`, закрыт без мержа);
+* `ci.yml` отсутствует в дереве head PR #65 (до мержа) или в `main` (после);
+* последний прогон `ci` на **текущем head** не завершился успешно;
+* в прогоне нет полного набора job (`php-lint`, `php-tests`, `plugin-tests`,
+  `ci-repair-tests`) или какой-то job упал;
+* прогон относится к другому (например, более старому) коммиту.
+
+Мерж PR #65 до ACCEPT не требуется: его выполняет очередь трекера после
+приёмки, поэтому до мержа доказательством служит зелёный `ci` и
+`verify-ci-rollout` на актуальном head. После мержа тот же гейт дополнительно
+требует merge commit. Прогон на более старом SHA (в том числе `7052bf2`) не
+принимается, потому что его `head_sha` не совпадает с текущим head.
+
+После зелёного гейта workflow публикует на PR #65 идемпотентный комментарий
+`<!-- testeb-63-rollout -->` со ссылкой на штатный run `ci`, его `head_sha`,
+списком job и состоянием `mergeable`; комментарий не создаётся, пока
+доказательства красные. Поэтому доказательство всегда относится к тому
+коммиту, который реально проверялся, а не к прошлой сдаче.
+
 Recovery-workflow `Recover PR #62 checks`
 (`.github/workflows/recover-pr62.yml`) выкачивает ровно коммит
 `578e87b5a8587d6078aade92d26bd449448dd1d3` (`git rev-parse HEAD` сверяется с
