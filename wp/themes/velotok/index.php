@@ -9,7 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 get_header();
 ?>
-<main id="main" class="page-main">
+<main id="main" class="page-main" tabindex="-1">
 	<section class="section">
 		<div class="wrap">
 			<header class="page-header">

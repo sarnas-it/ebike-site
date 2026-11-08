@@ -12,7 +12,7 @@ get_header();
 while ( have_posts() ) :
 	the_post();
 	?>
-	<main id="main" class="page-main">
+	<main id="main" class="page-main" tabindex="-1">
 		<section class="section">
 			<div class="wrap page-wrap">
 				<article id="post-<?php the_ID(); ?>" <?php post_class( 'entry' ); ?>>

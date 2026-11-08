@@ -38,7 +38,7 @@ if ( is_product_category() ) {
 	}
 }
 ?>
-<main id="main" class="page-main">
+<main id="main" class="page-main" tabindex="-1">
 	<section class="catalog-head">
 		<div class="wrap">
 			<p class="label"><?php esc_html_e( 'Каталог', 'velotok' ); ?></p>

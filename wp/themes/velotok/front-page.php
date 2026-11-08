@@ -9,7 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 get_header();
 ?>
-<main id="main">
+<main id="main" tabindex="-1">
 	<?php
 	get_template_part( 'template-parts/hero' );
 	get_template_part( 'template-parts/categories' );

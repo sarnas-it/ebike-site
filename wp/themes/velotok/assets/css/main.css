@@ -338,6 +338,29 @@ body.is-locked{overflow:hidden}
   .model-body{padding:18px}
   .result-row .btn{width:100%}
 }
+/* Контрольные ширины: 1440, 1024, 768 и 360 px. */
+@media (min-width:1440px){
+  .section{padding-block:clamp(72px,7vw,124px)}
+  .model-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:1024px){
+  .model-grid{grid-template-columns:repeat(2,1fr)}
+  .cat-grid{grid-template-columns:repeat(2,1fr)}
+  .adv-grid,.picker-grid{grid-template-columns:1fr}
+}
+@media (max-width:768px){
+  .model-grid{grid-template-columns:1fr}
+  .cat-grid{grid-template-columns:1fr}
+  .lead-grid,.review-grid{grid-template-columns:1fr}
+  .footer-top{grid-template-columns:1fr}
+  .footer-brand{grid-column:auto}
+}
+@media (max-width:360px){
+  .model-body{padding:16px}
+  .cat-card{padding:20px}
+  .hero h1{font-size:clamp(34px,11.5vw,44px)}
+  .hero-actions .btn{width:100%}
+}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}

@@ -19,7 +19,7 @@ while ( have_posts() ) :
 
 	$velotok_tagline = trim( (string) get_post_meta( $product->get_id(), '_velotok_tagline', true ) );
 	?>
-	<main id="main" class="page-main">
+	<main id="main" class="page-main" tabindex="-1">
 		<div class="wrap product-breadcrumbs">
 			<?php
 			woocommerce_breadcrumb( array(
