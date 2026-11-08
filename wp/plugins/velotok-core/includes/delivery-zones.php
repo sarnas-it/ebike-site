@@ -24,12 +24,24 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			return $contract;
 		}
 
+		$provider_capabilities = array(
+			'methods'         => true,
+			'rates'           => true,
+			'pickup_points'   => true,
+			'eta'             => true,
+			'test_mode'       => true,
+			'tracking'        => true,
+			'errors'          => true,
+			'configuration'   => true,
+			'free_shipping'   => true,
+		);
+
 		$contract = array(
 			'spec'                    => 'delivery',
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39', 'TESTEB-40', 'TESTEB-41' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39', 'TESTEB-40', 'TESTEB-41', 'TESTEB-42' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -46,6 +58,41 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'local_pickup' => 'Самовывоз',
 			),
 			'supported_providers'     => array( 'cdek', 'russian_post' ),
+			'provider_parity'         => array(
+				'requirement'              => 'TESTEB-42',
+				'equal'                    => true,
+				'providers'                => array( 'cdek', 'russian_post' ),
+				'same_interface'           => true,
+				'same_features'            => true,
+				'same_error_handling'      => true,
+				'same_test_mode'           => true,
+				'same_pickup_points'       => true,
+				'same_tracking'            => true,
+				'same_configuration'       => true,
+				'no_preferred_provider'    => true,
+				'features'                 => array_values( array_keys( $provider_capabilities ) ),
+				'error_code'               => 'DELIVERY_PROVIDER_ERROR',
+				'error_visible'            => true,
+				'fallback_tariff'          => false,
+				'adapters'                 => array(
+					'cdek'         => array(
+						'id'              => 'cdek',
+						'provider'        => 'cdek',
+						'label'           => 'СДЭК',
+						'method_id'       => 'cdek',
+						'shipping_method' => 'Velotok_Shipping_Method_CDEK',
+						'features'        => $provider_capabilities,
+					),
+					'russian_post' => array(
+						'id'              => 'russian_post',
+						'provider'        => 'russian_post',
+						'label'           => 'Почта РФ',
+						'method_id'       => 'russian_post',
+						'shipping_method' => 'Velotok_Shipping_Method_Russian_Post',
+						'features'        => $provider_capabilities,
+					),
+				),
+			),
 			'eta'                     => array(
 				'requirement'=> 'TESTEB-31',
 				'format'    => 'range',
@@ -375,8 +422,92 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 		$contract['test_mode_banner_buyer_visible'] = true;
 		$contract['store_configuration'] = $contract['configuration'];
 		$contract['store_delivery_configuration'] = $contract['configuration'];
+		$contract['provider_adapters'] = $contract['provider_parity']['adapters'];
+		$contract['provider_equality'] = $contract['provider_parity'];
+		$contract['provider_parity_explicit'] = true;
 
 		return $contract;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_adapters' ) ) {
+	/**
+	 * Return the provider adapter descriptors used by delivery.
+	 *
+	 * СДЭК and Почта РФ are described by the same capability set so neither
+	 * provider is treated as a second-class adapter.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	function velotok_core_delivery_provider_adapters() {
+		$contract = velotok_core_delivery_zones_contract();
+
+		return isset( $contract['provider_parity']['adapters'] ) && is_array( $contract['provider_parity']['adapters'] )
+			? $contract['provider_parity']['adapters']
+			: array();
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_contract' ) ) {
+	/**
+	 * Return the adapter descriptor for one provider or all of them.
+	 *
+	 * @param mixed $provider Provider identifier.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_provider_contract( $provider = '' ) {
+		$adapters = velotok_core_delivery_provider_adapters();
+
+		if ( '' === trim( (string) $provider ) || null === $provider ) {
+			return $adapters;
+		}
+
+		$provider_id = function_exists( 'mb_strtolower' )
+			? mb_strtolower( trim( (string) $provider ), 'UTF-8' )
+			: strtolower( trim( (string) $provider ) );
+		$provider_id = velotok_core_delivery_pickup_provider_id( $provider_id );
+		$provider_id = '' !== $provider_id ? $provider_id : strtolower( trim( (string) $provider ) );
+
+		return isset( $adapters[ $provider_id ] ) ? $adapters[ $provider_id ] : array();
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_provider_parity' ) ) {
+	/**
+	 * Return the provider parity contract with the equality verdict recomputed
+	 * from the adapter capabilities.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_provider_parity() {
+		$contract = velotok_core_delivery_zones_contract();
+		$parity   = isset( $contract['provider_parity'] ) && is_array( $contract['provider_parity'] )
+			? $contract['provider_parity']
+			: array();
+		$adapters = velotok_core_delivery_provider_adapters();
+		$baseline = null;
+		$equal    = true;
+
+		foreach ( $adapters as $adapter ) {
+			$features = isset( $adapter['features'] ) && is_array( $adapter['features'] ) ? $adapter['features'] : array();
+			$features = array_values( array_keys( $features ) );
+			sort( $features );
+
+			if ( null === $baseline ) {
+				$baseline = $features;
+				continue;
+			}
+
+			if ( $baseline !== $features ) {
+				$equal = false;
+			}
+		}
+
+		$parity['providers'] = array_values( array_keys( $adapters ) );
+		$parity['equal']     = $equal && array( 'cdek', 'russian_post' ) === $parity['providers'];
+		$parity['features']  = null !== $baseline ? $baseline : array();
+
+		return $parity;
 	}
 }
 
