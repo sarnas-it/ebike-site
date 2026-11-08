@@ -270,6 +270,7 @@ $webhook_signature = velotok_core_payment_webhook_signature( $payload );
 velotok_payment_test_assert( '' !== $webhook_signature, 'Подпись webhook должна вычисляться.' );
 velotok_payment_test_assert( velotok_core_payment_webhook_verify( $payload, $webhook_signature ), 'Верная подпись должна приниматься.' );
 velotok_payment_test_assert( ! velotok_core_payment_webhook_verify( $payload, 'bad-signature' ), 'Неверная подпись должна отклоняться.' );
+velotok_payment_test_assert( $webhook_signature === velotok_core_payment_webhook_signature_from_headers( array( 'HTTP_X_VELOTOK_SIGNATURE' => $webhook_signature ) ), 'Подпись должна читаться из заголовка в серверном формате.' );
 
 $order_42 = new Velotok_Test_Order( 42, 1000 );
 $GLOBALS['velotok_test_orders'][42] = $order_42;
@@ -328,6 +329,23 @@ $partial = velotok_core_yookassa_refund( $order_44, 500, 'Частичный в�
 velotok_payment_test_assert( true === $partial['ok'], 'Частичный возврат должен выполняться.' );
 velotok_payment_test_assert( 'succeeded' === $partial['status'], 'Частичный возврат не должен переводить оплату в refunded.' );
 velotok_payment_test_assert( 'succeeded' === $order_44->meta['_velotok_payment_status'], 'Частичный возврат сохраняет succeeded.' );
+
+$order_45 = new Velotok_Test_Order( 45, 1000 );
+$order_45->meta['_velotok_payment_id'] = 'pay-45';
+$order_45->meta['_velotok_payment_status'] = 'succeeded';
+$GLOBALS['velotok_test_orders'][45] = $order_45;
+$GLOBALS['velotok_test_api_response'] = array( 'id' => 'refund-45-a', 'status' => 'succeeded' );
+
+$first_partial = velotok_core_yookassa_refund( $order_45, 600, 'Первая часть' );
+velotok_payment_test_assert( true === $first_partial['ok'] && 'succeeded' === $first_partial['status'], 'Первая часть возврата не должна завершать возврат.' );
+
+$GLOBALS['velotok_test_api_response'] = array( 'id' => 'refund-45-b', 'status' => 'succeeded' );
+$second_partial = velotok_core_yookassa_refund( $order_45, 400, 'Вторая часть' );
+velotok_payment_test_assert( true === $second_partial['ok'], 'Вторая часть возврата должна выполняться.' );
+velotok_payment_test_assert( 'refunded' === $second_partial['status'], 'Сумма частей, равная заказу, должна давать refunded.' );
+velotok_payment_test_assert( true === $second_partial['full'], 'Возврат всей суммы частями должен помечаться как full.' );
+velotok_payment_test_assert( 'refunded' === $order_45->meta['_velotok_payment_status'], 'Статус оплаты после возврата всей суммы должен быть refunded.' );
+velotok_payment_test_assert( 'refunded' === $order_45->status, 'Статус заказа после возврата всей суммы должен быть refunded.' );
 
 velotok_payment_test_assert( class_exists( 'Velotok_Yookassa_Gateway' ), 'Класс платёжного шлюза должен существовать.' );
 velotok_payment_test_assert( is_subclass_of( 'Velotok_Yookassa_Gateway', 'WC_Payment_Gateway' ), 'Шлюз должен расширять WC_Payment_Gateway.' );

@@ -649,6 +649,25 @@ function velotok_core_payment_webhook_verify( $body, $signature, $secret = null 
 }
 
 /**
+ * Normalize a header name for case-insensitive, transport-agnostic lookup.
+ *
+ * Accepts both `X-Velotok-Signature` and `HTTP_X_VELOTOK_SIGNATURE` forms.
+ *
+ * @param string $name Header name.
+ * @return string
+ */
+function velotok_core_payment_normalize_header_name( $name ) {
+	$name = strtolower( trim( (string) $name ) );
+	$name = str_replace( '_', '-', $name );
+
+	if ( 0 === strpos( $name, 'http-' ) ) {
+		$name = substr( $name, 5 );
+	}
+
+	return $name;
+}
+
+/**
  * Case-insensitive header lookup.
  *
  * @param array  $headers Headers.
@@ -660,8 +679,10 @@ function velotok_core_payment_header( $headers, $name ) {
 		return '';
 	}
 
+	$needle = velotok_core_payment_normalize_header_name( $name );
+
 	foreach ( $headers as $key => $value ) {
-		if ( strtolower( (string) $key ) === strtolower( (string) $name ) ) {
+		if ( velotok_core_payment_normalize_header_name( $key ) === $needle ) {
 			return is_array( $value ) ? (string) reset( $value ) : (string) $value;
 		}
 	}
@@ -922,14 +943,18 @@ function velotok_core_payment_webhook_process( $body, $signature = null, $header
 	if ( velotok_core_payment_webhook_is_duplicate( $event_id ) ) {
 		$events =& velotok_core_payment_processed_events();
 
+		$status = isset( $events[ $event_id ]['status'] ) ? $events[ $event_id ]['status'] : '';
+
 		return array(
-			'ok'         => true,
-			'code'       => 'PAYMENT_WEBHOOK_DUPLICATE',
-			'duplicate'  => true,
-			'verified'   => true,
-			'idempotent' => true,
-			'event_id'   => $event_id,
-			'status'     => isset( $events[ $event_id ]['status'] ) ? $events[ $event_id ]['status'] : '',
+			'ok'           => true,
+			'code'         => 'PAYMENT_WEBHOOK_DUPLICATE',
+			'duplicate'    => true,
+			'verified'     => true,
+			'idempotent'   => true,
+			'event_id'     => $event_id,
+			'status'       => $status,
+			'order_id'     => isset( $events[ $event_id ]['order_id'] ) ? $events[ $event_id ]['order_id'] : '',
+			'order_status' => '' !== $status ? velotok_core_payment_order_status( $status ) : '',
 		);
 	}
 
@@ -1312,9 +1337,9 @@ function velotok_core_yookassa_refund( $order, $amount = null, $reason = '' ) {
 		);
 	}
 
-	$status      = velotok_core_payment_refund_status( $amount, $total );
-	$refunded    = (float) velotok_core_payment_order_meta( $order, '_velotok_refunded_amount', 0 );
-	$refunded   += $amount;
+	$refunded  = (float) velotok_core_payment_order_meta( $order, '_velotok_refunded_amount', 0 );
+	$refunded += $amount;
+	$status    = velotok_core_payment_refund_status( $refunded, $total );
 
 	velotok_core_payment_update_order_meta( $order, '_velotok_refunded_amount', $refunded );
 

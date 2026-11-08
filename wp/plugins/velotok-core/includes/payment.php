@@ -12,6 +12,11 @@
  * - function velotok_core_payment_webhook_verify( $body, $signature, $secret = null )
  * - function velotok_core_payment_webhook_process( $body, $signature = null, $headers = array() )
  * - function velotok_core_yookassa_refund( $order, $amount = null, $reason = '' )
+ * - function velotok_core_payment_status_model()
+ * - function velotok_core_payment_apply_order_status( $order, $status, $note = '' )
+ * - woocommerce_payment_gateways
+ * - Idempotence-Key
+ * - https://api.yookassa.ru/v3
  * - 'mocked' => false, 'source' => 'gateway'
  * - hash_hmac( 'sha256', ... ), hash_equals( ... )
  * - statuses: 'pending', 'waiting_for_capture', 'succeeded', 'canceled', 'refunded'
