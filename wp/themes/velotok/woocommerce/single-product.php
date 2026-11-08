@@ -84,7 +84,7 @@ while ( have_posts() ) :
 							<?php
 							foreach ( $velotok_related_ids as $velotok_related_id ) {
 								$velotok_related = wc_get_product( $velotok_related_id );
-								if ( $velotok_related instanceof WC_Product ) {
+								if ( $velotok_related instanceof WC_Product && velotok_is_valid_product( $velotok_related ) ) {
 									get_template_part( 'template-parts/model-card', null, velotok_normalize_product( $velotok_related ) );
 								}
 							}
