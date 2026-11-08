@@ -1199,6 +1199,12 @@ function velotok_core_wc_cart_contains_snapshot( $items ) {
 /**
  * Merge the stored guest cart on login.
  *
+ * The guest cart normally lives in the WooCommerce session snapshot. When the
+ * snapshot has not been stored yet (for example the visitor logs in right after
+ * adding a product), the items already present in the live guest cart are used
+ * instead, so the cart still survives the login. Existing customer positions
+ * are preserved and duplicate products are merged by quantity.
+ *
  * @param string $user_login User login.
  * @param mixed  $user       User object.
  * @return array<string,mixed>|null
@@ -1214,16 +1220,25 @@ function velotok_core_wc_cart_merge_guest_on_login( $user_login = '', $user = nu
 		$user_id = (int) get_current_user_id();
 	}
 
-	$items = velotok_core_wc_cart_guest_snapshot();
+	$source = 'session_snapshot';
+	$items  = velotok_core_wc_cart_guest_snapshot();
+
+	if ( empty( $items ) ) {
+		$items  = velotok_core_wc_cart_items();
+		$source = empty( $items ) ? 'none' : 'live_cart';
+	}
 
 	if ( empty( $items ) ) {
 		velotok_core_wc_cart_clear_guest_snapshot();
 
 		return velotok_core_wc_cart_summary(
 			array(
-				'valid'         => true,
-				'transferred'   => 0,
-				'guest_cleared' => true,
+				'valid'           => true,
+				'login_merge'     => true,
+				'guest_source'    => 'none',
+				'transferred'     => 0,
+				'items_preserved' => 0,
+				'guest_cleared'   => true,
 			)
 		);
 	}
@@ -1233,15 +1248,28 @@ function velotok_core_wc_cart_merge_guest_on_login( $user_login = '', $user = nu
 
 		return velotok_core_wc_cart_summary(
 			array(
-				'valid'                   => true,
-				'transferred'             => 0,
-				'guest_cleared'           => true,
+				'valid'                      => true,
+				'login_merge'                => true,
+				'guest_source'               => $source,
+				'transferred'                => 0,
+				'items_preserved'            => count( $items ),
+				'guest_cleared'              => true,
 				'guest_cart_already_present' => true,
 			)
 		);
 	}
 
-	return velotok_core_wc_cart_transfer_guest_cart( array( 'items' => $items ), $user_id );
+	$result = velotok_core_wc_cart_transfer_guest_cart( array( 'items' => $items ), $user_id );
+
+	if ( ! is_array( $result ) ) {
+		return null;
+	}
+
+	$result['login_merge']     = true;
+	$result['guest_source']    = $source;
+	$result['items_preserved'] = count( $items );
+
+	return $result;
 }
 
 /**
