@@ -292,6 +292,18 @@ velotok_delivery_pickup_independent_assert(
 	'Раздел самовывоза должен ссылаться на TESTEB-34.'
 );
 velotok_delivery_pickup_independent_assert(
+	isset( $contract['requirement_ids'] ) && in_array( 'TESTEB-36', $contract['requirement_ids'], true ),
+	'Контракт доставки должен ссылаться на TESTEB-36.'
+);
+velotok_delivery_pickup_independent_assert(
+	isset( $contract['pickup']['only_russia'] ) && true === $contract['pickup']['only_russia'],
+	'Самовывоз должен быть ограничен Россией.'
+);
+velotok_delivery_pickup_independent_assert(
+	isset( $contract['pickup']['country'] ) && 'RU' === $contract['pickup']['country'],
+	'Страной самовывоза должна быть Россия.'
+);
+velotok_delivery_pickup_independent_assert(
 	isset( $contract['pickup']['independent_of_zone'] ) && true === $contract['pickup']['independent_of_zone'],
 	'Самовывоз должен быть объявлен независимым от зоны.'
 );
@@ -372,6 +384,25 @@ velotok_delivery_pickup_independent_assert( 1 === count( $existing_rates ), 'С�
 velotok_delivery_pickup_independent_assert(
 	isset( $existing_rates['local_pickup:1'] ) && $existing_rates['local_pickup:1'] === $existing_pickup,
 	'Существующий самовывоз из зоны должен сохраняться без подмены.'
+);
+
+$foreign_existing = new WC_Shipping_Rate( 'local_pickup:9', 'Самовывоз из зоны', 0, array(), 'local_pickup' );
+$foreign_existing_rates = apply_filters(
+	'woocommerce_package_rates',
+	array( 'local_pickup:9' => $foreign_existing ),
+	$foreign_package
+);
+velotok_delivery_pickup_independent_assert(
+	empty( $foreign_existing_rates ),
+	'За пределами России существующий самовывоз должен убираться из способов доставки.'
+);
+
+$foreign_option = velotok_core_delivery_zones_pickup_option(
+	array( 'address' => array( 'country' => 'KZ', 'city' => 'Алматы' ) )
+);
+velotok_delivery_pickup_independent_assert(
+	empty( $foreign_option['available'] ),
+	'За пределами России помощник самовывоза не должен помечать способ доступным.'
 );
 
 $zones = array(
