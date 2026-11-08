@@ -11,8 +11,15 @@ $checkout = WC()->checkout();
 
 do_action( 'woocommerce_before_checkout_form', $checkout );
 
-if ( ! $checkout->is_registration_enabled() && $checkout->is_registration_required() && ! is_user_logged_in() ) {
-	echo esc_html( apply_filters( 'woocommerce_checkout_must_be_logged_in_message', __( 'Для оформления заказа нужно войти в аккаунт.', 'velotok' ) ) );
+if ( ! is_user_logged_in() ) {
+	$velotok_checkout_login_url = function_exists( 'wc_get_page_permalink' )
+		? wc_get_page_permalink( 'myaccount' )
+		: wp_login_url( wc_get_checkout_url() );
+
+	echo '<div class="woocommerce-info">';
+	echo esc_html( apply_filters( 'woocommerce_checkout_must_be_logged_in_message', __( 'Оформление заказа доступно только авторизованным покупателям.', 'velotok' ) ) );
+	echo ' <a href="' . esc_url( $velotok_checkout_login_url ) . '">' . esc_html__( 'Войти в аккаунт', 'velotok' ) . '</a>';
+	echo '</div>';
 	return;
 }
 ?>
@@ -35,7 +42,7 @@ if ( ! $checkout->is_registration_enabled() && $checkout->is_registration_requir
 
 		<div class="checkout-review">
 			<h2 id="order_review_heading"><?php esc_html_e( 'Ваш заказ', 'velotok' ); ?></h2>
-			<p class="cart-note"><?php esc_html_e( 'Онлайн-оплаты нет: оплата при получении. Менеджер свяжется, чтобы подтвердить заказ и доставку.', 'velotok' ); ?></p>
+			<p class="cart-note"><?php esc_html_e( 'Выберите удобный способ оплаты: онлайн через ЮKassa или при получении. Менеджер свяжется, чтобы подтвердить заказ и доставку.', 'velotok' ); ?></p>
 			<?php do_action( 'woocommerce_checkout_before_order_review' ); ?>
 			<div id="order_review" class="woocommerce-checkout-review-order">
 				<?php do_action( 'woocommerce_checkout_order_review' ); ?>

@@ -1,18 +1,16 @@
 <?php
 /**
- * Shopping cart stub contract.
+ * Shopping cart contract.
  *
- * This is the single access point for the cart used to place an order. The
- * current iteration deliberately uses fixed in-memory data: it does not read
- * environment variables, files, the database or remote services and it does
- * not persist the cart between requests.
+ * This is the single access point for the cart used to place an order. On a
+ * live site the helpers delegate to WooCommerce (WC()->cart) through
+ * cart-woocommerce.php: the cart is stored in the WooCommerce session for
+ * guests and in customer user meta for authenticated users, totals include
+ * discounts and shipping, and a guest cart is merged on login without
+ * duplicates. The in-memory array implementation remains as a fallback for
+ * isolated tests.
  *
- * The cart works with the mocked electric bicycle catalog and provides the
- * item operations, totals and guest-cart transfer rules required by the
- * checkout flow. Synchronization with the WooCommerce session and a real
- * persistence layer are out of scope for this iteration.
- *
- * Spec: ecommerce-store (requirement TESTEB-151).
+ * Spec: cart (requirement TESTEB-7).
  *
  * @package Velotok_Core
  */
@@ -109,22 +107,45 @@ function velotok_core_cart_contract() {
 	);
 
 	$contract = array(
-		'spec'              => 'ecommerce-store',
-		'requirement'       => 'TESTEB-151',
+		'spec'              => 'cart',
+		'requirement'       => 'TESTEB-7',
+		'task'              => 'TESTEB-7',
+		'requirement_ids'   => array( 'TESTEB-7', 'TESTEB-151' ),
 		'parent_spec'       => 'ecommerce-store',
 		'catalog_spec'      => 'ecommerce-store',
 		'checkout_spec'     => 'clarify-096bb945',
 		'delivery_spec'     => 'clarify-b0e1a6d7',
 		'cart_spec'         => 'clarify-30af92ca',
 		'guest_cart_spec'   => 'clarify-30af92ca',
-		'parent_relation'   => 'Корзина реализует требование родительской спецификации ecommerce-store без реальной интеграции с WooCommerce.',
-		'source'            => 'stub',
-		'provider'          => 'stub',
-		'provider_id'       => 'stub',
-		'provider_label'    => 'Stub cart provider',
-		'mocked'            => true,
+		'parent_relation'   => 'Корзина ведётся на WooCommerce (WC()->cart); in-memory реализация используется только изолированными тестами.',
+		'requirements'      => array(
+			'woocommerce_cart'  => 'Система SHALL вести корзину на WooCommerce',
+			'guest_transfer'    => 'Гостевая корзина SHALL переноситься при входе',
+			'guest_persistence' => 'Гостевая корзина SHALL сохраняться между сессиями',
+			'user_persistence'  => 'Корзина авторизованного пользователя SHALL сохраняться между сессиями и устройствами',
+			'totals'            => 'Итоги корзины SHALL учитывать скидки и доставку',
+			'quantity_limit'    => 'Количество на позицию SHALL ограничиваться',
+			'checkout_auth'     => 'Покупка SHALL требовать авторизации',
+			'empty_on_remove'   => 'Удаление последней позиции SHALL переводить корзину в пустое состояние',
+		),
+		'source'            => 'woocommerce',
+		'provider'          => 'woocommerce',
+		'provider_id'       => 'woocommerce',
+		'provider_label'    => 'WooCommerce cart',
+		'cart_class'        => 'WC_Cart',
+		'cart_accessor'     => 'WC()->cart',
+		'uses_wc_cart'      => true,
+		'mocked'            => false,
 		'network'           => false,
-		'persistent'        => false,
+		'persistent'        => true,
+		'runtime'           => 'wordpress',
+		'in_memory_fallback' => true,
+		'integration'       => array(
+			'file'        => 'includes/cart-woocommerce.php',
+			'cart'        => 'WC()->cart',
+			'session'     => 'WC()->session',
+			'calculation' => 'WC_Cart::calculate_totals',
+		),
 		'cart_type'         => 'shopping_cart',
 		'operation'         => 'provide_cart_for_checkout',
 		'operations'        => array(
@@ -139,6 +160,14 @@ function velotok_core_cart_contract() {
 			'calculate_totals'   => 'velotok_core_cart_totals',
 			'clear'              => 'velotok_core_cart_clear',
 			'transfer_guest_cart' => 'velotok_core_cart_transfer_guest_cart',
+		),
+		'woocommerce_operations' => array(
+			'add_item'            => 'velotok_core_wc_cart_add_item',
+			'update_item'         => 'velotok_core_wc_cart_update_item',
+			'remove_item'         => 'velotok_core_wc_cart_remove_item',
+			'calculate_totals'    => 'velotok_core_wc_cart_totals',
+			'transfer_guest_cart' => 'velotok_core_wc_cart_transfer_guest_cart',
+			'checkout_auth'       => 'velotok_core_wc_cart_checkout_auth_status',
 		),
 		'currency'          => 'RUB',
 		'default_quantity'  => 1,
@@ -172,53 +201,65 @@ function velotok_core_cart_contract() {
 		'required_item_fields' => array( 'product_id', 'name', 'price', 'quantity' ),
 		'optional_fields'   => array( 'slug', 'category', 'image', 'currency', 'line_total', 'key' ),
 		'storage'           => array(
-			'type'        => 'memory',
-			'source'      => 'stub',
-			'mocked'      => true,
-			'persistent'  => false,
+			'type'        => 'woocommerce_session',
+			'source'      => 'woocommerce',
+			'mocked'      => false,
+			'persistent'  => true,
 			'network'     => false,
 			'guest'       => true,
+			'guest_storage' => 'woocommerce_session',
+			'user_storage'  => 'woocommerce_persistent_cart',
+			'guest_persistent' => true,
+			'user_persistent'  => true,
 			'merge_by'    => 'product_id',
 			'clear_after_checkout' => true,
 		),
 		'guest_cart'        => array(
 			'enabled'                 => true,
-			'source'                  => 'stub',
-			'mocked'                  => true,
-			'storage'                 => 'session',
-			'persistent'              => false,
-			'identifier'              => 'session_token',
+			'source'                  => 'woocommerce',
+			'mocked'                  => false,
+			'storage'                 => 'woocommerce_session',
+			'persistent'              => true,
+			'identifier'              => 'woocommerce_session_cookie',
 			'transfer_on_registration' => true,
 			'transfer_on_login'       => true,
 			'merge_strategy'          => 'merge_quantities',
+			'merge_by'                => 'product_id',
 			'clear_guest_after_transfer' => true,
 			'lost_on_logout'          => false,
 		),
 		'totals'            => array(
-			'fields'          => array( 'item_count', 'unique_item_count', 'subtotal', 'total', 'currency' ),
-			'strategy'        => 'sum_price_times_quantity',
+			'fields'          => array( 'item_count', 'unique_item_count', 'subtotal', 'discount_total', 'shipping_total', 'total_tax', 'total', 'currency' ),
+			'strategy'        => 'woocommerce_cart_totals',
 			'rounding'        => 2,
 			'currency'        => 'RUB',
-			'include_delivery' => false,
-			'delivery_source' => 'checkout',
-			'mocked'          => true,
-			'source'          => 'stub',
+			'include_discounts' => true,
+			'include_delivery' => true,
+			'include_taxes'    => true,
+			'delivery_source' => 'woocommerce_shipping',
+			'mocked'          => false,
+			'source'          => 'woocommerce',
 		),
 		'checkout'          => array(
 			'enabled'           => true,
+			'requires_auth'     => true,
 			'requires_items'    => true,
+			'guest_checkout'    => false,
 			'empty_error'       => 'CART_EMPTY',
+			'auth_error'        => 'CHECKOUT_AUTH_REQUIRED',
 			'delivery_source'   => 'checkout',
 			'payment_source'    => 'checkout',
-			'mocked'            => true,
-			'source'            => 'stub',
+			'mocked'            => false,
+			'source'            => 'woocommerce',
 		),
 		'error_codes'       => array(
 			'empty'            => 'CART_EMPTY',
 			'product_not_found' => 'CART_PRODUCT_NOT_FOUND',
 			'item_not_found'   => 'CART_ITEM_NOT_FOUND',
 			'quantity_invalid' => 'CART_QUANTITY_INVALID',
+			'quantity_limit'   => 'CART_QUANTITY_LIMIT',
 			'product_required' => 'CART_PRODUCT_REQUIRED',
+			'auth_required'    => 'CHECKOUT_AUTH_REQUIRED',
 		),
 		'empty_error'       => 'CART_EMPTY',
 		'allow_guest'       => true,
@@ -334,14 +375,38 @@ function velotok_core_cart_is_cart( $value ) {
 }
 
 /**
+ * Check whether a cart value is a WooCommerce-backed snapshot.
+ *
+ * @param mixed $cart Cart value.
+ * @return bool
+ */
+function velotok_core_cart_is_wc_cart( $cart ) {
+	if ( ! is_array( $cart ) ) {
+		return false;
+	}
+
+	if ( isset( $cart['uses_wc_cart'] ) && $cart['uses_wc_cart'] ) {
+		return true;
+	}
+
+	return isset( $cart['source'] ) && 'woocommerce' === $cart['source'];
+}
+
+/**
  * Normalize the items collection of a cart.
  *
  * @param mixed $cart Cart array.
  * @return array<int,array<string,mixed>>
  */
 function velotok_core_cart_items( $cart = array() ) {
-	if ( ! velotok_core_cart_is_cart( $cart ) ) {
-		return array();
+	if ( ! velotok_core_cart_is_cart( $cart ) || velotok_core_cart_is_wc_cart( $cart ) ) {
+		if ( function_exists( 'velotok_core_wc_cart_items' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+			return velotok_core_wc_cart_items();
+		}
+
+		if ( ! velotok_core_cart_is_cart( $cart ) ) {
+			return array();
+		}
 	}
 
 	$items = isset( $cart['items'] ) ? $cart['items'] : $cart['cart_items'];
@@ -376,6 +441,10 @@ function velotok_core_cart_recalculate( $cart ) {
 	}
 
 	$subtotal = round( $subtotal, 2 );
+	$discount = isset( $cart['discount_total'] ) && is_numeric( $cart['discount_total'] ) ? max( 0.0, (float) $cart['discount_total'] ) : 0.0;
+	$shipping = isset( $cart['shipping_total'] ) && is_numeric( $cart['shipping_total'] ) ? max( 0.0, (float) $cart['shipping_total'] ) : 0.0;
+	$tax      = isset( $cart['total_tax'] ) && is_numeric( $cart['total_tax'] ) ? max( 0.0, (float) $cart['total_tax'] ) : 0.0;
+	$total    = round( $subtotal - $discount + $shipping + $tax, 2 );
 
 	$cart['items']              = array_values( $items );
 	$cart['cart_items']         = array_values( $items );
@@ -385,7 +454,10 @@ function velotok_core_cart_recalculate( $cart ) {
 	$cart['unique_item_count']  = count( $items );
 	$cart['items_count']        = count( $items );
 	$cart['subtotal']           = $subtotal;
-	$cart['total']              = $subtotal;
+	$cart['discount_total']     = round( $discount, 2 );
+	$cart['shipping_total']     = round( $shipping, 2 );
+	$cart['total_tax']          = round( $tax, 2 );
+	$cart['total']              = $total;
 	$cart['empty']              = 0 === $item_count;
 	$cart['is_empty']           = 0 === $item_count;
 	$cart['mocked']             = true;
@@ -573,6 +645,14 @@ function velotok_core_cart_add_item( $cart = array(), $product = null, $quantity
 		$options = array();
 	}
 
+	if ( function_exists( 'velotok_core_wc_cart_add_item' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		$wc_cart = velotok_core_wc_cart_add_item( $product, $quantity, $options );
+
+		if ( null !== $wc_cart ) {
+			return $wc_cart;
+		}
+	}
+
 	$resolved = velotok_core_cart_resolve_product( $product );
 
 	if ( null === $resolved ) {
@@ -751,6 +831,14 @@ function velotok_core_cart_update_item( $cart, $value = null, $quantity = 1 ) {
 		$cart     = velotok_core_cart_create();
 	}
 
+	if ( is_scalar( $value ) && '' !== (string) $value && function_exists( 'velotok_core_wc_cart_update_item' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		$wc_cart = velotok_core_wc_cart_update_item( $value, $quantity );
+
+		if ( null !== $wc_cart ) {
+			return $wc_cart;
+		}
+	}
+
 	$item = velotok_core_cart_get_item( $cart, $value );
 
 	if ( null === $item ) {
@@ -816,6 +904,14 @@ function velotok_core_cart_remove_item( $cart, $value = null ) {
 	if ( ! velotok_core_cart_is_cart( $cart ) ) {
 		$value = $cart;
 		$cart  = velotok_core_cart_create();
+	}
+
+	if ( is_scalar( $value ) && '' !== (string) $value && function_exists( 'velotok_core_wc_cart_remove_item' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		$wc_cart = velotok_core_wc_cart_remove_item( $value );
+
+		if ( null !== $wc_cart ) {
+			return $wc_cart;
+		}
 	}
 
 	$items    = velotok_core_cart_items( $cart );
@@ -899,6 +995,14 @@ function velotok_core_cart_unique_count( $cart = array() ) {
  * @return float
  */
 function velotok_core_cart_subtotal( $cart = array() ) {
+	if ( ( ! velotok_core_cart_is_cart( $cart ) || velotok_core_cart_is_wc_cart( $cart ) ) && function_exists( 'velotok_core_wc_cart_totals' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		$wc_totals = velotok_core_wc_cart_totals();
+
+		if ( isset( $wc_totals['subtotal'] ) && is_numeric( $wc_totals['subtotal'] ) ) {
+			return (float) $wc_totals['subtotal'];
+		}
+	}
+
 	$subtotal = 0.0;
 
 	foreach ( velotok_core_cart_items( $cart ) as $item ) {
@@ -917,7 +1021,17 @@ function velotok_core_cart_subtotal( $cart = array() ) {
  * @return float
  */
 function velotok_core_cart_total( $cart = array() ) {
-	return velotok_core_cart_subtotal( $cart );
+	if ( ( ! velotok_core_cart_is_cart( $cart ) || velotok_core_cart_is_wc_cart( $cart ) ) && function_exists( 'velotok_core_wc_cart_totals' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		$wc_totals = velotok_core_wc_cart_totals();
+
+		if ( isset( $wc_totals['total'] ) && is_numeric( $wc_totals['total'] ) ) {
+			return (float) $wc_totals['total'];
+		}
+	}
+
+	$totals = velotok_core_cart_totals( $cart );
+
+	return isset( $totals['total'] ) && is_numeric( $totals['total'] ) ? (float) $totals['total'] : velotok_core_cart_subtotal( $cart );
 }
 
 /**
@@ -927,10 +1041,18 @@ function velotok_core_cart_total( $cart = array() ) {
  * @return array<string,mixed>
  */
 function velotok_core_cart_totals( $cart = array() ) {
+	if ( ( ! velotok_core_cart_is_cart( $cart ) || velotok_core_cart_is_wc_cart( $cart ) ) && function_exists( 'velotok_core_wc_cart_totals' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		return velotok_core_wc_cart_totals();
+	}
+
 	$contract   = velotok_core_cart_contract();
 	$items      = velotok_core_cart_items( $cart );
 	$item_count = velotok_core_cart_count( $cart );
 	$subtotal   = velotok_core_cart_subtotal( $cart );
+	$discount   = is_array( $cart ) && isset( $cart['discount_total'] ) && is_numeric( $cart['discount_total'] ) ? max( 0.0, (float) $cart['discount_total'] ) : 0.0;
+	$shipping   = is_array( $cart ) && isset( $cart['shipping_total'] ) && is_numeric( $cart['shipping_total'] ) ? max( 0.0, (float) $cart['shipping_total'] ) : 0.0;
+	$tax        = is_array( $cart ) && isset( $cart['total_tax'] ) && is_numeric( $cart['total_tax'] ) ? max( 0.0, (float) $cart['total_tax'] ) : 0.0;
+	$total      = round( $subtotal - $discount + $shipping + $tax, 2 );
 
 	return array(
 		'valid'             => true,
@@ -939,10 +1061,14 @@ function velotok_core_cart_totals( $cart = array() ) {
 		'quantity_count'    => $item_count,
 		'unique_item_count' => count( $items ),
 		'subtotal'          => $subtotal,
-		'total'             => $subtotal,
+		'discount_total'    => round( $discount, 2 ),
+		'shipping_total'    => round( $shipping, 2 ),
+		'total_tax'         => round( $tax, 2 ),
+		'total'             => $total,
 		'currency'          => $contract['currency'],
 		'empty'             => 0 === $item_count,
-		'include_delivery'  => false,
+		'include_discounts' => true,
+		'include_delivery'  => true,
 		'mocked'            => true,
 		'source'            => 'stub',
 		'provider'          => 'stub',
@@ -976,6 +1102,14 @@ function velotok_core_cart_has_items( $cart = array() ) {
  * @return array<string,mixed>
  */
 function velotok_core_cart_clear( $cart = array() ) {
+	if ( ( ! velotok_core_cart_is_cart( $cart ) || velotok_core_cart_is_wc_cart( $cart ) ) && function_exists( 'velotok_core_wc_cart_clear' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		$wc_cart = velotok_core_wc_cart_clear();
+
+		if ( null !== $wc_cart ) {
+			return $wc_cart;
+		}
+	}
+
 	$cart             = velotok_core_cart_recalculate( $cart );
 	$cart['items']    = array();
 	$cart             = velotok_core_cart_recalculate( $cart );
@@ -1010,6 +1144,14 @@ function velotok_core_cart_guest( $items = array() ) {
  * @return array<string,mixed>
  */
 function velotok_core_cart_transfer_guest_cart( $guest_cart, $user_cart = array() ) {
+	if ( function_exists( 'velotok_core_wc_cart_transfer_guest_cart' ) && function_exists( 'velotok_core_wc_cart_available' ) && velotok_core_wc_cart_available() ) {
+		$wc_cart = velotok_core_wc_cart_transfer_guest_cart( $guest_cart );
+
+		if ( null !== $wc_cart ) {
+			return $wc_cart;
+		}
+	}
+
 	$contract = velotok_core_cart_contract();
 	$result   = velotok_core_cart_is_cart( $user_cart ) ? $user_cart : velotok_core_cart_create();
 	$items    = velotok_core_cart_items( $guest_cart );
@@ -1182,4 +1324,8 @@ if ( ! function_exists( 'cartTotals' ) ) {
 	function cartTotals( $cart = array() ) {
 		return velotok_core_cart_totals( $cart );
 	}
+}
+
+if ( ! defined( 'VELOTOK_CART_SKIP_WC_INTEGRATION' ) && ! defined( 'VELOTOK_CART_WC_INTEGRATION_LOADING' ) && is_readable( __DIR__ . '/cart-woocommerce.php' ) ) {
+	require_once __DIR__ . '/cart-woocommerce.php';
 }

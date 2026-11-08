@@ -46,10 +46,30 @@ function testRejectsPullRequestWithoutHead() {
   console.log('PASS: a pull request without a head SHA is rejected');
 }
 
+function testPr68FollowsCurrentHeadWhenIncidentShaMoved() {
+  const incidentSha = '766eade4e49a86d4c14791da8d33e735948cfadb';
+  const target = resolveTargetFromPullRequest(
+    {
+      number: 68,
+      state: 'open',
+      merged: false,
+      head: { ref: 'feat/ebike-site-testeb-29', sha: MOVED_SHA },
+    },
+    { expectedSha: incidentSha },
+  );
+
+  assert.strictEqual(target.sha, MOVED_SHA);
+  assert.strictEqual(target.headRef, 'feat/ebike-site-testeb-29');
+  assert.strictEqual(target.drifted, true, 'the moved PR #68 head must be reported as drift');
+  assert.strictEqual(target.expectedSha, incidentSha);
+  console.log('PASS: TESTEB-65 recovery follows the current PR #68 head, not the stale incident SHA');
+}
+
 function main() {
   testFollowsCurrentHeadWhenIncidentShaMoved();
   testUsesHeadWhenNoIncidentSha();
   testRejectsPullRequestWithoutHead();
+  testPr68FollowsCurrentHeadWhenIncidentShaMoved();
 }
 
 try {

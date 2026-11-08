@@ -344,6 +344,60 @@ async function testCollectUsesRunLinkedFromCommitStatus() {
   );
 }
 
+async function testCollectUsesPr68RecoveryWorkflow() {
+  const pr68Sha = '766eade4e49a86d4c14791da8d33e735948cfadb';
+  const pr68 = {
+    number: 68,
+    state: 'closed',
+    merged: true,
+    merge_commit_sha: MERGE_SHA,
+    merged_at: '2026-11-08T10:54:41Z',
+    head: { sha: pr68Sha },
+  };
+  const run68 = {
+    ...SUCCESS_RUN,
+    path: '.github/workflows/recover-pr68.yml',
+    head_branch: 'feat/ebike-site-testeb-29',
+  };
+  const checks68 = GREEN_CHECKS.map((check) => ({
+    ...check,
+    head_sha: pr68Sha,
+  }));
+  const { fetchImpl } = makeFetch((call) => {
+    const { url, method } = call;
+    if (url.endsWith('/pulls/68') && method === 'GET') {
+      return response(200, pr68);
+    }
+    if (url.includes(`/commits/${pr68Sha}/check-runs`) && method === 'GET') {
+      return response(200, { total_count: checks68.length, check_runs: checks68 });
+    }
+    if (url.includes(`/commits/${pr68Sha}/status`) && method === 'GET') {
+      return response(200, {
+        state: 'success',
+        total_count: GREEN_STATUSES.length,
+        statuses: GREEN_STATUSES,
+      });
+    }
+    if (url.includes(`/actions/runs/${RUN_ID}`) && method === 'GET') {
+      return response(200, run68);
+    }
+    throw new Error(`unexpected request: ${method} ${url}`);
+  });
+
+  const evidence = await collectRecoveryEvidence({
+    owner: OWNER,
+    repo: REPO,
+    pullNumber: 68,
+    targetSha: pr68Sha,
+    token: 'test-token',
+    fetchImpl,
+  });
+
+  assert.strictEqual(evidence.ready, true, evidence.problems.join('; '));
+  assert.strictEqual(evidence.run.path, '.github/workflows/recover-pr68.yml');
+  console.log('PASS: TESTEB-65 evidence for PR #68 uses the PR #68 recovery workflow');
+}
+
 function testRenderedCommentContainsRealEvidence() {
   const evidence = summarizeRecoveryEvidence({
     pr: MERGED_PR,
@@ -476,14 +530,24 @@ function testRecoveryWorkflowsResolvePerPullRequest() {
     'PR #62 must use its own recovery workflow',
   );
   assert.strictEqual(
+    recoveryWorkflowForPullRequest(68),
+    '.github/workflows/recover-pr68.yml',
+    'PR #68 must use its own recovery workflow',
+  );
+  assert.strictEqual(
     recoveryWorkflowForPullRequest(73),
     '.github/workflows/recover-pr73.yml',
     'PR #73 must use its own recovery workflow',
   );
   assert.strictEqual(
+    recoveryWorkflowForPullRequest(78),
+    '.github/workflows/recover-pr78.yml',
+    'PR #78 must use its own recovery workflow',
+  );
+  assert.strictEqual(
     recoveryWorkflowForPullRequest(999),
-    RECOVERY_WORKFLOW_PATH,
-    'an unknown pull request falls back to the documented default workflow',
+    '.github/workflows/recover-pr.yml',
+    'an unknown pull request falls back to the generic recovery workflow',
   );
   console.log('PASS: each pull request keeps its own recovery workflow');
 }
@@ -498,6 +562,7 @@ async function main() {
   testEvidenceForUnlinkedRunIsRed();
   await testCollectUsesRunLinkedFromCommitStatus();
   testRecoveryWorkflowsResolvePerPullRequest();
+  await testCollectUsesPr68RecoveryWorkflow();
   testRenderedCommentContainsRealEvidence();
   testRenderedCommentReplacesStaleEvidence();
   await testPublishUpdatesExistingComment();

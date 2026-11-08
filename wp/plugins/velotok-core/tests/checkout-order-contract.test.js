@@ -20,6 +20,10 @@ function includes(fragment, message) {
 }
 
 includes('TESTEB-23', 'Contract must reference requirement TESTEB-23');
+includes('TESTEB-25', 'Contract must reference requirement TESTEB-25');
+includes('TESTEB-26', 'Contract must reference requirement TESTEB-26');
+includes("'requirement'       => 'TESTEB-25'", 'Order section must own the TESTEB-25 persistence requirement');
+includes("'requirement'       => 'TESTEB-26'", 'Idempotency section must own the TESTEB-26 duplicate requirement');
 includes("'spec'            => 'checkout'", 'Contract must reference the checkout spec');
 includes('WC_Checkout', 'WooCommerce Checkout class is missing');
 includes('uses_wc_checkout', 'WooCommerce Checkout usage must be declared');
@@ -33,6 +37,7 @@ includes('CHECKOUT_EMPTY_CART', 'Empty cart error code is missing');
 includes('CHECKOUT_DUPLICATE', 'Duplicate order error code is missing');
 includes('prevents_duplicate', 'Duplicate prevention must be declared');
 includes('_velotok_checkout_key', 'Idempotency order meta key is missing');
+includes('meta_query', 'Persisted duplicate lookup must use a WooCommerce meta query');
 includes('delivery_tracking_number', 'Delivery tracking number is missing');
 includes('customer_note', 'Order comment is missing');
 includes('line_items', 'Order composition is missing');

@@ -11,14 +11,23 @@ import {
 export const RECOVERY_WORKFLOW_PATH = '.github/workflows/recover-pr73.yml';
 export const RECOVERY_WORKFLOW_PATHS = {
   62: '.github/workflows/recover-pr62.yml',
+  68: '.github/workflows/recover-pr68.yml',
   73: '.github/workflows/recover-pr73.yml',
+  78: '.github/workflows/recover-pr78.yml',
 };
 
-export function recoveryWorkflowForPullRequest(pullNumber, fallback = RECOVERY_WORKFLOW_PATH) {
+export const RECOVERY_STATUS_CONTEXT = 'ci/recover';
+
+// Recovery used to be hard-coded to a single PR. Keeping the workflow mapping
+// explicit lets existing evidence stay verifiable while new pull requests use
+// their own recovery workflow (or the generic one).
+export function recoveryWorkflowForPullRequest(
+  pullNumber,
+  fallback = '.github/workflows/recover-pr.yml',
+) {
   return RECOVERY_WORKFLOW_PATHS[Number(pullNumber)] || fallback;
 }
 
-export const RECOVERY_STATUS_CONTEXT = 'ci/recover';
 export const EVIDENCE_START = '<!-- testeb-67-evidence:start -->';
 export const EVIDENCE_END = '<!-- testeb-67-evidence:end -->';
 
@@ -175,8 +184,12 @@ export function summarizeRecoveryEvidence({
     checks: {
       total: checks.total,
       success: checks.success,
-      names: checkRuns.map(checkName),
-      conclusions: checkRuns.map((check) => ({
+      // Only the newest run per check name is authoritative. Listing the raw
+      // check runs would repeat a stale in_progress duplicate next to the
+      // completed run that actually unblocked the pull request, making green
+      // evidence look as if it still had a pending check.
+      names: checks.effectiveRuns.map(checkName),
+      conclusions: checks.effectiveRuns.map((check) => ({
         name: checkName(check),
         conclusion: check.conclusion ?? null,
       })),
@@ -235,13 +248,31 @@ export function renderEvidenceBlock(evidence) {
   return lines.join('\n');
 }
 
-export function renderEvidenceComment(template, evidence) {
-  const body = (template || '').trimEnd();
-  const block = `${EVIDENCE_START}\n${renderEvidenceBlock(evidence)}\n${EVIDENCE_END}`;
+function evidenceMarkers(template, options = {}) {
+  if (options.startMarker && options.endMarker) {
+    return { start: options.startMarker, end: options.endMarker };
+  }
+  const match = /<!--\s*([A-Za-z0-9_-]+)-evidence:start\s*-->/.exec(
+    template || '',
+  );
+  const prefix = match ? match[1] : 'testeb-67';
+  return {
+    start: options.startMarker || `<!-- ${prefix}-evidence:start -->`,
+    end: options.endMarker || `<!-- ${prefix}-evidence:end -->`,
+  };
+}
 
-  if (body.includes(EVIDENCE_START) && body.includes(EVIDENCE_END)) {
-    const start = body.indexOf(EVIDENCE_START);
-    const end = body.indexOf(EVIDENCE_END) + EVIDENCE_END.length;
+export function renderEvidenceComment(template, evidence, options = {}) {
+  const body = (template || '').trimEnd();
+  const { start: startMarker, end: endMarker } = evidenceMarkers(
+    body,
+    options,
+  );
+  const block = `${startMarker}\n${renderEvidenceBlock(evidence)}\n${endMarker}`;
+
+  if (body.includes(startMarker) && body.includes(endMarker)) {
+    const start = body.indexOf(startMarker);
+    const end = body.indexOf(endMarker) + endMarker.length;
     return `${body.slice(0, start)}${block}${body.slice(end)}\n`;
   }
 
@@ -271,11 +302,12 @@ export async function collectRecoveryEvidence({
   pullNumber,
   targetSha,
   runId = null,
-  workflow = RECOVERY_WORKFLOW_PATH,
+  workflow = null,
   token,
   fetchImpl = globalThis.fetch,
   allowRunning = false,
 }) {
+  const workflowPath = workflow || recoveryWorkflowForPullRequest(pullNumber);
   const [pr, checkRuns, status] = await Promise.all([
     getPullRequest({ owner, repo, pullNumber, token, fetchImpl }),
     getCheckRuns({ owner, repo, ref: targetSha, token, fetchImpl }),
@@ -296,7 +328,7 @@ export async function collectRecoveryEvidence({
     : await getWorkflowRunsForWorkflow({
         owner,
         repo,
-        workflow,
+        workflow: workflowPath,
         token,
         fetchImpl,
       }).then((response) => latestSuccessfulRun(response?.workflow_runs));
@@ -307,7 +339,7 @@ export async function collectRecoveryEvidence({
     checkRuns: checkRuns?.check_runs ?? [],
     statuses,
     targetSha,
-    expectedWorkflowPath: workflow,
+    expectedWorkflowPath: workflowPath,
     allowRunning,
   });
 }
@@ -318,7 +350,7 @@ export async function publishRecoveryEvidence({
   pullNumber,
   targetSha,
   runId = null,
-  workflow = RECOVERY_WORKFLOW_PATH,
+  workflow = null,
   template = '',
   marker = null,
   token,

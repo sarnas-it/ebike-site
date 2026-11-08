@@ -10,6 +10,64 @@
 head + base). Ни в head, ни в base файла не было, поэтому запускать было
 нечего — отсюда `no checks reported for the pull request`.
 
+## Причина `no_checks` по PR #68 (TESTEB-65)
+
+Застрявший коммит `766eade4e49a86d4c14791da8d33e735948cfadb` (head ветки
+`feat/ebike-site-testeb-29`) не содержит `.github/workflows` в своём дереве.
+Это проверено по содержимому самого коммита: `git ls-tree` и
+`GET /contents/.github/workflows` для этого SHA не находят каталог workflow, а
+patch PR #68 меняет только файлы внутри `wp/**`.
+
+Проблема не только в head: в базовой ветке `main` на момент постановки задачи
+тоже не было `.github/workflows`. `main` тогда указывал на `efe1bc4` (мерж
+PR #62), и его дерево также состояло только из `wp/**`; корневого `.github/`
+не было. Для события `pull_request` GitHub ищет workflow-файл в дереве PR
+(merge-дерево head + base). Ни в head, ни в base файла не было, поэтому
+запускать было нечего — отсюда `no checks reported for the pull request`.
+
+GitHub не запускает workflow задним числом: появление файла в другой ветке или
+позже в `main` не создаёт прогон для уже существующего неизменённого head PR.
+Нужен либо новый коммит в head (новое событие `pull_request`/`synchronize`),
+либо отдельный прогон, который явно проверит актуальный head PR.
+
+Проверенные данные:
+
+* PR #68 — head `766eade4e49a86d4c14791da8d33e735948cfadb`, base `main`;
+* в дереве `766eade4` нет `.github/workflows` (raw/contents возвращает `404`);
+* в `main` на момент постановки (`efe1bc4`) не было `.github/workflows` и
+  вообще не было корневых файлов, только `wp/**`;
+* patch PR #68 добавляет и меняет только `wp/**`, workflow не добавляет;
+* фильтров по путям и веткам в CI нет: триггер `pull_request` широкий, без
+  `paths`;
+* очередь раннеров и лимит минут не при чём: прогон для этого SHA вообще не
+  создавался;
+* allow-list интеграции содержит `sarnas-it/ebike-site`, иначе PR #68 не был
+  бы создан.
+
+## Вторая причина по PR #68 (TESTEB-65): падение recovery на самодиспатче финализатора
+
+Первый recovery-прогон `Recover PR #68 checks` (run `42473326719`) успешно
+опубликовал проверки и завершил отложенный мерж PR #68, но упал на последнем
+шаге `Request completed evidence finalization`. Причина: recovery вызывал
+`workflow_dispatch` для `finalize-pr68-evidence.yml`, а GitHub разрешает
+диспатчить только workflow, который уже существует в базовой ветке. На ветке
+починки финализатор есть, в `main` его ещё не было, поэтому dispatch вернул
+«workflow not found». В результате на head ветки починки оставался красный
+check `Recover PR #68 checks`, хотя проверки и мерж уже прошли.
+
+Исправление: убрать самодиспатч. Recovery и finalizer запускаются одним и тем
+же `push`; finalizer сам находит recovery-прогон по точному SHA триггера
+(`--trigger-sha`), ждёт его завершения и только потом публикует доказательства.
+Если передан `--trigger-sha`, `wait-and-publish-evidence.mjs` **не**
+подставляет собственный `GITHUB_RUN_ID`: иначе финализатор ждал бы сам себя и
+никогда не увидел бы recovery-прогон.
+
+Recovery для застрявшего PR #68 описан в разделе ниже; он использует
+`.github/workflows/recover-pr68.yml`, а доказательства публикует
+`.github/workflows/finalize-pr68-evidence.yml` с комментарием
+`docs/testeb-65-comment.md` и маркерами `<!-- testeb-65-evidence:start/end -->`.
+
+
 ## Причина `no_checks` по PR #73 (TESTEB-67)
 
 Застрявший коммит `525b0d4803e03858cdb0bfce9cb90837bdf0473e` (head ветки
@@ -578,3 +636,69 @@ bash scripts/ci/run-checks.sh .
   «какой-нибудь» текущий head. Для `push` коммит выбирается автоматически
   (merge commit после мержа), чтобы последующие push в `main` не превращали
   доказательство в красное.
+
+## Причина `unknown` по PR #78 (TESTEB-68)
+
+Джоба `php-tests` прогона `ci` #42500219010 отработала успешно: theme-тесты
+прошли, после них выполнился `Post job cleanup`. При этом у коммита остался
+`in_progress`-дубликат check run с тем же именем `php-tests` — след отменённого
+или перезапущенного предыдущего прогона (`concurrency.cancel-in-progress`).
+Проверка статусов считала любой pending-дубликат блокирующим, поэтому мерж ждал
+`php-tests` 30 минут и был отложен с классом `unknown`. Recovery из TESTEB-67
+был зашит на PR #73, поэтому для #78 автоматического восстановления не было.
+
+Исправление:
+
+* `scripts/ci/lib.mjs` выбирает самый свежий check run для каждого имени (и
+  самый свежий commit status для каждого контекста), поэтому старый pending не
+  перекрывает завершённую успешную проверку. При публикации recovery
+  завершаются все оставшиеся pending-дубликаты check runs.
+* Если чужой check run нельзя обновить через PATCH (`403 Resource not
+  accessible by integration`), recovery публикует новый завершённый check run,
+  а не падает. Первый recovery-прогон #42504665607 упал именно на этом шаге и
+  не дошёл до публикации `ci/recover` и мержа. Раньше `upsertCheckRun`
+  пробрасывал ошибку PATCH, когда у проверки не было pending-дубликатов.
+* `.github/workflows/ci.yml` не отменяет предыдущий прогон
+  (`cancel-in-progress: false`), чтобы отменённые джобы не оставляли вечные
+  `in_progress`.
+* `.github/workflows/recover-pr.yml` — общий recovery после завершения `ci` и
+  вручную. Он определяет PR по событию или коммиту, проверяет только зависшие
+  или отсутствующие результаты (`scripts/ci/should-recover.mjs`) и не маскирует
+  настоящие падения.
+* `.github/workflows/recover-pr78.yml` — recovery текущего PR #78. Он берёт
+  актуальный head через GitHub API, прогоняет полный `scripts/ci/run-checks.sh`
+  и завершает отложенный мерж при зелёных проверках.
+* `.github/workflows/finalize-pr78-evidence.yml` публикует итоговые
+  доказательства только после завершения recovery-прогона.
+* `scripts/ci/evidence.mjs` перечисляет в доказательствах только самый свежий
+  check run для каждого имени, поэтому старый `in_progress`-дубликат не
+  выглядит как незавершённая проверка рядом с зелёным результатом.
+
+### Результат после починки (фактический)
+
+* recovery-прогон
+  [#42505520113](https://github.com/sarnas-it/ebike-site/actions/runs/42505520113)
+  — `.github/workflows/recover-pr78.yml`, событие `push`,
+  `status=completed`, `conclusion=success`, runner head
+  `65899b710cb71e2dea0c5b3ec46dc3171fac5a4f` (ветка
+  `feat/ebike-site-testeb-68`);
+* на проверяемом head PR #78 `841470c19d9e62c1a6c4e4c402dff322c81fd747`
+  опубликованы завершённые зелёные check runs `php-lint` (128807297687),
+  `php-tests` (128807302983), `plugin-tests` (128807306499),
+  `php-plugin-tests` (128807310353), `ci-repair-tests` (128807314799);
+* commit status `ci/recover=success` на этом коммите ссылается на run
+  #42505520113, а старый pending-дубликат `php-tests` `128791152777` больше не
+  является authoritative;
+* финализатор [Finalize PR #78 evidence
+  #42505520131](https://github.com/sarnas-it/ebike-site/actions/runs/42505520131)
+  завершился `completed/success`;
+* отложенный мерж PR #78 выполнен без ручного вмешательства
+  `2026-11-08T17:33:38Z`, merge commit
+  `330a631e8655c0ae1f2c8d76a011ae319e90a0ac`.
+
+Red-green проверка критериев приёмки:
+`node scripts/ci/tests/pr78-recovery-evidence.test.mjs` держит инцидентный
+снимок (упавший run #42504665607, PR не смержен) красным, а фактический
+post-fix снимок (run #42505520113, merge `330a631...`) зелёным.
+
+Проверка: `for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done`.

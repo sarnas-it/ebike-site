@@ -2,7 +2,7 @@
 import { appendFile } from 'node:fs/promises';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { getPullRequest } from './lib.mjs';
+import { getPullRequest, getPullRequestsForCommit } from './lib.mjs';
 
 const USAGE = `Usage:
   resolve-pr-target.mjs --pr <number> [options]
@@ -18,7 +18,8 @@ with the current head.
 
 Options:
   --repo <owner/name>   Repository (default: $GITHUB_REPOSITORY or sarnas-it/ebike-site)
-  --pr <number>         Pull request number (required)
+  --pr <number>         Pull request number (required unless --sha is used)
+  --sha <sha>           Commit to resolve the pull request from (optional)
   --expected-sha <sha>  Incident SHA to compare against (optional)
   --github-output <p>   Append sha/head_ref/drifted outputs (default: $GITHUB_OUTPUT)
   -h, --help            Show this help
@@ -53,6 +54,7 @@ function parseArgs(argv) {
   const options = {
     repo: process.env.GITHUB_REPOSITORY || 'sarnas-it/ebike-site',
     pr: null,
+    sha: null,
     expectedSha: null,
     githubOutput: process.env.GITHUB_OUTPUT || null,
   };
@@ -64,6 +66,8 @@ function parseArgs(argv) {
       options.repo = argv[++i];
     } else if (arg === '--pr') {
       options.pr = Number(argv[++i]);
+    } else if (arg === '--sha') {
+      options.sha = argv[++i];
     } else if (arg === '--expected-sha') {
       options.expectedSha = argv[++i];
     } else if (arg === '--github-output') {
@@ -81,8 +85,8 @@ async function main() {
     process.stdout.write(USAGE);
     return 0;
   }
-  if (!Number.isInteger(options.pr) || options.pr <= 0) {
-    throw new Error('--pr <number> is required');
+  if ((!Number.isInteger(options.pr) || options.pr <= 0) && !options.sha) {
+    throw new Error('--pr <number> or --sha <commit> is required');
   }
   const [owner, repo] = options.repo.split('/');
   if (!owner || !repo) {
@@ -90,17 +94,34 @@ async function main() {
   }
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 
+  let pullNumber = options.pr;
+  if (!Number.isInteger(pullNumber) || pullNumber <= 0) {
+    const pulls = await getPullRequestsForCommit({
+      owner,
+      repo,
+      ref: options.sha,
+      token,
+    });
+    const candidates = Array.isArray(pulls) ? pulls : [];
+    const candidate =
+      candidates.find((item) => item?.state === 'open') || candidates[0];
+    if (!candidate?.number) {
+      throw new Error(`no pull request found for commit ${options.sha}`);
+    }
+    pullNumber = candidate.number;
+  }
+
   const pr = await getPullRequest({
     owner,
     repo,
-    pullNumber: options.pr,
+    pullNumber,
     token,
   });
   const target = resolveTargetFromPullRequest(pr, {
     expectedSha: options.expectedSha,
   });
 
-  process.stdout.write(`pull request: #${target.prNumber ?? options.pr}\n`);
+  process.stdout.write(`pull request: #${target.prNumber ?? pullNumber}\n`);
   process.stdout.write(`head branch:  ${target.headRef ?? 'unknown'}\n`);
   process.stdout.write(`target sha:   ${target.sha}\n`);
   if (target.expectedSha) {

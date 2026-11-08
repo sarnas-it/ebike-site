@@ -11,7 +11,10 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not cancel superseded runs: a cancelled job can leave a stale
+  # in_progress check run that keeps the pull request blocked after the newer
+  # run has already finished green.
+  cancel-in-progress: false
 
 jobs:
   php-lint:
