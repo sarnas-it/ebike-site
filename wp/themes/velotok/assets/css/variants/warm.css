@@ -1,0 +1,34 @@
+/*
+ * Вариант дизайна «Тёплая».
+ * Подключается только когда манифест выбирает вариант warm.
+ */
+
+body.design-variant-warm {
+	--ink: #2a1b12;
+	--ink-2: #3d2a1d;
+	--paper: #fbf1e3;
+	--card: #fff9ef;
+	--muted: #6b5748;
+	--line: #e4d2bb;
+	--lime: #f2c14e;
+	--lime-soft: #f7e3b6;
+	--orange: #b5451b;
+	--radius: 18px;
+}
+
+body.design-variant-warm .site-header {
+	background: rgba(251, 241, 227, .93);
+}
+
+body.design-variant-warm .badge--lime,
+body.design-variant-warm .btn-primary {
+	color: #2a1b12;
+}
+
+body.design-variant-warm .section--models {
+	background: #f4e5d1;
+}
+
+body.design-variant-warm .section--picker {
+	background: #f7e3b6;
+}
