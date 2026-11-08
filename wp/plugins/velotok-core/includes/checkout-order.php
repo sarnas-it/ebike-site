@@ -17,7 +17,7 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 			'parent_spec'     => 'ecommerce-store',
 			'requirement'     => 'TESTEB-23',
 			'task'            => 'TESTEB-23',
-			'requirement_ids' => array( 'TESTEB-23' ),
+			'requirement_ids' => array( 'TESTEB-23', 'TESTEB-24' ),
 			'provider'        => 'woocommerce',
 			'provider_label'  => 'WooCommerce',
 			'checkout_class'  => 'WC_Checkout',
@@ -34,6 +34,7 @@ if ( ! function_exists( 'velotok_core_checkout_order_contract' ) ) {
 				'message'      => 'Срок действия формы истёк. Обновите страницу и повторите оформление.',
 			),
 			'auth'            => array(
+				'requirement'    => 'TESTEB-24',
 				'required'       => true,
 				'guest_checkout' => false,
 				'code'           => 'CHECKOUT_AUTH_REQUIRED',
@@ -183,6 +184,30 @@ if ( ! function_exists( 'velotok_core_checkout_is_authenticated' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_checkout_auth_result' ) ) {
+	function velotok_core_checkout_auth_result( $context = array() ) {
+		$contract = velotok_core_checkout_order_contract();
+
+		if ( velotok_core_checkout_is_authenticated( $context ) ) {
+			return array(
+				'required'      => true,
+				'authenticated' => true,
+				'available'     => true,
+				'code'          => 'CHECKOUT_AUTH_OK',
+				'message'       => '',
+			);
+		}
+
+		return array(
+			'required'      => true,
+			'authenticated' => false,
+			'available'     => false,
+			'code'          => $contract['auth']['code'],
+			'message'       => $contract['auth']['message'],
+		);
+	}
+}
+
 if ( ! function_exists( 'velotok_core_checkout_verify_nonce' ) ) {
 	function velotok_core_checkout_verify_nonce( $context = array() ) {
 		if ( array_key_exists( 'nonce_valid', $context ) ) {
@@ -286,12 +311,13 @@ if ( ! function_exists( 'velotok_core_checkout_validate_form' ) ) {
 if ( ! function_exists( 'velotok_core_checkout_available' ) ) {
 	function velotok_core_checkout_available( $context = array() ) {
 		$contract = velotok_core_checkout_order_contract();
+		$auth     = velotok_core_checkout_auth_result( $context );
 
-		if ( ! velotok_core_checkout_is_authenticated( $context ) ) {
+		if ( empty( $auth['authenticated'] ) ) {
 			return array(
 				'available' => false,
-				'code'      => $contract['auth']['code'],
-				'message'   => $contract['auth']['message'],
+				'code'      => $auth['code'],
+				'message'   => $auth['message'],
 			);
 		}
 
@@ -882,7 +908,33 @@ if ( ! function_exists( 'velotok_core_checkout_capture_order_meta' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_checkout_force_login' ) ) {
+	function velotok_core_checkout_force_login( $required = true ) {
+		return true;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_checkout_disable_guest_checkout' ) ) {
+	function velotok_core_checkout_disable_guest_checkout( $enabled = false ) {
+		return false;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_checkout_must_be_logged_in_message' ) ) {
+	function velotok_core_checkout_must_be_logged_in_message( $message = '' ) {
+		$contract = velotok_core_checkout_order_contract();
+
+		return $contract['auth']['message'];
+	}
+}
+
 if ( function_exists( 'add_action' ) ) {
 	add_action( 'woocommerce_checkout_process', 'velotok_core_checkout_validate_request' );
 	add_action( 'woocommerce_checkout_create_order', 'velotok_core_checkout_capture_order_meta', 10, 2 );
+}
+
+if ( function_exists( 'add_filter' ) ) {
+	add_filter( 'woocommerce_checkout_registration_required', 'velotok_core_checkout_force_login', 999 );
+	add_filter( 'woocommerce_checkout_registration_enabled', 'velotok_core_checkout_disable_guest_checkout', 999 );
+	add_filter( 'woocommerce_checkout_must_be_logged_in_message', 'velotok_core_checkout_must_be_logged_in_message', 999 );
 }
