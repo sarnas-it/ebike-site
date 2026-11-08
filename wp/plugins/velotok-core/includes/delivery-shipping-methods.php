@@ -132,13 +132,23 @@ abstract class Velotok_Shipping_Method extends WC_Shipping_Method {
 	 * @return void
 	 */
 	public function calculate_shipping( $package = array() ) {
-		$order   = velotok_core_delivery_package_order( $package );
-		$context = array(
+		$order     = velotok_core_delivery_package_order( $package );
+		$test_info = velotok_core_delivery_test_mode_info(
+			$this,
+			array( 'test_mode' => 'yes' === $this->get_option( 'test_mode', 'no' ) )
+		);
+		$context   = array(
 			'order'     => $order,
-			'test_mode' => 'yes' === $this->get_option( 'test_mode', 'no' ),
+			'test_mode' => ! empty( $test_info['enabled'] ),
 		);
 
 		$cost = velotok_core_delivery_zones_method_cost( $this, $order, $context );
+
+		if ( isset( $cost['test_mode_info'] ) && is_array( $cost['test_mode_info'] ) ) {
+			$test_info = $cost['test_mode_info'];
+		}
+
+		$context['test_mode'] = ! empty( $test_info['enabled'] );
 
 		if ( empty( $cost['ok'] ) ) {
 			if ( function_exists( 'wc_add_notice' ) && ! empty( $cost['error'] ) ) {
@@ -208,6 +218,10 @@ abstract class Velotok_Shipping_Method extends WC_Shipping_Method {
 				'_velotok_pickup_points_errors'   => $pickup_errors,
 				'_velotok_pickup_points_explicit_failure' => true,
 				'_velotok_test_mode'              => $context['test_mode'] ? 'yes' : 'no',
+				'_velotok_test_mode_explicit'     => 'yes',
+				'_velotok_test_mode_visible'      => 'yes',
+				'_velotok_test_mode_source'       => isset( $test_info['source'] ) ? $test_info['source'] : 'config',
+				'_velotok_test_mode_info'         => $test_info,
 			),
 		);
 

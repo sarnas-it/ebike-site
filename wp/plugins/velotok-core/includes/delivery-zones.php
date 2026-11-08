@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35', 'TESTEB-36', 'TESTEB-37', 'TESTEB-38', 'TESTEB-39' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -203,9 +203,25 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'replace_with_stub'=> false,
 			),
 			'test_mode'               => array(
-				'explicit'   => true,
-				'banner'     => true,
-				'banner_text'=> 'Тестовый режим доставки',
+				'requirement'    => 'TESTEB-39',
+				'explicit'       => true,
+				'visible'        => true,
+				'buyer_visible'  => true,
+				'admin_visible'  => true,
+				'banner'         => true,
+				'banner_text'    => 'Тестовый режим доставки',
+				'label'          => 'Тестовый режим',
+				'option'         => 'velotok_core_delivery_test_mode',
+				'meta'           => '_velotok_test_mode',
+				'method_key'     => 'test_mode',
+				'keys'           => array( 'test_mode', 'sandbox', 'provider_test_mode', 'is_test', 'test' ),
+				'result_keys'    => array( 'test_mode', 'sandbox', 'test', 'is_test', 'mode' ),
+				'providers'      => array( 'cdek', 'russian_post' ),
+				'source'         => 'provider',
+				'fallback'       => false,
+				'fake_tariff'    => false,
+				'silent'         => false,
+				'values'         => array( 'test', 'sandbox', 'demo' ),
 			),
 			'order'                   => array(
 				'requirement'    => 'TESTEB-37',
@@ -289,6 +305,10 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 		$contract['pickup_points_unavailable'] = $pickup_failure;
 		$contract['pickup_points_error']     = $pickup_failure;
 		$contract['pickup_points_availability'] = $pickup_failure;
+		$contract['provider_test_mode']      = $contract['test_mode'];
+		$contract['provider_test_mode']['providers'] = $contract['supported_providers'];
+		$contract['test_mode_explicit']      = true;
+		$contract['provider_test_mode_explicit'] = true;
 
 		return $contract;
 	}
@@ -1297,16 +1317,22 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 		try {
 			$result = call_user_func( $callback, $method, $order, $context );
 		} catch ( \Throwable $exception ) {
+			$test_mode = velotok_core_delivery_test_mode_info( $method, $context );
+
 			return array(
-				'ok'         => false,
-				'configured' => true,
-				'error'      => $exception->getMessage(),
-				'code'       => $contract['provider_error']['code'],
-				'visible'    => true,
+				'ok'                  => false,
+				'configured'          => true,
+				'error'               => $exception->getMessage(),
+				'code'                => $contract['provider_error']['code'],
+				'visible'             => true,
+				'test_mode'           => ! empty( $test_mode['enabled'] ),
+				'test_mode_explicit'  => true,
+				'test_mode_info'      => $test_mode,
 			);
 		}
 
-		$error = null;
+		$test_mode = velotok_core_delivery_test_mode_info( $method, $context, $result );
+		$error     = null;
 
 		$is_wp_error = is_object( $result ) && (
 			'WP_Error' === get_class( $result )
@@ -1324,11 +1350,14 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 
 		if ( null !== $error ) {
 			return array(
-				'ok'         => false,
-				'configured' => true,
-				'error'      => $error,
-				'code'       => $contract['provider_error']['code'],
-				'visible'    => true,
+				'ok'                 => false,
+				'configured'         => true,
+				'error'              => $error,
+				'code'               => $contract['provider_error']['code'],
+				'visible'            => true,
+				'test_mode'          => ! empty( $test_mode['enabled'] ),
+				'test_mode_explicit' => true,
+				'test_mode_info'     => $test_mode,
 			);
 		}
 
@@ -1338,19 +1367,25 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 
 		if ( ! is_numeric( $amount ) ) {
 			return array(
-				'ok'         => false,
-				'configured' => true,
-				'error'      => 'Провайдер доставки вернул некорректный тариф.',
-				'code'       => $contract['provider_error']['code'],
-				'visible'    => true,
+				'ok'                 => false,
+				'configured'         => true,
+				'error'              => 'Провайдер доставки вернул некорректный тариф.',
+				'code'               => $contract['provider_error']['code'],
+				'visible'            => true,
+				'test_mode'          => ! empty( $test_mode['enabled'] ),
+				'test_mode_explicit' => true,
+				'test_mode_info'     => $test_mode,
 			);
 		}
 
 		return array(
-			'ok'       => true,
-			'amount'   => (float) $amount,
-			'currency' => velotok_core_delivery_zones_scalar( velotok_core_delivery_zones_value( $result, array( 'currency' ), 'RUB' ), 'RUB' ),
-			'source'   => 'provider',
+			'ok'                 => true,
+			'amount'             => (float) $amount,
+			'currency'           => velotok_core_delivery_zones_scalar( velotok_core_delivery_zones_value( $result, array( 'currency' ), 'RUB' ), 'RUB' ),
+			'source'             => 'provider',
+			'test_mode'          => ! empty( $test_mode['enabled'] ),
+			'test_mode_explicit' => true,
+			'test_mode_info'     => $test_mode,
 		);
 	}
 }
@@ -1396,16 +1431,20 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 	 * @return array<string,mixed>
 	 */
 	function velotok_core_delivery_zones_method_cost( $method, $order = array(), $context = array() ) {
-		$contract = velotok_core_delivery_zones_contract();
-		$settings = velotok_core_delivery_zones_settings( $method );
-		$weight   = velotok_core_delivery_zones_order_weight( $order );
+		$contract  = velotok_core_delivery_zones_contract();
+		$settings  = velotok_core_delivery_zones_settings( $method );
+		$weight    = velotok_core_delivery_zones_order_weight( $order );
+		$test_info = velotok_core_delivery_test_mode_info( $method, $context );
 
 		if ( empty( $weight['ok'] ) ) {
 			return array(
-				'ok'     => false,
-				'code'   => $weight['code'],
-				'error'  => $weight['error'],
-				'amount' => null,
+				'ok'                 => false,
+				'code'               => $weight['code'],
+				'error'              => $weight['error'],
+				'amount'             => null,
+				'test_mode'          => ! empty( $test_info['enabled'] ),
+				'test_mode_explicit' => true,
+				'test_mode_info'     => $test_info,
 			);
 		}
 
@@ -1438,6 +1477,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 					'free'       => true,
 					'source'     => 'free_shipping',
 					'calculated' => true,
+					'test_mode'  => ! empty( $test_info['enabled'] ),
+					'test_mode_explicit' => true,
+					'test_mode_info' => $test_info,
 				),
 				$weight_info
 			);
@@ -1454,31 +1496,44 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 		if ( ! empty( $provider['ok'] ) ) {
 			$provider_amount = (float) $provider['amount'];
 			$amount          = $free ? 0.0 : $provider_amount;
+			$provider_test   = isset( $provider['test_mode_info'] ) && is_array( $provider['test_mode_info'] )
+				? $provider['test_mode_info']
+				: $test_info;
 
 			return array_merge(
 				array(
-					'ok'              => true,
-					'amount'          => $amount,
-					'cost'            => $amount,
-					'currency'        => $provider['currency'],
-					'free'            => $free || 0.0 === $provider_amount,
-					'provider_amount' => $provider_amount,
-					'source'          => 'provider',
-					'calculated'      => true,
+					'ok'                 => true,
+					'amount'             => $amount,
+					'cost'               => $amount,
+					'currency'           => $provider['currency'],
+					'free'               => $free || 0.0 === $provider_amount,
+					'provider_amount'    => $provider_amount,
+					'source'             => 'provider',
+					'calculated'         => true,
+					'test_mode'          => ! empty( $provider_test['enabled'] ),
+					'test_mode_explicit' => true,
+					'test_mode_info'     => $provider_test,
 				),
 				$weight_info
 			);
 		}
 
 		if ( true === $provider['configured'] && empty( $provider['ok'] ) ) {
+			$provider_test = isset( $provider['test_mode_info'] ) && is_array( $provider['test_mode_info'] )
+				? $provider['test_mode_info']
+				: $test_info;
+
 			return array_merge(
 				array(
-					'ok'         => false,
-					'code'       => $provider['code'],
-					'error'      => $provider['error'],
-					'amount'     => null,
-					'visible'    => true,
-					'calculated' => false,
+					'ok'                 => false,
+					'code'               => $provider['code'],
+					'error'              => $provider['error'],
+					'amount'             => null,
+					'visible'            => true,
+					'calculated'         => false,
+					'test_mode'          => ! empty( $provider_test['enabled'] ),
+					'test_mode_explicit' => true,
+					'test_mode_info'     => $provider_test,
 				),
 				$weight_info
 			);
@@ -1516,6 +1571,9 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 				'per_kg'     => $per_kg,
 				'source'     => 'tariff',
 				'calculated' => true,
+				'test_mode'  => ! empty( $test_info['enabled'] ),
+				'test_mode_explicit' => true,
+				'test_mode_info' => $test_info,
 			),
 			$weight_info
 		);
@@ -1548,6 +1606,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 
 		$instance_id = velotok_core_delivery_zones_value( $method, array( 'instance_id', 'id' ), '' );
 		$key         = $method_id;
+		$test_info   = velotok_core_delivery_test_mode_info( $method, $context );
 		$option      = array(
 			'id'             => $method_id,
 			'method'         => $method_id,
@@ -1574,7 +1633,13 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 			'amount'         => null,
 			'free'           => false,
 			'mocked'         => false,
-			'test_mode'      => isset( $context['test_mode'] ) ? (bool) $context['test_mode'] : false,
+			'test_mode'      => ! empty( $test_info['enabled'] ),
+			'test_mode_explicit' => true,
+			'test_mode_visible'  => true,
+			'test_mode_source'   => $test_info['source'],
+			'test_mode_label'    => $test_info['label'],
+			'test_mode_meta'     => $test_info['meta'],
+			'test_mode_info'     => $test_info,
 			'weight'         => null,
 			'weight_kg'      => null,
 			'billable_weight'=> null,
@@ -1599,6 +1664,15 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 				$option['error_code']= $cost['code'];
 				$option['visible']   = true;
 			}
+
+			if ( isset( $cost['test_mode_info'] ) && is_array( $cost['test_mode_info'] ) ) {
+				$test_info = $cost['test_mode_info'];
+			}
+
+			$option['test_mode']          = ! empty( $test_info['enabled'] );
+			$option['test_mode_explicit'] = true;
+			$option['test_mode_source']   = $test_info['source'];
+			$option['test_mode_info']     = $test_info;
 		}
 
 		$pickup_providers = isset( $contract['pickup_points']['providers'] ) ? $contract['pickup_points']['providers'] : array();
@@ -2655,6 +2729,8 @@ if ( ! function_exists( 'velotok_core_delivery_zones_pickup_option' ) ) {
 			$points_result = velotok_core_delivery_pickup_points( $address, null, $point_context );
 		}
 
+		$test_info = velotok_core_delivery_test_mode_info( null, $context );
+
 		return array(
 			'id'                  => $pickup['method_id'],
 			'method'              => $pickup['method_id'],
@@ -2683,7 +2759,13 @@ if ( ! function_exists( 'velotok_core_delivery_zones_pickup_option' ) ) {
 			'amount'              => 0.0,
 			'free'                => true,
 			'mocked'              => false,
-			'test_mode'           => isset( $context['test_mode'] ) ? (bool) $context['test_mode'] : false,
+			'test_mode'           => ! empty( $test_info['enabled'] ),
+			'test_mode_explicit'  => true,
+			'test_mode_visible'   => true,
+			'test_mode_source'    => $test_info['source'],
+			'test_mode_label'     => $test_info['label'],
+			'test_mode_meta'      => $test_info['meta'],
+			'test_mode_info'      => $test_info,
 			'points_by_radius'    => true,
 			'pickup_points'       => isset( $points_result['points'] ) ? $points_result['points'] : array(),
 			'points'              => isset( $points_result['points'] ) ? $points_result['points'] : array(),
@@ -2810,6 +2892,33 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			&& $pickup_allowed
 			&& array_keys( $methods ) === array( $contract['pickup']['method_id'] );
 
+		$test_info      = velotok_core_delivery_test_mode_info( null, $context );
+		$test_providers = array();
+
+		foreach ( $methods as $option ) {
+			if ( empty( $option['test_mode'] ) ) {
+				continue;
+			}
+
+			$test_info['enabled'] = true;
+			$provider_id = isset( $option['provider'] ) ? (string) $option['provider'] : '';
+
+			if ( '' !== $provider_id ) {
+				$test_providers[] = $provider_id;
+			}
+		}
+
+		$test_providers = array_values( array_unique( $test_providers ) );
+
+		if ( ! empty( $test_info['enabled'] ) ) {
+			$test_info['test_mode']       = true;
+			$test_info['is_test_mode']    = true;
+			$test_info['mode']            = 'test';
+			$test_info['banner']          = true;
+			$test_info['source']          = ! empty( $test_providers ) ? 'delivery_methods' : $test_info['source'];
+			$test_info['providers']       = $test_providers;
+		}
+
 		return array(
 			'available'       => $available,
 			'zone_matched'    => $matched,
@@ -2838,6 +2947,12 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			'pickup_points_message' => isset( $pickup_points['message'] ) ? $pickup_points['message'] : '',
 			'pickup_points_errors' => isset( $pickup_points['errors'] ) ? $pickup_points['errors'] : array(),
 			'pickup_points_explicit_failure' => true,
+			'test_mode'       => ! empty( $test_info['enabled'] ),
+			'test_mode_explicit' => true,
+			'test_mode_visible'  => true,
+			'test_mode_providers'=> $test_providers,
+			'test_mode_info'  => $test_info,
+			'test_mode_banner'=> ! empty( $test_info['enabled'] ) ? velotok_core_delivery_test_mode_banner( true ) : '',
 			'source'          => $contract['source'],
 			'requirement'     => $contract['requirement'],
 			'mocked'          => false,
@@ -2892,6 +3007,197 @@ if ( ! function_exists( 'velotok_core_delivery_provider_configuration_error' ) )
 			'visible' => true,
 			'admin'   => true,
 		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_normalize' ) ) {
+	/**
+	 * Normalize a test-mode value.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return bool|null Null when the value does not describe a mode.
+	 */
+	function velotok_core_delivery_test_mode_normalize( $value ) {
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+
+		if ( null === $value ) {
+			return null;
+		}
+
+		if ( is_int( $value ) || is_float( $value ) ) {
+			return 0.0 !== (float) $value;
+		}
+
+		if ( ! is_scalar( $value ) ) {
+			return null;
+		}
+
+		$text = strtolower( trim( (string) $value ) );
+
+		if ( '' === $text ) {
+			return null;
+		}
+
+		if ( in_array( $text, array( 'yes', '1', 'true', 'on', 'test', 'sandbox', 'demo' ), true ) ) {
+			return true;
+		}
+
+		if ( in_array( $text, array( 'no', '0', 'false', 'off', 'live', 'production', 'prod', 'none' ), true ) ) {
+			return false;
+		}
+
+		return null;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_value' ) ) {
+	/**
+	 * Read a test-mode flag from a scalar or a nested status object.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return bool|null Null when the value does not describe a mode.
+	 */
+	function velotok_core_delivery_test_mode_value( $value ) {
+		$normalized = velotok_core_delivery_test_mode_normalize( $value );
+
+		if ( null !== $normalized ) {
+			return $normalized;
+		}
+
+		if ( ! is_array( $value ) && ! is_object( $value ) ) {
+			return null;
+		}
+
+		foreach ( array( 'enabled', 'active', 'on', 'test_mode', 'sandbox', 'is_test', 'test', 'mode', 'value' ) as $key ) {
+			$nested = velotok_core_delivery_zones_value( $value, array( $key ), null );
+
+			if ( null === $nested || $nested === $value ) {
+				continue;
+			}
+
+			$normalized = velotok_core_delivery_test_mode_normalize( $nested );
+
+			if ( null !== $normalized ) {
+				return $normalized;
+			}
+		}
+
+		return null;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_test_mode_info' ) ) {
+	/**
+	 * Resolve the provider test mode and return it explicitly.
+	 *
+	 * The flag may come from the shipping method configuration, from the
+	 * delivery context or from the provider response. Every source is merged
+	 * with a logical OR so a provider cannot silently fall back to live mode
+	 * when the shop or the provider enabled test mode.
+	 *
+	 * @param mixed $method          Shipping method data.
+	 * @param mixed $context         Delivery context.
+	 * @param mixed $provider_result Provider rate result.
+	 * @return array<string,mixed>
+	 */
+	function velotok_core_delivery_test_mode_info( $method = null, $context = array(), $provider_result = null ) {
+		$contract = velotok_core_delivery_zones_contract();
+		$config   = $contract['test_mode'];
+		$enabled  = false;
+		$sources  = array();
+		$provider_enabled = false;
+		$settings = null !== $method ? velotok_core_delivery_zones_settings( $method ) : array();
+		$groups   = array(
+			'method'   => $method,
+			'settings' => $settings,
+			'context'  => $context,
+		);
+
+		foreach ( $groups as $name => $source ) {
+			if ( ! is_array( $source ) && ! is_object( $source ) ) {
+				continue;
+			}
+
+			foreach ( (array) $config['keys'] as $key ) {
+				$value = velotok_core_delivery_zones_value( $source, array( $key ), null );
+				$flag  = velotok_core_delivery_test_mode_value( $value );
+
+				if ( null === $flag ) {
+					continue;
+				}
+
+				if ( $flag ) {
+					$enabled   = true;
+					$sources[] = $name . '.' . $key;
+				}
+			}
+		}
+
+		if ( is_array( $provider_result ) || is_object( $provider_result ) ) {
+			foreach ( (array) $config['result_keys'] as $key ) {
+				$value = velotok_core_delivery_zones_value( $provider_result, array( $key ), null );
+				$flag  = velotok_core_delivery_test_mode_value( $value );
+
+				if ( null === $flag ) {
+					continue;
+				}
+
+				if ( $flag ) {
+					$enabled          = true;
+					$provider_enabled = true;
+					$sources[]        = 'provider.' . $key;
+				}
+			}
+		}
+
+		$provider = null !== $method ? velotok_core_delivery_zones_method_id( $method ) : '';
+		$source   = 'config';
+
+		if ( $provider_enabled ) {
+			$source = 'provider';
+		} elseif ( in_array( 'context.test_mode', $sources, true ) ) {
+			$source = 'context';
+		} elseif ( $enabled ) {
+			$source = 'method';
+		}
+
+		return array(
+			'enabled'           => $enabled,
+			'test_mode'         => $enabled,
+			'is_test_mode'      => $enabled,
+			'explicit'          => true,
+			'visible'           => true,
+			'buyer_visible'     => true,
+			'admin_visible'     => true,
+			'banner'            => $enabled && ! empty( $config['banner'] ),
+			'banner_text'       => $config['banner_text'],
+			'label'             => $config['label'],
+			'meta'              => $config['meta'],
+			'mode'              => $enabled ? 'test' : 'live',
+			'source'            => $source,
+			'provider'          => $provider,
+			'provider_test_mode'=> $provider_enabled,
+			'sources'           => array_values( array_unique( $sources ) ),
+			'requirement'       => $config['requirement'],
+		);
+	}
+}
+
+if ( ! function_exists( 'velotok_core_delivery_method_test_mode' ) ) {
+	/**
+	 * Whether the provider behind a delivery method runs in test mode.
+	 *
+	 * @param mixed $method          Shipping method data.
+	 * @param mixed $context         Delivery context.
+	 * @param mixed $provider_result Provider rate result.
+	 * @return bool
+	 */
+	function velotok_core_delivery_method_test_mode( $method = null, $context = array(), $provider_result = null ) {
+		$info = velotok_core_delivery_test_mode_info( $method, $context, $provider_result );
+
+		return ! empty( $info['enabled'] );
 	}
 }
 
