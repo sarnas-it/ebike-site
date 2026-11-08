@@ -8,6 +8,52 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * Каталог шаблонов WooCommerce внутри темы.
+ *
+ * WooCommerce ищет переопределения в этом каталоге раньше, чем в собственных
+ * шаблонах, поэтому архив, карточка товара, корзина и оформление заказа
+ * берутся из `wp/themes/velotok/woocommerce/`.
+ *
+ * @param string $path Путь по умолчанию.
+ * @return string
+ */
+function velotok_woocommerce_template_path( $path = 'woocommerce/' ) {
+	return 'woocommerce/';
+}
+add_filter( 'woocommerce_template_path', 'velotok_woocommerce_template_path' );
+
+/**
+ * Подключает переопределённый шаблон WooCommerce из темы.
+ *
+ * Фильтр срабатывает после поиска шаблона в теме и позволяет явно вернуть
+ * файл из `woocommerce/`, даже если WooCommerce нашёл только свой шаблон.
+ * Если переопределения нет, возвращается исходный путь без изменений.
+ *
+ * @param string $template      Найденный шаблон.
+ * @param string $template_name Имя шаблона относительно каталога WooCommerce.
+ * @param string $template_path Каталог шаблонов внутри темы.
+ * @return string
+ */
+function velotok_locate_woocommerce_template( $template, $template_name, $template_path = 'woocommerce/' ) {
+	if ( ! is_string( $template_name ) || '' === trim( $template_name ) ) {
+		return $template;
+	}
+
+	$template_path = ( is_string( $template_path ) && '' !== trim( $template_path ) )
+		? $template_path
+		: velotok_woocommerce_template_path();
+
+	$theme_template = get_template_directory() . '/' . trim( $template_path, '/' ) . '/' . ltrim( $template_name, '/' );
+
+	if ( is_readable( $theme_template ) ) {
+		return $theme_template;
+	}
+
+	return $template;
+}
+add_filter( 'woocommerce_locate_template', 'velotok_locate_woocommerce_template', 10, 3 );
+
+/**
  * Отключает стандартные стили WooCommerce: оформление задаёт тема.
  *
  * @return array
