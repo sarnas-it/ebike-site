@@ -478,6 +478,30 @@ function velotok_installment_months() {
 }
 
 /**
+ * Корректна ли цена товара для витрины.
+ *
+ * Цена обязательна, должна быть числом (допускается запятая как десятичный
+ * разделитель) и не может быть отрицательной. Нулевая цена допустима: карточка
+ * показывает товар с подписью «Цена по запросу».
+ *
+ * @param mixed $product Кандидат в товары.
+ * @return bool
+ */
+function velotok_product_has_valid_price( $product ) {
+	if ( ! is_object( $product ) || ! method_exists( $product, 'get_price' ) ) {
+		return true;
+	}
+
+	$price = $product->get_price();
+
+	if ( is_string( $price ) ) {
+		$price = trim( str_replace( ',', '.', $price ) );
+	}
+
+	return '' !== $price && null !== $price && is_numeric( $price ) && (float) $price >= 0;
+}
+
+/**
  * Проверяет, можно ли показывать товар на витрине.
  *
  * WooCommerce обычно сам ограничивает выборку опубликованными товарами, но
@@ -517,16 +541,8 @@ function velotok_is_valid_product( $product ) {
 		return false;
 	}
 
-	if ( method_exists( $product, 'get_price' ) ) {
-		$price = $product->get_price();
-
-		if ( is_string( $price ) ) {
-			$price = trim( str_replace( ',', '.', $price ) );
-		}
-
-		if ( '' === $price || ! is_numeric( $price ) || (float) $price < 0 ) {
-			return false;
-		}
+	if ( ! velotok_product_has_valid_price( $product ) ) {
+		return false;
 	}
 
 	return true;
