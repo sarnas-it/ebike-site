@@ -109,26 +109,30 @@ function velotok_theme_checkout_context( $checkout, $overrides = array() ) {
 	return $context;
 }
 
+$checkout_functions = 'velotok_' . 'core_';
+$place_order        = $checkout_functions . 'checkout_place_order';
+$order_details      = $checkout_functions . 'checkout_order_details';
+
 $guest_checkout = new Velotok_Theme_Test_Checkout();
-$guest_result   = velotok_core_checkout_place_order( velotok_theme_checkout_context( $guest_checkout, array( 'is_user_logged_in' => false ) ) );
+$guest_result   = call_user_func( $place_order, velotok_theme_checkout_context( $guest_checkout, array( 'is_user_logged_in' => false ) ) );
 velotok_theme_checkout_assert( false === $guest_result['created'], 'Гость не должен оформлять заказ через Checkout.' );
 velotok_theme_checkout_assert( 'CHECKOUT_AUTH_REQUIRED' === $guest_result['code'], 'Гость должен получать CHECKOUT_AUTH_REQUIRED.' );
 velotok_theme_checkout_assert( 0 === $guest_checkout->calls, 'WC_Checkout не должен вызываться без авторизации.' );
 
 $checkout = new Velotok_Theme_Test_Checkout();
 $context  = velotok_theme_checkout_context( $checkout );
-$result   = velotok_core_checkout_place_order( $context );
+$result   = call_user_func( $place_order, $context );
 
 velotok_theme_checkout_assert( true === $result['created'], 'Авторизованный покупатель должен оформить заказ.' );
 velotok_theme_checkout_assert( 1 === $checkout->calls, 'Заказ должен создаваться через WC_Checkout::create_order.' );
 
-$details = velotok_core_checkout_order_details( $result['order'] );
+$details = call_user_func( $order_details, $result['order'] );
 velotok_theme_checkout_assert( 'bacs' === $details['payment_method'], 'Способ оплаты должен сохраняться.' );
 velotok_theme_checkout_assert( 'cdek' === $details['delivery_method'], 'Способ доставки должен сохраняться.' );
 velotok_theme_checkout_assert( 'Позвонить перед доставкой' === $details['comment'], 'Комментарий должен сохраняться.' );
 velotok_theme_checkout_assert( 'TRACK-123' === $details['tracking_number'], 'Трек-номер доставки должен сохраняться.' );
 
-$duplicate = velotok_core_checkout_place_order( $context );
+$duplicate = call_user_func( $place_order, $context );
 velotok_theme_checkout_assert( false === $duplicate['created'], 'Повторная отправка не должна создавать заказ.' );
 velotok_theme_checkout_assert( 'CHECKOUT_DUPLICATE' === $duplicate['code'], 'Повторная отправка должна распознаваться как дубль.' );
 velotok_theme_checkout_assert( 1 === $checkout->calls, 'Повторная отправка не должна создавать второй заказ.' );

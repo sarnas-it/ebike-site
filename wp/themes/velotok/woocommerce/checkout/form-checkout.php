@@ -35,9 +35,7 @@ if ( function_exists( 'WC' ) ) {
 }
 
 if ( is_object( $velotok_checkout_cart ) ) {
-	if ( function_exists( 'velotok_core_checkout_cart_is_empty' ) ) {
-		$velotok_checkout_cart_empty = velotok_core_checkout_cart_is_empty( array( 'cart' => $velotok_checkout_cart ) );
-	} elseif ( method_exists( $velotok_checkout_cart, 'is_empty' ) ) {
+	if ( method_exists( $velotok_checkout_cart, 'is_empty' ) ) {
 		$velotok_checkout_cart_empty = (bool) $velotok_checkout_cart->is_empty();
 	} elseif ( method_exists( $velotok_checkout_cart, 'get_cart_contents_count' ) ) {
 		$velotok_checkout_cart_empty = 0 === (int) $velotok_checkout_cart->get_cart_contents_count();
@@ -45,14 +43,8 @@ if ( is_object( $velotok_checkout_cart ) ) {
 }
 
 if ( $velotok_checkout_cart_empty ) {
-	$velotok_checkout_empty_message = 'Нельзя оформить заказ с пустой корзиной.';
-
-	if ( function_exists( 'velotok_core_checkout_order_contract' ) ) {
-		$velotok_checkout_empty_contract = velotok_core_checkout_order_contract();
-		$velotok_checkout_empty_message  = $velotok_checkout_empty_contract['cart']['message'];
-	}
-
-	$velotok_checkout_cart_url = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/' );
+	$velotok_checkout_empty_message = __( 'Нельзя оформить заказ с пустой корзиной.', 'velotok' );
+	$velotok_checkout_cart_url      = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/' );
 
 	echo '<div class="woocommerce-info">';
 	echo esc_html( $velotok_checkout_empty_message );
