@@ -698,10 +698,6 @@ form.checkout .button:hover {
 	line-height: 1;
 }
 
-.woocommerce-product-gallery__trigger .screen-reader-text {
-	display: none;
-}
-
 .flex-control-thumbs {
 	display: flex;
 	flex-wrap: wrap;
@@ -1576,6 +1572,46 @@ form.checkout .button:hover {
 	.nav > li,
 	.nav > li > a {
 		width: 100%;
+	}
+}
+
+/* Контрольные ширины каталога: 1440, 1024, 768 и 360 px. */
+@media (min-width: 1440px) {
+	.catalog-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 1024px) {
+	.catalog-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.catalog-toolbar {
+		align-items: stretch;
+	}
+}
+
+@media (max-width: 768px) {
+	.catalog-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.catalog-sort,
+	.catalog-sort .velotok-ordering,
+	.catalog-sort select {
+		width: 100%;
+	}
+}
+
+@media (max-width: 360px) {
+	.catalog-filters {
+		gap: 6px;
+	}
+
+	.woocommerce-pagination ul,
+	.nav-links {
+		gap: 6px;
 	}
 }
 
