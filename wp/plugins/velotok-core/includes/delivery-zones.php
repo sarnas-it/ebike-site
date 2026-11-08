@@ -206,6 +206,46 @@ if ( ! function_exists( 'velotok_core_delivery_zones_settings' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_delivery_zones_method_enabled' ) ) {
+	/**
+	 * Resolve whether a shipping method is enabled.
+	 *
+	 * Supports injected arrays, WooCommerce method objects and their settings.
+	 *
+	 * @param mixed $method Method data.
+	 * @return bool
+	 */
+	function velotok_core_delivery_zones_method_enabled( $method ) {
+		$settings = velotok_core_delivery_zones_settings( $method );
+		$value    = null;
+
+		if ( is_array( $method ) && array_key_exists( 'enabled', $method ) ) {
+			$value = $method['enabled'];
+		} elseif ( is_object( $method ) && isset( $method->enabled ) ) {
+			$value = $method->enabled;
+		} elseif ( array_key_exists( 'enabled', $settings ) ) {
+			$value = $settings['enabled'];
+		} elseif ( is_object( $method ) ) {
+			foreach ( array( 'is_enabled', 'isEnabled' ) as $candidate ) {
+				if ( method_exists( $method, $candidate ) ) {
+					$value = $method->$candidate();
+					break;
+				}
+			}
+		}
+
+		if ( null === $value ) {
+			return true;
+		}
+
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+
+		return ! in_array( strtolower( trim( (string) $value ) ), array( 'no', 'false', '0', 'off' ), true );
+	}
+}
+
 if ( ! function_exists( 'velotok_core_delivery_zones_address' ) ) {
 	/**
 	 * Normalize the destination address.
@@ -366,20 +406,21 @@ if ( ! function_exists( 'velotok_core_delivery_zones_location_matches' ) ) {
 				return false;
 			}
 
-			$code = strtoupper( $code );
-			$code = false !== strpos( $code, ':' ) ? substr( $code, strpos( $code, ':' ) + 1 ) : $code;
+			$state = false !== strpos( $state, ':' ) ? substr( $state, strpos( $state, ':' ) + 1 ) : $state;
+			$code  = strtoupper( $code );
+			$code  = false !== strpos( $code, ':' ) ? substr( $code, strpos( $code, ':' ) + 1 ) : $code;
 
 			return $code === $state;
 		}
 
 		if ( 'postcode' === $type ) {
-			$postcode = $address['postcode'];
+			$postcode = trim( $address['postcode'] );
 
 			if ( '' === $postcode ) {
 				return false;
 			}
 
-			$pattern = $code;
+			$pattern = trim( $code );
 
 			if ( false !== strpos( $pattern, '*' ) ) {
 				$regex = '/^' . str_replace( '\\*', '.*', preg_quote( $pattern, '/' ) ) . '$/i';
@@ -388,9 +429,21 @@ if ( ! function_exists( 'velotok_core_delivery_zones_location_matches' ) ) {
 			}
 
 			if ( false !== strpos( $pattern, '...' ) ) {
-				$prefix = str_replace( '...', '', $pattern );
+				list( $from, $to ) = explode( '...', $pattern, 2 );
+				$from = trim( $from );
+				$to   = trim( $to );
 
-				return 0 === strpos( $postcode, $prefix );
+				if ( '' !== $from && '' !== $to ) {
+					if ( ctype_digit( $from ) && ctype_digit( $to ) && ctype_digit( $postcode ) ) {
+						return (int) $postcode >= (int) $from && (int) $postcode <= (int) $to;
+					}
+
+					return strtoupper( $postcode ) >= strtoupper( $from ) && strtoupper( $postcode ) <= strtoupper( $to );
+				}
+
+				$prefix = '' !== $from ? $from : $to;
+
+				return '' !== $prefix && 0 === strpos( strtoupper( $postcode ), strtoupper( $prefix ) );
 			}
 
 			return strtoupper( $pattern ) === strtoupper( $postcode );
@@ -736,10 +789,27 @@ if ( ! function_exists( 'velotok_core_delivery_zones_provider_rate' ) ) {
 			return array( 'ok' => false, 'configured' => false );
 		}
 
-		$result = call_user_func( $callback, $method, $order, $context );
-		$error  = null;
+		try {
+			$result = call_user_func( $callback, $method, $order, $context );
+		} catch ( \Throwable $exception ) {
+			return array(
+				'ok'         => false,
+				'configured' => true,
+				'error'      => $exception->getMessage(),
+				'code'       => $contract['provider_error']['code'],
+				'visible'    => true,
+			);
+		}
 
-		if ( is_object( $result ) && 'WP_Error' === get_class( $result ) && method_exists( $result, 'get_error_message' ) ) {
+		$error = null;
+
+		$is_wp_error = is_object( $result ) && (
+			'WP_Error' === get_class( $result )
+			|| is_a( $result, 'WP_Error' )
+			|| ( function_exists( 'is_wp_error' ) && is_wp_error( $result ) )
+		);
+
+		if ( $is_wp_error && method_exists( $result, 'get_error_message' ) ) {
 			$error = $result->get_error_message();
 		} elseif ( is_array( $result ) && isset( $result['error'] ) && is_scalar( $result['error'] ) && '' !== (string) $result['error'] ) {
 			$error = (string) $result['error'];
@@ -800,6 +870,20 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_cost' ) ) {
 				'code'   => $weight['code'],
 				'error'  => $weight['error'],
 				'amount' => null,
+			);
+		}
+
+		if ( 'free_shipping' === velotok_core_delivery_zones_method_id( $method ) ) {
+			return array(
+				'ok'         => true,
+				'amount'     => 0.0,
+				'cost'       => 0.0,
+				'currency'   => 'RUB',
+				'free'       => true,
+				'weight'     => $weight['weight'],
+				'weight_kg'  => $weight['weight'],
+				'source'     => 'free_shipping',
+				'calculated' => true,
 			);
 		}
 
@@ -904,8 +988,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_method_option' ) ) {
 		$settings  = velotok_core_delivery_zones_settings( $method );
 		$method_id = velotok_core_delivery_zones_method_id( $method );
 		$eta       = velotok_core_delivery_zones_eta_range( $method );
-		$enabled   = velotok_core_delivery_zones_value( $method, array( 'enabled', 'is_enabled' ), true );
-		$enabled   = is_bool( $enabled ) ? $enabled : ! in_array( strtolower( (string) $enabled ), array( 'no', 'false', '0', 'off' ), true );
+		$enabled   = velotok_core_delivery_zones_method_enabled( $method );
 		$label     = velotok_core_delivery_zones_scalar(
 			velotok_core_delivery_zones_value( $method, array( 'title', 'label', 'method_title', 'name' ), '' )
 		);

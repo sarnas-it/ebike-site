@@ -242,6 +242,82 @@ $min_amount_free = velotok_core_delivery_zone_methods(
 velotok_delivery_zones_assert( true === $min_amount_free['methods']['cdek']['free'], 'Порог бесплатной доставки должен читаться из настроек зоны.' );
 velotok_delivery_zones_assert( 0.0 === (float) $min_amount_free['methods']['cdek']['cost'], 'Порог бесплатной доставки должен обнулять тариф зоны.' );
 
+$free_shipping_zones = $zones;
+$free_shipping_zones[0]['shipping_methods'] = array(
+	array(
+		'instance_id' => 103,
+		'method_id'   => 'free_shipping',
+		'title'       => 'Бесплатная доставка',
+		'enabled'     => true,
+		'settings'    => array( 'base' => 500 ),
+	),
+);
+
+$free_shipping_result = velotok_core_delivery_zone_methods(
+	$address,
+	$free_shipping_zones,
+	array( 'order' => array( 'subtotal' => 1000, 'weight' => 2 ) )
+);
+velotok_delivery_zones_assert( 0.0 === (float) $free_shipping_result['methods']['free_shipping']['cost'], 'Способ бесплатной доставки должен стоить 0.' );
+velotok_delivery_zones_assert( true === $free_shipping_result['methods']['free_shipping']['free'], 'Способ бесплатной доставки должен быть отмечен бесплатным.' );
+
+$disabled_zones = $zones;
+$disabled_zones[0]['shipping_methods'][0]['enabled'] = false;
+
+$disabled_result = velotok_core_delivery_zone_methods(
+	$address,
+	$disabled_zones,
+	array( 'order' => array( 'subtotal' => 1000, 'weight' => 2 ) )
+);
+velotok_delivery_zones_assert( false === $disabled_result['methods']['cdek']['available'], 'Отключённый способ зоны не должен быть доступен.' );
+
+$throwing_zones = $zones;
+$throwing_zones[0]['shipping_methods'][0]['rate_provider'] = function () {
+	throw new RuntimeException( 'Провайдер недоступен' );
+};
+
+$throwing_provider = velotok_core_delivery_zone_methods(
+	$address,
+	$throwing_zones,
+	array( 'order' => array( 'subtotal' => 1000, 'weight' => 2 ) )
+);
+velotok_delivery_zones_assert( false === $throwing_provider['methods']['cdek']['available'], 'Исключение провайдера должно делать способ недоступным.' );
+velotok_delivery_zones_assert( 'DELIVERY_PROVIDER_ERROR' === $throwing_provider['methods']['cdek']['error_code'], 'Исключение провайдера должно быть видимой ошибкой.' );
+velotok_delivery_zones_assert( null === $throwing_provider['methods']['cdek']['cost'], 'Исключение провайдера не должно подменяться тарифом.' );
+
+$range_zones = array(
+	array(
+		'zone_id'       => 40,
+		'zone_name'     => 'Диапазон',
+		'zone_order'    => 1,
+		'zone_locations'=> array(
+			array( 'type' => 'postcode', 'code' => '101000...102000' ),
+		),
+		'shipping_methods' => array(
+			array( 'method_id' => 'cdek', 'title' => 'СДЭК', 'enabled' => true, 'settings' => array( 'base' => 100 ) ),
+		),
+	),
+);
+
+$range_result = velotok_core_delivery_zone_methods(
+	array( 'country' => 'RU', 'postcode' => '101500', 'state' => 'RU:MOW' ),
+	$range_zones,
+	array( 'order' => array( 'subtotal' => 1000, 'weight' => 1 ) )
+);
+velotok_delivery_zones_assert( true === $range_result['zone_matched'], 'Почтовый диапазон зоны должен сопоставляться с адресом.' );
+
+$state_zones = $range_zones;
+$state_zones[0]['zone_locations'] = array(
+	array( 'type' => 'state', 'code' => 'RU:MOW' ),
+);
+
+$state_result = velotok_core_delivery_zone_methods(
+	array( 'country' => 'RU', 'state' => 'MOW' ),
+	$state_zones,
+	array( 'order' => array( 'subtotal' => 1000, 'weight' => 1 ) )
+);
+velotok_delivery_zones_assert( true === $state_result['zone_matched'], 'Код региона с префиксом страны должен сопоставляться с адресом.' );
+
 $single = velotok_core_delivery_zone_option( 'cdek', $address, $zones, array( 'order' => array( 'subtotal' => 1000, 'weight' => 1 ) ) );
 velotok_delivery_zones_assert( is_array( $single ) && 'cdek' === $single['method_id'], 'Должен возвращаться отдельный способ по идентификатору.' );
 
