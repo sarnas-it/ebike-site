@@ -51,6 +51,7 @@ function velotok_core_cart_woocommerce_contract() {
 		'parent_spec'      => 'ecommerce-store',
 		'requirement'      => 'TESTEB-7',
 		'task'             => 'TESTEB-7',
+		'requirement_ids'  => array( 'TESTEB-7', 'TESTEB-8', 'TESTEB-9', 'TESTEB-10' ),
 		'requirements'     => array(
 			'woocommerce_cart'  => 'Система SHALL вести корзину на WooCommerce',
 			'guest_transfer'    => 'Гостевая корзина SHALL переноситься при входе',
@@ -90,6 +91,8 @@ function velotok_core_cart_woocommerce_contract() {
 			'transfer_guest_cart' => 'velotok_core_wc_cart_transfer_guest_cart',
 			'persist_guest_cart'  => 'velotok_core_wc_cart_store_guest_snapshot',
 			'restore_guest_cart'  => 'velotok_core_wc_cart_restore_guest_snapshot',
+			'persist_user_cart'   => 'velotok_core_wc_cart_store_user_snapshot',
+			'restore_user_cart'   => 'velotok_core_wc_cart_restore_user_snapshot',
 			'checkout_auth'       => 'velotok_core_wc_cart_checkout_auth_status',
 		),
 		'currency'         => 'RUB',
@@ -104,6 +107,9 @@ function velotok_core_cart_woocommerce_contract() {
 			'persistent'      => true,
 			'guest_storage'   => 'woocommerce_session',
 			'user_storage'    => 'woocommerce_persistent_cart',
+			'user_key'        => '_woocommerce_persistent_cart_{blog_id}',
+			'user_meta'       => '_woocommerce_persistent_cart_{blog_id}',
+			'user_snapshot_meta' => VELOTOK_CART_USER_CART_META,
 			'guest_key'       => 'velotok_guest_cart',
 			'guest_persistent' => true,
 			'guest_cookie'    => 'velotok_guest_cart',
@@ -1258,6 +1264,499 @@ function velotok_core_wc_cart_clear_guest_snapshot() {
 	velotok_core_wc_cart_clear_guest_cookie();
 }
 
+if ( ! defined( 'VELOTOK_CART_USER_CART_META' ) ) {
+	define( 'VELOTOK_CART_USER_CART_META', '_velotok_user_cart' );
+}
+
+/**
+ * Resolve a customer id from an id, user object or the current session.
+ *
+ * @param mixed $user User object, id or null.
+ * @return int
+ */
+function velotok_core_wc_cart_user_id( $user = 0 ) {
+	if ( is_object( $user ) && isset( $user->ID ) ) {
+		return (int) $user->ID;
+	}
+
+	if ( is_numeric( $user ) && (int) $user > 0 ) {
+		return (int) $user;
+	}
+
+	if ( function_exists( 'get_current_user_id' ) ) {
+		return (int) get_current_user_id();
+	}
+
+	if ( function_exists( 'wc_get_current_user_id' ) ) {
+		return (int) wc_get_current_user_id();
+	}
+
+	return 0;
+}
+
+/**
+ * Name of the WooCommerce persistent cart user meta.
+ *
+ * WooCommerce keeps the customer cart under a blog-specific user meta key. The
+ * customer cart is therefore available after a new session starts and from any
+ * device the customer signs in on.
+ *
+ * @param int $user_id Customer id.
+ * @return string
+ */
+function velotok_core_wc_cart_user_meta_key( $user_id = 0 ) {
+	unset( $user_id );
+
+	$blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 1;
+
+	return '_woocommerce_persistent_cart_' . $blog_id;
+}
+
+/**
+ * Candidate user meta keys read back as the persistent customer cart.
+ *
+ * @param int $user_id Customer id.
+ * @return array<int,string>
+ */
+function velotok_core_wc_cart_user_meta_keys( $user_id = 0 ) {
+	$blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 1;
+	$keys    = array( velotok_core_wc_cart_user_meta_key( $user_id ) );
+
+	if ( $blog_id > 0 ) {
+		$keys[] = '_woocommerce_persistent_cart_' . $blog_id;
+	}
+
+	$keys[] = '_woocommerce_persistent_cart';
+	$keys[] = VELOTOK_CART_USER_CART_META;
+
+	return array_values( array_unique( $keys ) );
+}
+
+/**
+ * Reduce saved cart data to the fields needed to rebuild a customer cart.
+ *
+ * @param mixed $items Saved cart lines or a cart payload.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_wc_cart_normalize_user_items( $items ) {
+	$normalized = array();
+
+	if ( ! is_array( $items ) ) {
+		return $normalized;
+	}
+
+	if ( isset( $items['items'] ) && is_array( $items['items'] ) ) {
+		$items = $items['items'];
+	} elseif ( isset( $items['cart'] ) && is_array( $items['cart'] ) ) {
+		$items = $items['cart'];
+	}
+
+	foreach ( $items as $key => $item ) {
+		if ( ! is_array( $item ) ) {
+			continue;
+		}
+
+		$product_id = isset( $item['product_id'] ) && is_numeric( $item['product_id'] )
+			? (int) $item['product_id']
+			: 0;
+
+		if ( $product_id <= 0 ) {
+			continue;
+		}
+
+		$quantity = isset( $item['quantity'] ) && is_numeric( $item['quantity'] )
+			? (int) $item['quantity']
+			: 0;
+
+		if ( $quantity < 1 ) {
+			continue;
+		}
+
+		$line_key = '';
+
+		if ( isset( $item['key'] ) && is_scalar( $item['key'] ) ) {
+			$line_key = (string) $item['key'];
+		} elseif ( is_string( $key ) && '' !== $key ) {
+			$line_key = $key;
+		}
+
+		$price      = isset( $item['price'] ) && is_numeric( $item['price'] ) ? (float) $item['price'] : 0.0;
+		$line_total = isset( $item['line_total'] ) && is_numeric( $item['line_total'] )
+			? (float) $item['line_total']
+			: $price * $quantity;
+
+		$line = array(
+			'key'          => $line_key,
+			'product_id'   => $product_id,
+			'variation_id' => isset( $item['variation_id'] ) && is_numeric( $item['variation_id'] )
+				? (int) $item['variation_id']
+				: 0,
+			'slug'         => isset( $item['slug'] ) && is_scalar( $item['slug'] ) ? (string) $item['slug'] : '',
+			'name'         => isset( $item['name'] ) && is_scalar( $item['name'] ) ? (string) $item['name'] : '',
+			'price'        => round( $price, 2 ),
+			'quantity'     => $quantity,
+			'line_total'   => round( $line_total, 2 ),
+		);
+
+		if ( isset( $item['variation'] ) && is_array( $item['variation'] ) ) {
+			$line['variation'] = $item['variation'];
+		}
+
+		$normalized[] = $line;
+	}
+
+	return $normalized;
+}
+
+/**
+ * Build the WooCommerce persistent cart payload for an item list.
+ *
+ * @param array<int,array<string,mixed>> $items Normalized cart items.
+ * @return array<string,mixed>
+ */
+function velotok_core_wc_cart_user_payload( $items ) {
+	$lines = array();
+
+	foreach ( (array) $items as $item ) {
+		if ( ! is_array( $item ) || empty( $item['product_id'] ) ) {
+			continue;
+		}
+
+		$key = isset( $item['key'] ) && '' !== (string) $item['key']
+			? (string) $item['key']
+			: 'product_' . (int) $item['product_id'] . '_' . ( isset( $item['variation_id'] ) ? (int) $item['variation_id'] : 0 );
+
+		$lines[ $key ] = array(
+			'key'          => $key,
+			'product_id'   => (int) $item['product_id'],
+			'variation_id' => isset( $item['variation_id'] ) ? (int) $item['variation_id'] : 0,
+			'quantity'     => isset( $item['quantity'] ) ? (int) $item['quantity'] : 1,
+			'line_total'   => isset( $item['line_total'] ) ? (float) $item['line_total'] : 0.0,
+			'line_tax'     => 0.0,
+			'line_subtotal' => isset( $item['line_total'] ) ? (float) $item['line_total'] : 0.0,
+			'line_subtotal_tax' => 0.0,
+		);
+	}
+
+	return array(
+		'cart'       => $lines,
+		'items'      => array_values( (array) $items ),
+		'updated_at' => time(),
+		'version'    => 1,
+	);
+}
+
+/**
+ * Read the persistent customer cart stored in user meta.
+ *
+ * @param mixed $user User object, id or null.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_wc_cart_user_snapshot( $user = 0 ) {
+	$user_id = velotok_core_wc_cart_user_id( $user );
+
+	if ( $user_id <= 0 ) {
+		return array();
+	}
+
+	$raw = null;
+
+	if ( function_exists( 'get_user_meta' ) ) {
+		foreach ( velotok_core_wc_cart_user_meta_keys( $user_id ) as $key ) {
+			$value = get_user_meta( $user_id, $key, true );
+
+			if ( is_array( $value ) && ! empty( $value ) ) {
+				$raw = $value;
+				break;
+			}
+		}
+	}
+
+	if ( null === $raw ) {
+		$session = velotok_core_wc_cart_session();
+
+		if ( null !== $session && method_exists( $session, 'get' ) ) {
+			$value = $session->get( 'velotok_user_cart_' . $user_id );
+
+			if ( is_array( $value ) && ! empty( $value ) ) {
+				$raw = $value;
+			}
+		}
+	}
+
+	return velotok_core_wc_cart_normalize_user_items( $raw );
+}
+
+/**
+ * Persist the current customer cart in user meta between sessions and devices.
+ *
+ * @param mixed $user User object, id or null.
+ * @return bool Whether the cart state was written.
+ */
+function velotok_core_wc_cart_store_user_snapshot( $user = 0 ) {
+	$explicit = ( is_object( $user ) && isset( $user->ID ) && (int) $user->ID > 0 )
+		|| ( is_numeric( $user ) && (int) $user > 0 );
+	$user_id  = velotok_core_wc_cart_user_id( $user );
+
+	if ( $user_id <= 0 ) {
+		return false;
+	}
+
+	if ( ! $explicit && function_exists( 'is_user_logged_in' ) && ! is_user_logged_in() ) {
+		return false;
+	}
+
+	$items = velotok_core_wc_cart_items();
+
+	if ( empty( $items ) ) {
+		velotok_core_wc_cart_clear_user_snapshot( $user_id );
+
+		return true;
+	}
+
+	$payload = velotok_core_wc_cart_user_payload( $items );
+	$stored  = false;
+
+	if ( function_exists( 'update_user_meta' ) ) {
+		$meta_key = velotok_core_wc_cart_user_meta_key( $user_id );
+
+		update_user_meta( $user_id, $meta_key, $payload );
+		$stored = true;
+
+		if ( VELOTOK_CART_USER_CART_META !== $meta_key ) {
+			update_user_meta( $user_id, VELOTOK_CART_USER_CART_META, $payload );
+		}
+	}
+
+	if ( ! $stored ) {
+		$session = velotok_core_wc_cart_session();
+
+		if ( null !== $session && method_exists( $session, 'set' ) ) {
+			$session->set( 'velotok_user_cart_' . $user_id, $payload );
+			$stored = true;
+		}
+	}
+
+	return $stored;
+}
+
+/**
+ * Remove the persistent customer cart snapshot.
+ *
+ * @param mixed $user User object, id or null.
+ * @return bool Whether a stored cart was cleared.
+ */
+function velotok_core_wc_cart_clear_user_snapshot( $user = 0 ) {
+	$user_id = velotok_core_wc_cart_user_id( $user );
+
+	if ( $user_id <= 0 ) {
+		return false;
+	}
+
+	$cleared = false;
+
+	if ( function_exists( 'delete_user_meta' ) ) {
+		foreach ( velotok_core_wc_cart_user_meta_keys( $user_id ) as $key ) {
+			if ( delete_user_meta( $user_id, $key ) ) {
+				$cleared = true;
+			}
+		}
+	} elseif ( function_exists( 'update_user_meta' ) ) {
+		$empty = array(
+			'cart'       => array(),
+			'items'      => array(),
+			'updated_at' => time(),
+			'version'    => 1,
+		);
+
+		foreach ( velotok_core_wc_cart_user_meta_keys( $user_id ) as $key ) {
+			update_user_meta( $user_id, $key, $empty );
+		}
+
+		$cleared = true;
+	}
+
+	$session = velotok_core_wc_cart_session();
+
+	if ( null !== $session ) {
+		if ( method_exists( $session, 'delete' ) ) {
+			$session->delete( 'velotok_user_cart_' . $user_id );
+		} elseif ( method_exists( $session, 'set' ) ) {
+			$session->set( 'velotok_user_cart_' . $user_id, array() );
+		}
+	}
+
+	return $cleared;
+}
+
+/**
+ * Restore a customer cart from user meta into an empty live cart.
+ *
+ * The cart is stored in user meta, so the same positions are restored after a
+ * new session or on another device. Quantities are capped by the per-position
+ * limit during the restore.
+ *
+ * @param mixed $user User object, id or null.
+ * @return bool Whether items were restored.
+ */
+function velotok_core_wc_cart_restore_user_snapshot( $user = 0 ) {
+	$user_id = velotok_core_wc_cart_user_id( $user );
+
+	if ( $user_id <= 0 ) {
+		return false;
+	}
+
+	$cart = velotok_core_wc_cart_runtime();
+
+	if ( null === $cart || ! method_exists( $cart, 'add_to_cart' ) ) {
+		return false;
+	}
+
+	if ( method_exists( $cart, 'is_empty' ) && ! $cart->is_empty() ) {
+		return false;
+	}
+
+	$items = velotok_core_wc_cart_user_snapshot( $user_id );
+
+	if ( empty( $items ) ) {
+		return false;
+	}
+
+	$restored = false;
+
+	foreach ( $items as $item ) {
+		$quantity = isset( $item['quantity'] ) ? (int) $item['quantity'] : 1;
+		$result   = velotok_core_wc_cart_add_item( $item, $quantity );
+
+		if ( is_array( $result ) && ! empty( $result['added'] ) ) {
+			$restored = true;
+		}
+	}
+
+	if ( $restored ) {
+		if ( method_exists( $cart, 'calculate_totals' ) ) {
+			$cart->calculate_totals();
+		}
+
+		velotok_core_wc_cart_store_user_snapshot( $user_id );
+	}
+
+	return $restored;
+}
+
+/**
+ * Restore the customer cart when the WooCommerce session is loaded.
+ *
+ * @param mixed $user User object, id or null.
+ * @return bool
+ */
+function velotok_core_wc_cart_restore_user_on_session( $user = 0 ) {
+	if ( function_exists( 'is_user_logged_in' ) && ! is_user_logged_in() ) {
+		return false;
+	}
+
+	return velotok_core_wc_cart_restore_user_snapshot( $user );
+}
+
+/**
+ * Restore the customer cart on login.
+ *
+ * @param string $user_login User login.
+ * @param mixed  $user       User object.
+ * @return bool
+ */
+function velotok_core_wc_cart_restore_user_on_login( $user_login = '', $user = null ) {
+	unset( $user_login );
+
+	return velotok_core_wc_cart_restore_user_snapshot( $user );
+}
+
+/**
+ * Persist the customer cart when the WooCommerce cart changes.
+ *
+ * @param mixed $user User object, id or null.
+ * @return bool
+ */
+function velotok_core_wc_cart_store_user_on_cart_update( $user = 0 ) {
+	if ( function_exists( 'is_user_logged_in' ) && ! is_user_logged_in() ) {
+		return false;
+	}
+
+	return velotok_core_wc_cart_store_user_snapshot( $user );
+}
+
+if ( ! function_exists( 'velotok_core_wc_cart_persist_user_cart' ) ) {
+	/**
+	 * Alias for persisting the customer cart.
+	 *
+	 * @param mixed $user User object, id or null.
+	 * @return bool
+	 */
+	function velotok_core_wc_cart_persist_user_cart( $user = 0 ) {
+		return velotok_core_wc_cart_store_user_snapshot( $user );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_wc_cart_store_user_cart' ) ) {
+	/**
+	 * Alias for persisting the customer cart.
+	 *
+	 * @param mixed $user User object, id or null.
+	 * @return bool
+	 */
+	function velotok_core_wc_cart_store_user_cart( $user = 0 ) {
+		return velotok_core_wc_cart_store_user_snapshot( $user );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_wc_cart_load_user_cart' ) ) {
+	/**
+	 * Alias for restoring the customer cart.
+	 *
+	 * @param mixed $user User object, id or null.
+	 * @return bool
+	 */
+	function velotok_core_wc_cart_load_user_cart( $user = 0 ) {
+		return velotok_core_wc_cart_restore_user_snapshot( $user );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_wc_cart_restore_user_cart' ) ) {
+	/**
+	 * Alias for restoring the customer cart.
+	 *
+	 * @param mixed $user User object, id or null.
+	 * @return bool
+	 */
+	function velotok_core_wc_cart_restore_user_cart( $user = 0 ) {
+		return velotok_core_wc_cart_restore_user_snapshot( $user );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_wc_cart_read_user_cart' ) ) {
+	/**
+	 * Alias for reading the customer cart snapshot.
+	 *
+	 * @param mixed $user User object, id or null.
+	 * @return array<int,array<string,mixed>>
+	 */
+	function velotok_core_wc_cart_read_user_cart( $user = 0 ) {
+		return velotok_core_wc_cart_user_snapshot( $user );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_wc_cart_clear_user_cart' ) ) {
+	/**
+	 * Alias for clearing the customer cart snapshot.
+	 *
+	 * @param mixed $user User object, id or null.
+	 * @return bool
+	 */
+	function velotok_core_wc_cart_clear_user_cart( $user = 0 ) {
+		return velotok_core_wc_cart_clear_user_snapshot( $user );
+	}
+}
+
 /**
  * Transfer a guest cart into the live customer cart without duplicates.
  *
@@ -1773,8 +2272,15 @@ if ( ! function_exists( 'velotok_core_cart_wc_clear' ) ) {
 
 if ( function_exists( 'add_action' ) ) {
 	add_action( 'woocommerce_cart_updated', 'velotok_core_wc_cart_store_guest_snapshot' );
+	add_action( 'woocommerce_cart_updated', 'velotok_core_wc_cart_store_user_snapshot' );
+	add_action( 'woocommerce_cart_updated', 'velotok_core_wc_cart_store_user_on_cart_update' );
 	add_action( 'woocommerce_cart_loaded_from_session', 'velotok_core_wc_cart_restore_guest_snapshot' );
+	add_action( 'woocommerce_cart_loaded_from_session', 'velotok_core_wc_cart_restore_user_snapshot' );
+	add_action( 'woocommerce_cart_loaded_from_session', 'velotok_core_wc_cart_restore_user_on_session' );
 	add_action( 'woocommerce_checkout_process', 'velotok_core_wc_cart_validate_checkout_auth' );
+	add_action( 'wp_login', 'velotok_core_wc_cart_restore_user_snapshot', 10, 2 );
+	add_action( 'wp_login', 'velotok_core_wc_cart_restore_user_on_login', 10, 2 );
+	add_action( 'wp_logout', 'velotok_core_wc_cart_store_user_snapshot', 10, 1 );
 	add_action( 'wp_login', 'velotok_core_wc_cart_merge_guest_on_login', 20, 2 );
 	add_action( 'woocommerce_add_to_cart_validation', 'velotok_core_wc_cart_validate_add_quantity', 10, 5 );
 	add_action( 'woocommerce_update_cart_validation', 'velotok_core_wc_cart_validate_update_quantity', 10, 4 );
