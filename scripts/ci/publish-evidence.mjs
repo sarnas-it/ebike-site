@@ -5,6 +5,7 @@ import {
   RECOVERY_WORKFLOW_PATH,
   collectRecoveryEvidence,
   publishRecoveryEvidence,
+  recoveryWorkflowForPullRequest,
   renderEvidenceComment,
 } from './evidence.mjs';
 
@@ -24,7 +25,7 @@ Options:
   --pr <number>         Pull request number (required)
   --sha <sha>           Exact commit under test (required)
   --run-id <id>         Recovery workflow run to verify (default: latest successful)
-  --workflow <path>     Recovery workflow path (default: ${RECOVERY_WORKFLOW_PATH})
+  --workflow <path>     Recovery workflow path (default: the workflow for the PR)
   --comment-file <path> Markdown template to publish/update on the pull request
   --comment-marker <s>  Idempotency marker for the comment
   --allow-running       Accept the current run while it is still in progress
@@ -44,7 +45,7 @@ function parseArgs(argv) {
     // GITHUB_RUN_ID here would verify whatever workflow happens to invoke this
     // script instead of the recovery run that produced the checks.
     runId: null,
-    workflow: RECOVERY_WORKFLOW_PATH,
+    workflow: null,
     commentFile: null,
     commentMarker: '<!-- testeb-67-recovery -->',
     allowRunning: false,
@@ -96,6 +97,8 @@ async function main() {
     throw new Error(`invalid --repo value: ${options.repo}`);
   }
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+  const workflow =
+    options.workflow || recoveryWorkflowForPullRequest(options.pr);
 
   let template = '';
   if (options.commentFile) {
@@ -108,7 +111,7 @@ async function main() {
     pullNumber: options.pr,
     targetSha: options.sha,
     runId: options.runId,
-    workflow: options.workflow,
+    workflow,
     token,
     allowRunning: options.allowRunning,
   };

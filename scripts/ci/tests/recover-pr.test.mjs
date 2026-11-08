@@ -46,6 +46,7 @@ function baseHandler({
   comments = [],
   existingChecks = [],
   mergeStatus = 200,
+  patchStatus = 200,
 } = {}) {
   return (call) => {
     const { url, method } = call;
@@ -56,6 +57,11 @@ function baseHandler({
       return response(201, { id: 501, ...call.body });
     }
     if (/\/check-runs\/\d+$/.test(url) && method === 'PATCH') {
+      if (patchStatus !== 200) {
+        return response(patchStatus, {
+          message: 'Resource not accessible by integration',
+        });
+      }
       return response(200, { id: Number(url.split('/').pop()), ...call.body });
     }
     if (url.includes('/statuses/') && method === 'POST') {
@@ -292,6 +298,73 @@ async function testExistingCheckRunIsUpdated() {
   console.log('PASS: existing check runs are updated in place');
 }
 
+async function testUnpatchableExistingChecksStillMerge() {
+  const existingChecks = [
+    {
+      id: 31,
+      name: 'php-lint',
+      status: 'completed',
+      conclusion: 'success',
+      completed_at: '2026-11-08T16:30:34Z',
+    },
+    {
+      id: 32,
+      name: 'php-tests',
+      status: 'in_progress',
+      conclusion: 'success',
+      completed_at: '2026-11-08T16:30:32Z',
+    },
+  ];
+  const { fetchImpl, calls } = makeFetch(
+    baseHandler({ existingChecks, patchStatus: 403 }),
+  );
+
+  const result = await recoverPullRequest({
+    owner: OWNER,
+    repo: REPO,
+    pullNumber: PR_NUMBER,
+    targetSha: TARGET_SHA,
+    results: {
+      'php-lint': 'success',
+      'php-tests': 'success',
+      'plugin-tests': 'success',
+    },
+    detailsUrl: 'https://github.com/sarnas-it/ebike-site/actions/runs/2',
+    summary: 'recovered',
+    token: 'test-token',
+    fetchImpl,
+  });
+
+  assert.strictEqual(
+    result.merged,
+    true,
+    'recovery must still merge when the old check runs belong to another run',
+  );
+  assert.strictEqual(mergeCalls(calls).length, 1);
+
+  const created = calls.filter(
+    (call) => call.method === 'POST' && call.url.endsWith('/check-runs'),
+  );
+  assert.strictEqual(
+    created.length,
+    3,
+    'a fresh completed check is published for every check when patching is forbidden',
+  );
+  assert.ok(
+    created.every(
+      (call) =>
+        call.body.head_sha === TARGET_SHA &&
+        call.body.status === 'completed' &&
+        call.body.conclusion === 'success',
+    ),
+  );
+  const status = calls.find((call) =>
+    call.url.includes(`/statuses/${TARGET_SHA}`),
+  );
+  assert.strictEqual(status.body.state, 'success');
+  console.log('PASS: recovery republishes unpatchable checks and completes the deferred merge');
+}
+
 function testAllChecksPassed() {
   assert.strictEqual(allChecksPassed({ 'php-lint': 'success' }), true);
   assert.strictEqual(allChecksPassed({ 'php-lint': 'success', 'php-tests': 'skipped' }), true);
@@ -336,6 +409,7 @@ async function main() {
   await testSkipsAlreadyMergedPr();
   await testCommentIsIdempotent();
   await testExistingCheckRunIsUpdated();
+  await testUnpatchableExistingChecksStillMerge();
   testAllChecksPassed();
   testSummarizeRecovery();
 }
