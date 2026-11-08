@@ -85,6 +85,10 @@ if ( is_product_category() ) {
 					<?php
 					while ( have_posts() ) :
 						the_post();
+						$velotok_loop_product = function_exists( 'wc_get_product' ) ? wc_get_product( get_the_ID() ) : null;
+						if ( is_object( $velotok_loop_product ) && ! velotok_is_valid_product( $velotok_loop_product ) ) {
+							continue;
+						}
 						wc_get_template_part( 'content', 'product' );
 					endwhile;
 					?>

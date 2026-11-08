@@ -432,6 +432,55 @@ function velotok_installment_months() {
 }
 
 /**
+ * Проверяет, можно ли показывать товар на витрине.
+ *
+ * WooCommerce обычно сам ограничивает выборку опубликованными товарами, но
+ * витрина дополнительно проверяет каждый товар: черновики, приватные и
+ * удалённые записи, скрытые из каталога позиции и товары без обязательных
+ * данных (названия и корректной цены) не должны попадать в каталог.
+ *
+ * @param mixed $product Кандидат в товары.
+ * @return bool
+ */
+function velotok_is_valid_product( $product ) {
+	if ( ! is_object( $product ) ) {
+		return false;
+	}
+
+	if ( method_exists( $product, 'get_status' ) ) {
+		$status = $product->get_status();
+
+		if ( is_string( $status ) && '' !== $status && 'publish' !== $status ) {
+			return false;
+		}
+	}
+
+	if ( method_exists( $product, 'is_visible' ) && false === $product->is_visible() ) {
+		return false;
+	}
+
+	$name = method_exists( $product, 'get_name' ) ? trim( wp_strip_all_tags( (string) $product->get_name() ) ) : '';
+
+	if ( '' === $name ) {
+		return false;
+	}
+
+	if ( method_exists( $product, 'get_price' ) ) {
+		$price = $product->get_price();
+
+		if ( is_string( $price ) ) {
+			$price = trim( str_replace( ',', '.', $price ) );
+		}
+
+		if ( '' === $price || ! is_numeric( $price ) || (float) $price < 0 ) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/**
  * Приводит товар WooCommerce к структуре карточки темы.
  *
  * @param WC_Product $product Товар.
@@ -681,10 +730,12 @@ function velotok_get_home_models() {
 		if ( ! empty( $products ) ) {
 			$index = 0;
 			foreach ( $products as $product ) {
-				if ( $product instanceof WC_Product ) {
-					$index++;
-					$models[] = velotok_normalize_product( $product, $index );
+				if ( ! $product instanceof WC_Product || ! velotok_is_valid_product( $product ) ) {
+					continue;
 				}
+
+				$index++;
+				$models[] = velotok_normalize_product( $product, $index );
 			}
 		}
 	}
@@ -721,10 +772,12 @@ function velotok_get_products_by_category( $slug, $limit = 3 ) {
 	$models = array();
 	$index  = 0;
 	foreach ( $products as $product ) {
-		if ( $product instanceof WC_Product ) {
-			$index++;
-			$models[] = velotok_normalize_product( $product, $index );
+		if ( ! $product instanceof WC_Product || ! velotok_is_valid_product( $product ) ) {
+			continue;
 		}
+
+		$index++;
+		$models[] = velotok_normalize_product( $product, $index );
 	}
 
 	return $models;
