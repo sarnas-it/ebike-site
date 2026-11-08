@@ -29,7 +29,7 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 			'parent_spec'             => 'ecommerce-store',
 			'requirement'             => 'TESTEB-28',
 			'task'                    => 'TESTEB-28',
-			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34' ),
+			'requirement_ids'         => array( 'TESTEB-28', 'TESTEB-29', 'TESTEB-30', 'TESTEB-31', 'TESTEB-32', 'TESTEB-33', 'TESTEB-34', 'TESTEB-35' ),
 			'source'                  => 'woocommerce_zones',
 			'provider'                => 'woocommerce',
 			'provider_label'          => 'WooCommerce',
@@ -138,17 +138,55 @@ if ( ! function_exists( 'velotok_core_delivery_zones_contract' ) ) {
 				'outside_radius_code'=> 'DELIVERY_PICKUP_POINTS_OUTSIDE_RADIUS',
 			),
 			'out_of_zone'             => array(
+				'requirement'      => 'TESTEB-35',
 				'code'             => 'DELIVERY_ZONE_NOT_FOUND',
 				'message'          => 'Адрес не попадает ни в одну зону доставки WooCommerce.',
 				'pickup_available' => true,
 				'pickup_independent_of_zone' => true,
+				'no_zone'          => true,
+				'behavior'         => 'pickup_fallback',
+				'fallback'         => 'pickup',
+				'fallback_method'  => 'local_pickup',
+				'same_behavior'    => true,
+				'same_as_ambiguous'          => true,
+				'same_behavior_as_ambiguous' => true,
+				'same_methods_as_ambiguous'  => true,
+				'provider_methods_hidden'    => true,
+				'fake_tariff'      => false,
 			),
 			'ambiguous_address'       => array(
+				'requirement'          => 'TESTEB-35',
 				'code'                 => 'DELIVERY_ADDRESS_AMBIGUOUS',
 				'message'              => 'Адрес доставки неоднозначен.',
 				'same_as_out_of_zone'  => true,
 				'pickup_available'     => true,
 				'pickup_independent_of_zone' => true,
+				'no_zone'              => true,
+				'behavior'             => 'pickup_fallback',
+				'fallback'             => 'pickup',
+				'fallback_method'      => 'local_pickup',
+				'same_behavior'        => true,
+				'same_behavior_as_out_of_zone' => true,
+				'same_methods_as_out_of_zone'  => true,
+				'provider_methods_hidden'      => true,
+				'fake_tariff'          => false,
+			),
+			'no_zone'                 => array(
+				'requirement'          => 'TESTEB-35',
+				'same_behavior'        => true,
+				'behavior'             => 'pickup_fallback',
+				'fallback'             => 'pickup',
+				'fallback_method'      => 'local_pickup',
+				'pickup_available'     => true,
+				'provider_methods_hidden' => true,
+				'fake_tariff'          => false,
+				'same_methods'         => true,
+				'same_available'       => true,
+				'same_errors_visible'  => true,
+				'codes'                => array(
+					'out_of_zone'       => 'DELIVERY_ZONE_NOT_FOUND',
+					'ambiguous_address' => 'DELIVERY_ADDRESS_AMBIGUOUS',
+				),
 			),
 			'zones_unavailable'       => array(
 				'code'    => 'DELIVERY_ZONES_UNAVAILABLE',
@@ -604,13 +642,19 @@ if ( ! function_exists( 'velotok_core_delivery_zones_match' ) ) {
 
 		if ( $ambiguous ) {
 			return array(
-				'matched' => false,
-				'code'    => $contract['ambiguous_address']['code'],
-				'message' => $contract['ambiguous_address']['message'],
-				'zone'    => null,
-				'zone_id' => 0,
-				'address' => $address,
-				'errors'  => array( $contract['ambiguous_address'] ),
+				'matched'         => false,
+				'code'            => $contract['ambiguous_address']['code'],
+				'message'         => $contract['ambiguous_address']['message'],
+				'zone'            => null,
+				'zone_id'         => 0,
+				'address'         => $address,
+				'errors'          => array( $contract['ambiguous_address'] ),
+				'no_zone'         => true,
+				'behavior'        => $contract['ambiguous_address']['behavior'],
+				'fallback'        => $contract['ambiguous_address']['fallback'],
+				'fallback_method' => $contract['ambiguous_address']['fallback_method'],
+				'pickup_available'=> true,
+				'same_behavior'   => true,
 			);
 		}
 
@@ -661,13 +705,19 @@ if ( ! function_exists( 'velotok_core_delivery_zones_match' ) ) {
 		}
 
 		return array(
-			'matched' => false,
-			'code'    => $contract['out_of_zone']['code'],
-			'message' => $contract['out_of_zone']['message'],
-			'zone'    => $rest_zone,
-			'zone_id' => 0,
-			'address' => $address,
-			'errors'  => array( $contract['out_of_zone'] ),
+			'matched'         => false,
+			'code'            => $contract['out_of_zone']['code'],
+			'message'         => $contract['out_of_zone']['message'],
+			'zone'            => $rest_zone,
+			'zone_id'         => 0,
+			'address'         => $address,
+			'errors'          => array( $contract['out_of_zone'] ),
+			'no_zone'         => true,
+			'behavior'        => $contract['out_of_zone']['behavior'],
+			'fallback'        => $contract['out_of_zone']['fallback'],
+			'fallback_method' => $contract['out_of_zone']['fallback_method'],
+			'pickup_available'=> true,
+			'same_behavior'   => true,
 		);
 	}
 }
@@ -2698,9 +2748,24 @@ if ( ! function_exists( 'velotok_core_delivery_zone_methods' ) ) {
 			}
 		}
 
+		$no_zone   = ! $matched;
+		$behavior  = $no_zone ? 'pickup_fallback' : 'zone_methods';
+		$fallback  = $no_zone ? 'pickup' : '';
+		$pickup_only = $no_zone
+			&& $pickup_allowed
+			&& array_keys( $methods ) === array( $contract['pickup']['method_id'] );
+
 		return array(
 			'available'       => $available,
 			'zone_matched'    => $matched,
+			'no_zone'         => $no_zone,
+			'no_zone_match'   => $no_zone,
+			'behavior'        => $behavior,
+			'fallback'        => $fallback,
+			'fallback_method' => $no_zone ? $contract['pickup']['method_id'] : '',
+			'pickup_only'     => $pickup_only,
+			'provider_methods_hidden' => $no_zone,
+			'same_behavior'   => $no_zone,
 			'zone_id'         => isset( $match['zone_id'] ) ? (int) $match['zone_id'] : 0,
 			'zone'            => isset( $match['zone'] ) ? $match['zone'] : null,
 			'code'            => isset( $match['code'] ) ? $match['code'] : '',
