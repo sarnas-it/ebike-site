@@ -83,6 +83,8 @@ function velotok_core_accounts_contract() {
 			'password_storage'            => 'password_hash',
 			'duplicate_account'           => false,
 			'existing_email_strategy'     => 'login',
+			'existing_email_next_step'    => 'login',
+			'existing_email_creates_account' => false,
 			'auto_login'                  => false,
 			'persistent'                  => true,
 			'mocked'                      => false,
@@ -105,6 +107,7 @@ function velotok_core_accounts_contract() {
 			'unconfirmed_access'            => false,
 			'invalid_credentials_code'      => 'ACCOUNT_INVALID_CREDENTIALS',
 			'reveals_account_existence'     => false,
+			'target_url'                    => '/account/login/',
 			'mocked'                        => false,
 			'source'                        => 'wordpress',
 		),
@@ -547,6 +550,10 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 		'status'                => null,
 		'confirmation_token'    => null,
 		'next_step'             => null,
+		'login_url'             => '',
+		'redirect_url'          => '',
+		'redirected'            => false,
+		'existing_email_strategy' => 'login',
 		'code'                  => null,
 		'error'                 => null,
 		'message'               => '',
@@ -574,12 +581,22 @@ function velotok_core_account_register( $email = '', $password = '', $options = 
 	}
 
 	if ( isset( $state['users'][ $key ] ) ) {
-		$result['valid']          = true;
-		$result['existing_user']  = true;
-		$result['login_required'] = true;
-		$result['email_sent']     = true;
-		$result['next_step']      = 'login';
-		$result['message']        = $contract['privacy']['generic_registration_message'];
+		$login_url = isset( $contract['login']['target_url'] ) ? (string) $contract['login']['target_url'] : '/account/login/';
+
+		$result['valid']                 = true;
+		$result['registered']            = false;
+		$result['existing_user']         = true;
+		$result['login_required']        = true;
+		$result['confirmation_required'] = false;
+		$result['email_sent']            = true;
+		$result['next_step']             = 'login';
+		$result['login_url']             = $login_url;
+		$result['redirect_url']          = $login_url;
+		$result['redirected']            = false;
+		$result['existing_email_strategy'] = 'login';
+		$result['message']               = $contract['privacy']['generic_registration_message'];
+		$result['user_id']               = (int) $state['users'][ $key ]['user_id'];
+		$result['status']                = isset( $state['users'][ $key ]['status'] ) ? $state['users'][ $key ]['status'] : null;
 
 		return $result;
 	}
