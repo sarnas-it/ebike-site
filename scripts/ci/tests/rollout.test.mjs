@@ -491,6 +491,27 @@ function testCheckRunsForAnotherCommitAreRejected() {
   console.log('PASS: standard check runs from another commit are rejected');
 }
 
+function testCheckRunsWithoutCommitProvenanceAreRejected() {
+  // The review finding was that recorded evidence from another commit was used
+  // for the submitted head. A check run that does not carry head_sha has no
+  // provenance at all and must not be accepted for any concrete submission.
+  const anonymous = STANDARD_CHECK_RUNS.map((check) => {
+    const { head_sha: _headSha, ...rest } = check;
+    return rest;
+  });
+  const evidence = greenEvidence({ checkRuns: anonymous });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some(
+      (problem) =>
+        problem.includes('is for unknown') &&
+        problem.includes(`expected ${HEAD_SHA}`),
+    ),
+    'check runs without head_sha must not prove the submitted commit',
+  );
+  console.log('PASS: check runs without commit provenance are rejected');
+}
+
 function testFailedStandardCheckRunIsRed() {
   const failed = greenEvidence({
     checkRuns: STANDARD_CHECK_RUNS.map((check) =>
@@ -744,6 +765,7 @@ async function main() {
   testSyntheticCheckRunsAreRejected();
   testCheckRunsFromAnotherSuiteLinkToRunAreRejected();
   testCheckRunsForAnotherCommitAreRejected();
+  testCheckRunsWithoutCommitProvenanceAreRejected();
   testFailedStandardCheckRunIsRed();
   testLatestRunWins();
   await testCollectsFromApiByRunId();

@@ -90,8 +90,9 @@ Workflow `verify-ci-rollout` теперь запускается на самом
   `php-plugin-tests`, `plugin-tests`, `ci-repair-tests`) или какой-то job упал;
 * на проверяемом коммите нет штатных check runs этих job, привязанных к check
   suite проверяемого прогона `ci` и к тому же `head_sha` (зелёные check runs,
-  созданные через Checks API в обход workflow или принадлежащие другому check
-  suite, не принимаются);
+  созданные через Checks API в обход workflow, принадлежащие другому check
+  suite или не содержащие `head_sha`, не принимаются — без явного коммита они
+  не доказывают сдаваемый SHA);
 * прогон или check run относится к другому коммиту (например, к предыдущей
   сдаче).
 

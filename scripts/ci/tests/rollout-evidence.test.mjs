@@ -123,6 +123,37 @@ function testRecordedEvidenceCannotProveAnotherSubmittedHead() {
   );
 }
 
+function testRecordedChecksWithoutCommitProvenanceAreRejected() {
+  // Every accepted check run must name the exact commit under test. A recording
+  // with stripped head_sha has no way to prove the submitted SHA, so it is red.
+  const anonymous = fixture.checkRuns.map((check) => {
+    const { head_sha: _headSha, ...rest } = check;
+    return rest;
+  });
+  const evidence = summarizeRolloutEvidence({
+    pr: fixture.pullRequest,
+    repository: fixture.repository,
+    workflow: fixture.workflow.present ? fixture.workflow : null,
+    run: fixture.run,
+    jobs: fixture.jobs,
+    checkRuns: anonymous,
+    targetSha: fixture.run.head_sha,
+    workflowRef: fixture.run.head_sha,
+  });
+  assert.strictEqual(evidence.ready, false);
+  assert.ok(
+    evidence.problems.some(
+      (problem) =>
+        problem.includes('is for unknown') &&
+        problem.includes(`expected ${fixture.run.head_sha}`),
+    ),
+    'check runs without head_sha cannot prove the submitted commit',
+  );
+  console.log(
+    'PASS: recorded check runs without commit provenance are rejected',
+  );
+}
+
 function testDocumentationDescribesDynamicEvidence() {
   for (const relative of ['docs/testeb-63-comment.md', 'docs/ci.md']) {
     const text = readFileSync(path.join(repoRoot, relative), 'utf8');
@@ -162,6 +193,7 @@ function main() {
   testRealRunHasEveryRequiredJobAndCheck();
   testRealEvidenceIsGreenAndPinnedToTheHead();
   testRecordedEvidenceCannotProveAnotherSubmittedHead();
+  testRecordedChecksWithoutCommitProvenanceAreRejected();
   testDocumentationDescribesDynamicEvidence();
 }
 

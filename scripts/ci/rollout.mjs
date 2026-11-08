@@ -91,8 +91,14 @@ function checkRunBelongsToRun(check, run) {
 // exact commit this gate is certifying. A check run for an older head must not
 // count for a newer submitted head.
 function checkRunIsForCommit(check, targetSha) {
-  if (!targetSha || !check.headSha) {
+  if (!targetSha) {
     return true;
+  }
+  // A check run that does not name the commit it was created for cannot prove
+  // the submitted SHA. Accepting it would let a recording from another commit
+  // (or a check run with missing provenance) stand in for this submission.
+  if (!check.headSha) {
+    return false;
   }
   return String(check.headSha) === String(targetSha);
 }
