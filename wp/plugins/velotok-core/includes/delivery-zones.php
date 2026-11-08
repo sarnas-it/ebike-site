@@ -192,17 +192,19 @@ if ( ! function_exists( 'velotok_core_delivery_zones_settings' ) ) {
 	 * @return array<string,mixed>
 	 */
 	function velotok_core_delivery_zones_settings( $method ) {
-		$settings = velotok_core_delivery_zones_value(
-			$method,
-			array( 'settings', 'instance_settings', 'options', 'config' ),
-			array()
-		);
+		foreach ( array( 'instance_settings', 'settings', 'options', 'config' ) as $key ) {
+			$settings = velotok_core_delivery_zones_value( $method, array( $key ), null );
 
-		if ( is_object( $settings ) ) {
-			$settings = get_object_vars( $settings );
+			if ( is_object( $settings ) ) {
+				$settings = get_object_vars( $settings );
+			}
+
+			if ( is_array( $settings ) && ! empty( $settings ) ) {
+				return $settings;
+			}
 		}
 
-		return is_array( $settings ) ? $settings : array();
+		return array();
 	}
 }
 

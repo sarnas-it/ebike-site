@@ -47,6 +47,7 @@ if ( is_readable( VELOTOK_CORE_PATH . 'includes/delivery-options.php' ) ) {
 	require_once VELOTOK_CORE_PATH . 'includes/delivery-options.php';
 }
 require_once VELOTOK_CORE_PATH . 'includes/delivery-zones.php';
+require_once VELOTOK_CORE_PATH . 'includes/delivery-woocommerce.php';
 if ( is_readable( VELOTOK_CORE_PATH . 'includes/delivery-order-total.php' ) ) {
 	require_once VELOTOK_CORE_PATH . 'includes/delivery-order-total.php';
 }
