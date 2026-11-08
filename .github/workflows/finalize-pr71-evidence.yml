@@ -1,0 +1,61 @@
+name: "Finalize PR #71 evidence"
+run-name: "Finalize PR #71 evidence for run ${{ inputs.run_id }}"
+
+# The recovery workflow cannot publish its own final status: while it is still
+# running its status is in_progress. This separate workflow is dispatched at the
+# end of recovery, waits for that exact run to complete, and only then publishes
+# the completed evidence to the pull request comment.
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        default: '71'
+      sha:
+        description: Exact commit under test
+        required: true
+      run_id:
+        description: Recovery workflow run id to finalize
+        required: true
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  issues: write
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: finalize-pr-71-evidence-${{ inputs.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Finalize PR #71 evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Wait for the recovery run and publish completed evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/ci/wait-and-publish-evidence.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "${{ inputs.pr }}" \
+            --sha "${{ inputs.sha }}" \
+            --run-id "${{ inputs.run_id }}" \
+            --workflow .github/workflows/recover-pr71.yml \
+            --comment-file docs/testeb-66-comment.md \
+            --comment-marker '<!-- testeb-66-recovery -->' \
+            --timeout-ms 2400000 \
+            --interval-ms 15000
