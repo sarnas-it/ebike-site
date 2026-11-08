@@ -489,25 +489,31 @@ function velotok_installment_months() {
  * @return bool
  */
 function velotok_is_valid_product( $product ) {
-	if ( ! is_object( $product ) ) {
+	if ( ! is_object( $product ) || ! velotok_product_is_published( $product ) ) {
 		return false;
-	}
-
-	if ( method_exists( $product, 'get_status' ) ) {
-		$status = $product->get_status();
-
-		if ( is_string( $status ) && '' !== $status && 'publish' !== $status ) {
-			return false;
-		}
 	}
 
 	if ( method_exists( $product, 'is_visible' ) && false === $product->is_visible() ) {
 		return false;
 	}
 
+	if ( method_exists( $product, 'get_catalog_visibility' ) ) {
+		$visibility = (string) $product->get_catalog_visibility();
+
+		if ( in_array( $visibility, array( 'hidden', 'search' ), true ) ) {
+			return false;
+		}
+	}
+
 	$name = method_exists( $product, 'get_name' ) ? trim( wp_strip_all_tags( (string) $product->get_name() ) ) : '';
 
 	if ( '' === $name ) {
+		return false;
+	}
+
+	$id = method_exists( $product, 'get_id' ) ? (int) $product->get_id() : 0;
+
+	if ( $id <= 0 ) {
 		return false;
 	}
 
@@ -751,20 +757,79 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 }
 
 /**
+ * Возвращает состояние товара из модели WooCommerce.
+ *
+ * Товары старых тестовых двойников могут не иметь get_status(); для них
+ * состояние берётся из записи, а при отсутствии источника считается publish.
+ *
+ * @param WC_Product $product Товар.
+ * @return string
+ */
+function velotok_product_status( $product ) {
+	if ( ! is_object( $product ) ) {
+		return '';
+	}
+
+	if ( method_exists( $product, 'get_status' ) ) {
+		$status = (string) $product->get_status();
+
+		if ( '' !== $status ) {
+			return $status;
+		}
+	}
+
+	if ( method_exists( $product, 'get_id' ) && function_exists( 'get_post_status' ) ) {
+		$status = get_post_status( (int) $product->get_id() );
+
+		if ( is_string( $status ) && '' !== $status ) {
+			return $status;
+		}
+	}
+
+	return 'publish';
+}
+
+/**
+ * Опубликован ли товар.
+ *
+ * @param WC_Product $product Товар.
+ * @return bool
+ */
+function velotok_product_is_published( $product ) {
+	return 'publish' === velotok_product_status( $product );
+}
+
+/**
+ * Валиден ли товар для показа на витрине.
+ *
+ * Витрина показывает только опубликованные публичные товары, у которых есть
+ * идентификатор и название, а цена является неотрицательным числом. Описание
+ * и фото необязательны: карточка подставляет безопасные запасные значения.
+ *
+ * @param WC_Product $product Товар.
+ * @return bool
+ */
+function velotok_product_is_valid( $product ) {
+	return velotok_is_valid_product( $product );
+}
+
+/**
  * Модели для главной страницы.
+ *
+ * Если WooCommerce доступен, витрина строится только из опубликованных
+ * валидных товаров. Пустой каталог возвращает пустой список: шаблон выводит
+ * пустое состояние, а не демо-карточки. Встроенные демо-модели остаются только
+ * для сайта, где WooCommerce не установлен вовсе.
  *
  * @return array<int,array>
  */
 function velotok_get_home_models() {
-	static $models = null;
-
-	if ( null !== $models ) {
-		return $models;
-	}
-
-	$models = array();
+	$models  = array();
+	$queried = false;
+	$raw     = array();
 
 	if ( function_exists( 'wc_get_products' ) ) {
+		$queried  = true;
 		$products = wc_get_products( array(
 			'status'   => 'publish',
 			'limit'    => -1,
@@ -773,20 +838,23 @@ function velotok_get_home_models() {
 			'return'   => 'objects',
 		) );
 
-		if ( ! empty( $products ) ) {
-			$index = 0;
-			foreach ( $products as $product ) {
-				if ( ! $product instanceof WC_Product || ! velotok_is_valid_product( $product ) ) {
-					continue;
-				}
-
-				$index++;
-				$models[] = velotok_normalize_product( $product, $index );
-			}
+		if ( is_array( $products ) ) {
+			$raw = $products;
 		}
 	}
 
-	if ( empty( $models ) ) {
+	$index = 0;
+
+	foreach ( $raw as $product ) {
+		if ( velotok_product_is_valid( $product ) ) {
+			$index++;
+			$models[] = velotok_normalize_product( $product, $index );
+		}
+	}
+
+	$use_demo = ! $queried;
+
+	if ( $use_demo ) {
 		$index = 0;
 		foreach ( velotok_fallback_models() as $model ) {
 			$index++;
@@ -815,15 +883,17 @@ function velotok_get_products_by_category( $slug, $limit = 3 ) {
 		'return'   => 'objects',
 	) );
 
+	if ( ! is_array( $products ) ) {
+		return array();
+	}
+
 	$models = array();
 	$index  = 0;
 	foreach ( $products as $product ) {
-		if ( ! $product instanceof WC_Product || ! velotok_is_valid_product( $product ) ) {
-			continue;
+		if ( velotok_product_is_valid( $product ) ) {
+			$index++;
+			$models[] = velotok_normalize_product( $product, $index );
 		}
-
-		$index++;
-		$models[] = velotok_normalize_product( $product, $index );
 	}
 
 	return $models;

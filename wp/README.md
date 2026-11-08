@@ -31,6 +31,7 @@ docker compose run --rm wpcli plugin list
 php wp/themes/velotok/tests/catalog-render-test.php
 php wp/themes/velotok/tests/catalog-display-test.php
 php wp/themes/velotok/tests/catalog-all-products-test.php
+php wp/themes/velotok/tests/catalog-published-products-test.php
 php wp/plugins/velotok-core/tests/product-attributes-contract-test.php
 php wp/plugins/velotok-core/tests/product-attributes-card-test.php
 php wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
@@ -50,7 +51,10 @@ WooCommerce → список моделей → шаблон каталога �
 каталог перестаёт выводить все товары или их обязательные и произвольные
 атрибуты. Тест `catalog-all-products-test.php` проверяет, что каталог не
 обрезается до первых семи товаров и что карточка сохраняет описание даже при
-пустых полях описания у товара. Тесты `product-attributes-contract-test.php`
+пустых полях описания у товара. Тест `catalog-published-products-test.php`
+проверяет, что витрина показывает только опубликованные публичные валидные
+товары, а пустой активный каталог выводит пустое состояние без демо-карточек.
+Тесты `product-attributes-contract-test.php`
 и `product-attributes-card-test.php` проверяют mocked-контракт источника
 произвольных дополнительных атрибутов и их вывод в карточке. Тест
 `payment-gateway-contract-test.php` проверяет шлюз ЮKassa для WooCommerce:
@@ -101,6 +105,7 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/themes/velotok/tests/catalog-render-test.php` — тест карточек каталога;
 * `wp/themes/velotok/tests/catalog-display-test.php` — тест вывода всего каталога;
 * `wp/themes/velotok/tests/catalog-all-products-test.php` — тест полноты каталога и описания;
+* `wp/themes/velotok/tests/catalog-published-products-test.php` — тест опубликованных валидных товаров и пустого каталога;
 * `wp/plugins/velotok-core/tests/product-attributes-contract-test.php` — тест контракта дополнительных атрибутов;
 * `wp/plugins/velotok-core/tests/product-attributes-card-test.php` — тест вывода дополнительных атрибутов в карточке;
 * `wp/tests/smoke.sh` — дымовой тест локального запуска.
