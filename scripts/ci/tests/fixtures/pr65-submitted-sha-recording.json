@@ -1,0 +1,212 @@
+{
+  "captured_at": "2026-11-08T19:15:24Z",
+  "source": {
+    "repository": "https://github.com/sarnas-it/ebike-site",
+    "pull_request": "https://api.github.com/repos/sarnas-it/ebike-site/pulls/65",
+    "run": "https://github.com/sarnas-it/ebike-site/actions/runs/42506679632",
+    "jobs": "https://api.github.com/repos/sarnas-it/ebike-site/actions/runs/42506679632/jobs",
+    "check_runs": "https://api.github.com/repos/sarnas-it/ebike-site/commits/fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e/check-runs",
+    "mergeable_observation": "https://github.com/sarnas-it/ebike-site/pull/65#issuecomment-6720902130"
+  },
+  "note": "Verbatim GitHub API recording of the ci run and standard check runs on the previously submitted PR #65 head fc1fe23. The mergeable=true value is the value the verify-ci-rollout gate observed and recorded in the PR #65 evidence comment before GitHub started recomputing mergeability asynchronously (the live API may return null/unknown while recomputing). This recording proves criteria 2 and 3 for that exact submitted SHA; it is NOT evidence for a later head, which must get its own run and check runs.",
+  "repository": {
+    "owner": "sarnas-it",
+    "name": "ebike-site",
+    "default_branch": "main"
+  },
+  "pullRequest": {
+    "number": 65,
+    "state": "open",
+    "merged": false,
+    "mergeable": true,
+    "mergeable_state": "unstable",
+    "merged_at": null,
+    "merge_commit_sha": "87995a2d0250156fc072cc2daffc23d8ef5bb454",
+    "base": {
+      "ref": "main"
+    },
+    "head": {
+      "ref": "feat/ebike-site-testeb-63",
+      "sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e"
+    }
+  },
+  "workflow": {
+    "path": ".github/workflows/ci.yml",
+    "ref": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+    "present": true
+  },
+  "run": {
+    "id": 42506679632,
+    "html_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506679632",
+    "path": ".github/workflows/ci.yml",
+    "name": "ci",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+    "head_branch": "feat/ebike-site-testeb-63",
+    "check_suite_id": 115141962596,
+    "created_at": "2026-11-08T17:47:10Z",
+    "updated_at": "2026-11-08T17:47:30Z"
+  },
+  "jobs": [
+    {
+      "id": 128810708673,
+      "name": "php-tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128810708806,
+      "name": "php-plugin-tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128810708807,
+      "name": "ci-repair-tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128810708889,
+      "name": "plugin-tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128810708965,
+      "name": "php-lint",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "checkRuns": [
+    {
+      "id": 128810708965,
+      "name": "php-lint",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141962596
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506679632/job/128810708965",
+      "app": {
+        "slug": "github-actions"
+      }
+    },
+    {
+      "id": 128810708889,
+      "name": "plugin-tests",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141962596
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506679632/job/128810708889",
+      "app": {
+        "slug": "github-actions"
+      }
+    },
+    {
+      "id": 128810708854,
+      "name": "verify-ci-rollout",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141962591
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506679696/job/128810708854",
+      "app": {
+        "slug": "github-actions"
+      }
+    },
+    {
+      "id": 128810708807,
+      "name": "ci-repair-tests",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141962596
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506679632/job/128810708807",
+      "app": {
+        "slug": "github-actions"
+      }
+    },
+    {
+      "id": 128810708806,
+      "name": "php-plugin-tests",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141962596
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506679632/job/128810708806",
+      "app": {
+        "slug": "github-actions"
+      }
+    },
+    {
+      "id": 128810708673,
+      "name": "php-tests",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141962596
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506679632/job/128810708673",
+      "app": {
+        "slug": "github-actions"
+      }
+    },
+    {
+      "id": 128810696273,
+      "name": "Recover PR",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141951384
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506675367/job/128810696273",
+      "app": {
+        "slug": "github-actions"
+      }
+    },
+    {
+      "id": 128810696129,
+      "name": "Finalize PR",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141951288
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506675342/job/128810696129",
+      "app": {
+        "slug": "github-actions"
+      }
+    },
+    {
+      "id": 128810695832,
+      "name": "Recover PR",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "fc1fe23e61e9dcde4986f45cd0ed8d030588fe8e",
+      "check_suite": {
+        "id": 115141951353
+      },
+      "details_url": "https://github.com/sarnas-it/ebike-site/actions/runs/42506675361/job/128810695832",
+      "app": {
+        "slug": "github-actions"
+      }
+    }
+  ]
+}

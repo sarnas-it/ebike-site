@@ -446,7 +446,7 @@ export async function repairPrChecks({
   token,
   fetchImpl = globalThis.fetch,
   workflowContent = null,
-  commitMessage = 'ci: run checks on pull request head (TESTEB-65)',
+  commitMessage = 'ci: run checks on pull request head (TESTEB-63, TESTEB-65, TESTEB-67)',
   log = () => {},
 }) {
   const pr = await getPullRequest({

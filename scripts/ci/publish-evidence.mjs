@@ -25,7 +25,7 @@ Options:
   --pr <number>         Pull request number (required)
   --sha <sha>           Exact commit under test (required)
   --run-id <id>         Recovery workflow run to verify (default: latest successful)
-  --workflow <path>     Recovery workflow path (default: the workflow for the PR)
+  --workflow <path>     Recovery workflow path (default: per pull request, ${RECOVERY_WORKFLOW_PATH} otherwise)
   --comment-file <path> Markdown template to publish/update on the pull request
   --comment-marker <s>  Idempotency marker for the comment
   --allow-running       Accept the current run while it is still in progress
@@ -47,7 +47,7 @@ function parseArgs(argv) {
     runId: null,
     workflow: null,
     commentFile: null,
-    commentMarker: '<!-- testeb-67-recovery -->',
+    commentMarker: null,
     allowRunning: false,
     dryRun: false,
   };
@@ -96,9 +96,11 @@ async function main() {
   if (!owner || !repo) {
     throw new Error(`invalid --repo value: ${options.repo}`);
   }
+  const workflow = options.workflow || recoveryWorkflowForPullRequest(options.pr);
+  const commentMarker =
+    options.commentMarker ||
+    (options.pr === 62 ? '<!-- testeb-63-recovery -->' : '<!-- testeb-67-recovery -->');
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
-  const workflow =
-    options.workflow || recoveryWorkflowForPullRequest(options.pr);
 
   let template = '';
   if (options.commentFile) {
@@ -131,7 +133,7 @@ async function main() {
   const result = await publishRecoveryEvidence({
     ...shared,
     template,
-    marker: options.commentFile ? options.commentMarker : null,
+    marker: options.commentFile ? commentMarker : null,
   });
 
   process.stdout.write(`${result.body.trimEnd()}\n`);

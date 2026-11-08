@@ -35,7 +35,7 @@ function parseArgs(argv) {
     detailsUrl: process.env.CI_RUN_URL || '',
     summary: '',
     commentFile: null,
-    commentMarker: '<!-- testeb-67-recovery -->',
+    commentMarker: '<!-- testeb-63-recovery -->',
     mergeMethod: 'squash',
     dryRun: false,
   };

@@ -97,13 +97,15 @@ function main() {
   testBrokenWorkflowIsRed();
   testRepositoryWorkflowIsGreen();
   testBrokenRecoveryWorkflowIsRed();
-  testRecoveryWorkflowIsGreen();
+  testRecoveryPr62WorkflowIsGreen();
+  testRecoveryPr73WorkflowIsGreen();
   testFinalizerWorkflowIsGreen();
   testPr78RecoveryWorkflowIsGreen();
   testPr78FinalizerIsGreen();
   testPr68RecoveryWorkflowIsGreen();
   testPr68FinalizerIsGreen();
   testSharedCheckRunnerCoversAllGroups();
+  testRolloutVerificationWorkflowIsWired();
   testCiWorkflowRunsPluginPhpContracts();
   testCiWorkflowKeepsTheVerifiedJobSet();
 }
@@ -164,6 +166,13 @@ function recoveryWorkflowChecks(text) {
     hasPathsFilter: analysis.hasPathsFilter,
     permissions,
     env,
+    checksOutExactSha: /ref:\s*(?:\$\{\{\s*env\.TARGET_SHA\s*\}\}|578e87b5a8587d6078aade92d26bd449448dd1d3)/.test(text),
+    runsSharedChecks: /scripts\/ci\/run-checks\.sh/.test(text),
+    publishesAndMerges: /scripts\/ci\/recover-pr\.mjs/.test(text),
+    publishesRealRunEvidence: /scripts\/ci\/publish-evidence\.mjs/.test(text),
+    allowsRunningEvidenceStep: /--allow-running/.test(text),
+    runNameNamesTargetSha:
+      /^run-name:.*578e87b5a8587d6078aade92d26bd449448dd1d3/m.test(text),
     resolvesCurrentHead: /scripts\/ci\/resolve-pr-target\.mjs/.test(text),
     checksOutResolvedHead:
       /ref:\s*\$\{\{\s*steps\.target\.outputs\.sha\s*\}\}/.test(text),
@@ -172,8 +181,6 @@ function recoveryWorkflowChecks(text) {
       /--sha\s+['\"]?525b0d48/.test(text),
     nameQuoted: /^name:\s*["'].*#73.*["']\s*$/m.test(text),
     runNameQuoted: /^run-name:\s*["'].*#73.*["']\s*$/m.test(text),
-    runsSharedChecks: /scripts\/ci\/run-checks\.sh/.test(text),
-    publishesAndMerges: /scripts\/ci\/recover-pr\.mjs/.test(text),
     dispatchesEvidenceFinalizer:
       /scripts\/ci\/request-evidence-finalize\.mjs/.test(text),
     publishesInProgressEvidence: /--allow-running/.test(text),
@@ -201,17 +208,82 @@ function testBrokenRecoveryWorkflowIsRed() {
   assert.strictEqual(checks.permissions['checks'], undefined);
   assert.strictEqual(checks.permissions['statuses'], undefined);
   assert.strictEqual(checks.permissions['pull-requests'], undefined);
-  assert.strictEqual(checks.resolvesCurrentHead, false);
-  assert.strictEqual(checks.checksOutResolvedHead, false);
+  assert.strictEqual(checks.checksOutExactSha, false);
   assert.strictEqual(checks.runsSharedChecks, false);
   assert.strictEqual(checks.publishesAndMerges, false);
+  assert.strictEqual(checks.publishesRealRunEvidence, false);
+  assert.strictEqual(checks.allowsRunningEvidenceStep, false);
+  assert.strictEqual(checks.runNameNamesTargetSha, false);
+  assert.strictEqual(checks.resolvesCurrentHead, false);
+  assert.strictEqual(checks.checksOutResolvedHead, false);
   assert.strictEqual(checks.dispatchesEvidenceFinalizer, false);
   assert.strictEqual(checks.nameQuoted, false);
   assert.strictEqual(checks.runNameQuoted, false);
-  console.log('PASS: a recovery workflow without write permissions and dynamic head is red');
+  console.log('PASS: a recovery workflow without write permissions and exact checkout is red');
 }
 
-function testRecoveryWorkflowIsGreen() {
+function testRecoveryPr62WorkflowIsGreen() {
+  const text = readFileSync(path.join(repoRoot, '.github/workflows/recover-pr62.yml'), 'utf8');
+  const checks = recoveryWorkflowChecks(text);
+
+  assert.ok(checks.triggers.includes('push'), 'recovery must run on push to any branch');
+  assert.ok(
+    checks.triggers.includes('workflow_dispatch'),
+    'recovery must be manually dispatchable',
+  );
+  assert.strictEqual(checks.hasPathsFilter, false, 'recovery must not filter by paths');
+  assert.strictEqual(checks.permissions['checks'], 'write');
+  assert.strictEqual(checks.permissions['statuses'], 'write');
+  assert.strictEqual(checks.permissions['pull-requests'], 'write');
+  assert.strictEqual(checks.permissions['contents'], 'write');
+  assert.strictEqual(
+    checks.env.TARGET_PR,
+    '62',
+    'recovery must target the pull request from the incident',
+  );
+  assert.strictEqual(
+    checks.env.TARGET_SHA,
+    '578e87b5a8587d6078aade92d26bd449448dd1d3',
+    'recovery must check out the exact commit from the incident',
+  );
+  assert.strictEqual(
+    checks.checksOutExactSha,
+    true,
+    'recovery must check out the exact target SHA, not a branch head',
+  );
+  assert.strictEqual(
+    checks.runsSharedChecks,
+    true,
+    'recovery must run the same checks as the normal CI',
+  );
+  assert.strictEqual(
+    checks.publishesAndMerges,
+    true,
+    'recovery must publish checks and complete the deferred merge',
+  );
+  assert.strictEqual(
+    checks.publishesRealRunEvidence,
+    true,
+    'recovery must verify a real workflow run before confirming the result',
+  );
+  assert.strictEqual(
+    checks.allowsRunningEvidenceStep,
+    true,
+    'the evidence step must be able to record its own in-progress run',
+  );
+  assert.strictEqual(
+    checks.runNameNamesTargetSha,
+    true,
+    'the run name must identify the target SHA so the run is auditable',
+  );
+  assert.ok(
+    text.includes('docs/testeb-63-comment.md'),
+    'recovery must post a confirmed comment on the pull request',
+  );
+  console.log('PASS: recovery workflow targets PR #62 at the exact SHA and publishes verified evidence');
+}
+
+function testRecoveryPr73WorkflowIsGreen() {
   const text = readFileSync(path.join(repoRoot, '.github/workflows/recover-pr73.yml'), 'utf8');
   const checks = recoveryWorkflowChecks(text);
 
@@ -427,6 +499,74 @@ function testSharedCheckRunnerCoversAllGroups() {
     assert.ok(runner.includes(group), `run-checks.sh must keep the ${group} check`);
   }
   console.log('PASS: the shared runner keeps the full check set');
+}
+
+function testRolloutVerificationWorkflowIsWired() {
+  const text = readFileSync(
+    path.join(repoRoot, '.github/workflows/verify-ci-rollout.yml'),
+    'utf8',
+  );
+  const analysis = analyzeWorkflow(text);
+  assert.ok(analysis.triggers.includes('push'), 'rollout verification must run on push');
+  assert.ok(
+    analysis.triggers.includes('workflow_dispatch'),
+    'rollout verification must be manually dispatchable',
+  );
+  assert.ok(
+    analysis.triggers.includes('pull_request'),
+    'rollout verification must run on the fix pull request itself, otherwise the real head is never checked',
+  );
+  assert.strictEqual(
+    analysis.hasPathsFilter,
+    false,
+    'the rollout gate must not skip pushes that do not touch the workflow itself',
+  );
+  assert.ok(
+    /branches:\s*\[\s*main\s*\]/.test(text),
+    'rollout verification must run on the base branch',
+  );
+  assert.ok(
+    /github\.event\.pull_request\.number\s*==\s*65/.test(text),
+    'the pull_request run must target PR #65 so it attaches a normal check run to the real head',
+  );
+  assert.ok(
+    text.includes('scripts/ci/verify-rollout.mjs'),
+    'rollout verification must call the red-green gate',
+  );
+  assert.ok(
+    text.includes('scripts/ci/publish-rollout-evidence.mjs'),
+    'rollout verification must publish the verified head run as evidence on PR #65',
+  );
+  assert.ok(
+    /pull-requests:\s*write/.test(text),
+    'publishing the evidence comment requires pull-requests: write',
+  );
+  assert.ok(
+    /TARGET_SHA:\s*\$\{\{\s*github\.event_name == 'pull_request'\s*&&\s*github\.event\.pull_request\.head\.sha\s*\|\|\s*''\s*\}\}/.test(
+      text,
+    ),
+    'a pull_request run must pin the verified commit to the actual PR head',
+  );
+  assert.ok(
+    /if \[ -n "\$TARGET_SHA" \]; then[\s\S]*?target_args=\(--sha "\$TARGET_SHA"\)/.test(
+      text,
+    ),
+    'the pinned head must be passed only when the event supplies it (push verifies the landed commit)',
+  );
+  assert.ok(
+    /verify-rollout\.mjs[\s\S]*?"\$\{target_args\[@\]\}"/.test(text),
+    'verify-rollout must verify the pinned commit, not whatever the PR head later becomes',
+  );
+  assert.ok(
+    /publish-rollout-evidence\.mjs[\s\S]*?"\$\{target_args\[@\]\}"/.test(text),
+    'the published evidence comment must be pinned to the same verified commit',
+  );
+  assert.ok(
+    /actions\/upload-artifact@v4/.test(text) &&
+      /path:\s*\$\{\{\s*runner\.temp\s*\}\}\/rollout-evidence\.md/.test(text),
+    'the verified evidence must be stored as an artifact, not only in an editable comment',
+  );
+  console.log('PASS: rollout verification runs on PR #65, push to main and manually');
 }
 
 function testCiWorkflowRunsPluginPhpContracts() {
