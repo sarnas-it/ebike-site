@@ -1,18 +1,54 @@
 TESTEB-2: Регистрация SHALL требовать подтверждения email
 ================================================================
 
-Обязательная команда проверки:
+Mandatory check command (raw output, current workspace):
 
 $ php wp/plugins/velotok-core/tests/accounts-contract-test.php
 PASS: контракт аккаунтов выполняется.
+exit code: 0
 
-Фокусный тест требования:
+The mandatory contract test now also loads includes/accounts-wordpress.php
+through tests/helpers/accounts-wordpress-harness.php and verifies the real
+WordPress/WooCommerce path: registration persists a pending customer, stores
+the unconfirmed meta/status/token, sends exactly one confirmation email, blocks
+login and personal-area access before confirmation, and activates the account
+only after the emailed token is used.
+
+Focused TESTEB-2 WordPress-path test:
+
+$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-wp-test.php
+PASS: WordPress-регистрация требует подтверждения email (TESTEB-2).
+exit code: 0
+
+PHP red-green proof (the focused test and the mandatory contract test fail when
+email confirmation is removed, and pass on the real integration):
+
+$ php wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
+PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
+exit code: 0
+
+Additional accounts checks:
 
 $ php wp/plugins/velotok-core/tests/accounts-email-confirmation-test.php
 PASS: регистрация требует подтверждения email (TESTEB-2).
+exit code: 0
 
-Red-green проверка фокусного теста (без обязательного подтверждения email
-тест падает):
+$ php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
+PASS: WordPress-интеграция аккаунтов выполняется.
+exit code: 0
+
+$ node wp/plugins/velotok-core/tests/accounts-contract.test.js
+PASS: accounts contract and PHP behavior test passed
+exit code: 0
+
+$ node wp/plugins/velotok-core/tests/accounts-redgreen.test.js
+PASS: accounts contract test fails without email confirmation and passes with it
+exit code: 0
+
+$ node wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
+PASS: WordPress accounts integration is persistent and the test fails without email confirmation or customer persistence
+exit code: 0
 
 $ node wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen.test.js
-PASS: TESTEB-2 test fails without email confirmation and passes with it
+PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
+exit code: 0
