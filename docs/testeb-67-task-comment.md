@@ -36,13 +36,19 @@ PR workflow тоже не было. Для события `pull_request` GitHub 
 
 - Проверяемый коммит (актуальный head PR #73):
   `525b0d4803e03858cdb0bfce9cb90837bdf0473e`.
-- Проверки на коммите: `php-lint=success`, `php-tests=success`,
-  `plugin-tests=success`, `php-plugin-tests=success`.
+- Recovery workflow run:
+  [#42492889252](https://github.com/sarnas-it/ebike-site/actions/runs/42492889252)
+  — `status=completed`, `conclusion=success`, `event=push`, workflow
+  `.github/workflows/recover-pr73.yml`.
+- Commit status на проверяемом коммите: `ci/recover=success` со ссылкой на
+  run `42492889252`.
+- Зелёные check runs на проверяемом коммите: `php-lint` (128768985954),
+  `php-tests` (128768989481), `plugin-tests` (128768992188),
+  `php-plugin-tests` (128768994590) — все `completed/success`.
 - `php wp/plugins/velotok-core/tests/accounts-contract-test.php`:
-  `PASS: контракт аккаунтов выполняется.`, exit code 0.
-- Ссылка на post-fix recovery-прогон, его статус и merge commit публикуются
-  автоматически финализатором в `docs/testeb-67-comment.md` после того, как
-  GitHub создаст recovery-прогон; заранее вымышленные run id в документации не
-  фиксируются.
-- PR #73 мержится recovery-прогоном только после зелёных проверок и совпадения
-  head PR с проверенным коммитом.
+  `PASS: контракт аккаунтов выполняется.`, exit code 0; команда входит в
+  `php-plugin-tests`.
+- PR #73 смержен без ручного вмешательства `2026-11-08T15:04:35Z`, merge
+  commit `6a14f53349e6f7da967e1bd1aded48c12deb82be`.
+- После нового push финализатор заменяет блок доказательств в
+  `docs/testeb-67-comment.md` данными нового recovery-прогона через GitHub API.

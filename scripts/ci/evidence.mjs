@@ -9,11 +9,42 @@ import {
 } from './lib.mjs';
 
 export const RECOVERY_WORKFLOW_PATH = '.github/workflows/recover-pr73.yml';
+export const RECOVERY_STATUS_CONTEXT = 'ci/recover';
 export const EVIDENCE_START = '<!-- testeb-67-evidence:start -->';
 export const EVIDENCE_END = '<!-- testeb-67-evidence:end -->';
 
 function runPath(run) {
   return run?.path || run?.workflow_path || null;
+}
+
+function runIdFromUrl(url) {
+  const match = /\/actions\/runs\/(\d+)(?:[/?#]|$)/.exec(url || '');
+  return match ? Number(match[1]) : null;
+}
+
+// Recovery runs execute on the commit that triggered the push, not necessarily
+// on the pull request head. The only durable link between the head commit and
+// the run that verified it is the ci/recover commit status published on that
+// head. Resolve the exact run id from that status so evidence can never fall
+// back to an unrelated "latest successful" run.
+export function findRecoveryRunLink(
+  statuses = [],
+  context = RECOVERY_STATUS_CONTEXT,
+) {
+  const list = Array.isArray(statuses) ? statuses : [];
+  for (const status of list) {
+    if (status?.context !== context) {
+      continue;
+    }
+    if (status?.state !== 'success') {
+      continue;
+    }
+    const id = runIdFromUrl(status?.target_url);
+    if (id) {
+      return { id, url: status.target_url, state: status.state };
+    }
+  }
+  return null;
 }
 
 function runUrl(run) {
@@ -81,6 +112,19 @@ export function summarizeRecoveryEvidence({
           'not a completed successful run',
       );
     }
+  }
+
+  const linkedRun = findRecoveryRunLink(statuses);
+  if (!linkedRun) {
+    problems.push(
+      `commit ${targetSha} has no successful ${RECOVERY_STATUS_CONTEXT} status ` +
+        'linking a recovery run',
+    );
+  } else if (normalizedRun && linkedRun.id !== normalizedRun.id) {
+    problems.push(
+      `recovery run ${normalizedRun.id} is not linked from the ` +
+        `${RECOVERY_STATUS_CONTEXT} commit status, which points to run ${linkedRun.id}`,
+    );
   }
 
   if (checkRuns.length === 0) {
@@ -223,26 +267,36 @@ export async function collectRecoveryEvidence({
   fetchImpl = globalThis.fetch,
   allowRunning = false,
 }) {
-  const [pr, checkRuns, status, run] = await Promise.all([
+  const [pr, checkRuns, status] = await Promise.all([
     getPullRequest({ owner, repo, pullNumber, token, fetchImpl }),
     getCheckRuns({ owner, repo, ref: targetSha, token, fetchImpl }),
     getCombinedStatus({ owner, repo, ref: targetSha, token, fetchImpl }),
-    runId
-      ? getWorkflowRun({ owner, repo, runId, token, fetchImpl })
-      : getWorkflowRunsForWorkflow({
-          owner,
-          repo,
-          workflow,
-          token,
-          fetchImpl,
-        }).then((response) => latestSuccessfulRun(response?.workflow_runs)),
   ]);
+
+  const statuses = status?.statuses ?? [];
+  const linkedRun = findRecoveryRunLink(statuses);
+  const resolvedRunId = runId || linkedRun?.id || null;
+  const run = resolvedRunId
+    ? await getWorkflowRun({
+        owner,
+        repo,
+        runId: resolvedRunId,
+        token,
+        fetchImpl,
+      })
+    : await getWorkflowRunsForWorkflow({
+        owner,
+        repo,
+        workflow,
+        token,
+        fetchImpl,
+      }).then((response) => latestSuccessfulRun(response?.workflow_runs));
 
   return summarizeRecoveryEvidence({
     pr,
     run,
     checkRuns: checkRuns?.check_runs ?? [],
-    statuses: status?.statuses ?? [],
+    statuses,
     targetSha,
     expectedWorkflowPath: workflow,
     allowRunning,

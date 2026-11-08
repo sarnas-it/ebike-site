@@ -297,6 +297,11 @@ function testFinalizerWorkflowIsGreen() {
   );
   assert.strictEqual(analysis.hasPathsFilter, false);
   assert.strictEqual(permissions['issues'], 'write');
+  assert.strictEqual(
+    permissions['pull-requests'],
+    'write',
+    'the finalizer must be allowed to create/update the pull request comment',
+  );
   assert.strictEqual(permissions['actions'], 'read');
   assert.ok(
     /scripts\/ci\/wait-and-publish-evidence\.mjs/.test(text),

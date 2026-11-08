@@ -50,16 +50,22 @@ PR-деревьях workflow присутствует. В ветке PR #73 та
   `GITHUB_RUN_ID`: при наличии `--trigger-sha` он обязан найти именно
   recovery-прогон, иначе он ждал бы сам себя и не опубликовал бы этот
   комментарий. Первый recovery-прогон не смог задиспатчить финализатор,
-  потому что workflow ещё не было в базовой ветке; проверки и мерж при этом
-  уже прошли.
+  потому что workflow ещё не было в базовой ветке. Затем push-триггерный
+  финализатор запустился, но упал на шаге публикации комментария. Чтобы
+  публикация комментария к pull request была разрешена, в workflow добавлено
+  право `pull-requests: write` в дополнение к `issues: write`. Проверки и
+  смерженный PR при этом уже были зелёными; наличие права проверяет
+  `scripts/ci/tests/workflow-triggers.test.mjs`.
 
 <!-- testeb-67-evidence:start -->
 ## Подтверждение из реального recovery-прогона
 
-- Проверяемый коммит (актуальный head PR #73): `525b0d4803e03858cdb0bfce9cb90837bdf0473e`
-- Post-fix recovery workflow run: будет опубликован автоматически после push; финализатор заменит этот блок реальными данными из GitHub API.
-- Ожидаемые проверки на коммите: `php-lint`, `php-tests`, `plugin-tests`, `php-plugin-tests`.
-- Обязательная команда `php wp/plugins/velotok-core/tests/accounts-contract-test.php` входит в `php-plugin-tests`.
-- PR #73 мержится recovery-прогоном только после зелёных проверок; итоговый merge commit берётся из API.
-- Итог: это черновик; после recovery-прогона здесь будут фактические `completed/success` доказательства со ссылками на run и merge commit.
+- Проверяемый коммит (актуальный head PR): `525b0d4803e03858cdb0bfce9cb90837bdf0473e`
+- Recovery workflow run: [#42492889252](https://github.com/sarnas-it/ebike-site/actions/runs/42492889252) — status=completed, conclusion=success, event=push, runner head=`2ef3bdca990ab39a81133a06751ceab8fed20aaf`
+- Ветка прогона: `feat/ebike-site-testeb-67`
+- Commit status на проверяемом коммите: `ci/recover=success` → run [#42492889252](https://github.com/sarnas-it/ebike-site/actions/runs/42492889252)
+- Проверки на проверяемом коммите: `php-plugin-tests=success` ([run 128768994590](https://github.com/sarnas-it/ebike-site/runs/128768994590)), `plugin-tests=success` ([run 128768992188](https://github.com/sarnas-it/ebike-site/runs/128768992188)), `php-tests=success` ([run 128768989481](https://github.com/sarnas-it/ebike-site/runs/128768989481)), `php-lint=success` ([run 128768985954](https://github.com/sarnas-it/ebike-site/runs/128768985954))
+- PR merged=true, merge commit=`6a14f53349e6f7da967e1bd1aded48c12deb82be`, merged at=2026-11-08T15:04:35Z
+- Head PR совпадает с проверенным коммитом: true
+- Итог: доказательства полные (green)
 <!-- testeb-67-evidence:end -->

@@ -121,9 +121,25 @@ GitHub не запускает workflow задним числом: появле�
 
 ### Результат после починки
 
-Фактические идентификаторы recovery-прогона и merge commit заранее неизвестны:
-их создаёт GitHub после push этой ветки. Поэтому в документации не фиксируются
-вымышленные run id. После применения починки:
+Починка уже отработала на реальном PR #73, поэтому ниже зафиксированы
+фактические идентификаторы из GitHub API, а не черновик:
+
+* recovery-прогон
+  [#42492889252](https://github.com/sarnas-it/ebike-site/actions/runs/42492889252)
+  — `status=completed`, `conclusion=success`, `event=push`, workflow
+  `.github/workflows/recover-pr73.yml`;
+* проверяемый head PR #73 — `525b0d4803e03858cdb0bfce9cb90837bdf0473e`;
+  recovery исполнялся на коммите-триггере
+  `2ef3bdca990ab39a81133a06751ceab8fed20aaf`, а на проверяемый head
+  опубликован commit status `ci/recover=success` со ссылкой на этот run;
+* зелёные check runs на проверяемом head: `php-lint` (128768985954),
+  `php-tests` (128768989481), `plugin-tests` (128768992188),
+  `php-plugin-tests` (128768994590) — все `completed/success`;
+* PR #73 смержен без ручного вмешательства
+  `2026-11-08T15:04:35Z`, merge commit
+  `6a14f53349e6f7da967e1bd1aded48c12deb82be`.
+
+После применения починки:
 
 1. recovery-workflow `Recover PR #73 checks` находит актуальный head PR #73,
    прогоняет на нём общий набор проверок и публикует check runs на этот SHA;
@@ -132,6 +148,20 @@ GitHub не запускает workflow задним числом: появле�
    триггера, дожидается его `completed/success` и заменяет блок доказательств
    в `docs/testeb-67-comment.md` реальными ссылками на run, проверки и merge
    commit, которые получены из GitHub API.
+
+`verify-recovery.mjs` без `--run-id` больше не берёт произвольный «последний
+успешный» прогон: он читает commit status `ci/recover` на проверяемом коммите
+и достаёт из его `target_url` точный recovery-run. Это связывает проверки с
+конкретным прогоном, который их опубликовал, и делает доказательства
+неподдельными. Тест `scripts/ci/tests/evidence.test.mjs` краснеет, если
+зелёные check runs не привязаны к `ci/recover`, и проходит на реальной связке.
+
+Первый push-триггерный finalizer-прогон завершился `failure` на шаге
+публикации комментария. Чтобы публикация комментария к pull request была
+разрешена, workflow теперь запрашивает `pull-requests: write` (раньше был
+только `issues: write`); `scripts/ci/tests/workflow-triggers.test.mjs`
+проверяет наличие этого права. Сами проверки и мерж к этому моменту уже
+прошли.
 
 `wait-and-publish-evidence.mjs` при `--trigger-sha` намеренно игнорирует
 собственный `GITHUB_RUN_ID`: иначе финализатор ждал бы сам себя, никогда не
@@ -151,16 +181,20 @@ node scripts/ci/diagnose-pr-checks.mjs \
 
 # после recovery: реальный успешный run + зелёные проверки + merge (green).
 # Без --sha проверяется актуальный head PR #73, поэтому уехавший head не
-# подменяется старым SHA из инцидента.
+# подменяется старым SHA из инцидента. Без --run-id точный recovery-прогон
+# берётся из commit status ci/recover на проверяемом коммите.
 node scripts/ci/verify-recovery.mjs \
-  --repo sarnas-it/ebike-site --pr 73 \
-  --run-id <id recovery-прогона>
+  --repo sarnas-it/ebike-site --pr 73
+# фактический результат для PR #73:
+#   workflow run: #42492889252 completed/success
+#   merge commit: 6a14f53349e6f7da967e1bd1aded48c12deb82be
 ```
 
 `verify-recovery.mjs` возвращает код 1, пока нет завершившегося успешного
-recovery-прогона, у коммита нет зелёных check runs или отсутствует merge
-commit. Это red-green гейт для восстановления PR #73. Без `--sha` гейт сам
-берёт актуальный head PR, а `--sha` позволяет явно закрепить коммит.
+recovery-прогона, у коммита нет зелёных check runs, нет `ci/recover`-статуса
+со ссылкой на этот прогон или отсутствует merge commit. Это red-green гейт для
+восстановления PR #73. Без `--sha` гейт сам берёт актуальный head PR, а `--sha`
+позволяет явно закрепить коммит.
 
 Ручной запуск recovery (если нужно повторить). Сначала разрешите актуальный
 head, затем проверьте и смержите именно его:

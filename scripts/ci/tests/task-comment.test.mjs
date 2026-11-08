@@ -54,6 +54,23 @@ function testCommentRecordsCauseAndFullEvidence() {
     comment.includes('GITHUB_RUN_ID'),
     'the task comment must explain the finalizer run-id bug that was fixed',
   );
+  assert.ok(
+    comment.includes('42492889252'),
+    'the task comment must link the real completed recovery run',
+  );
+  assert.ok(
+    comment.includes('ci/recover=success'),
+    'the task comment must show the commit status linking the recovery run',
+  );
+  assert.ok(
+    comment.includes('6a14f53349e6f7da967e1bd1aded48c12deb82be'),
+    'the task comment must record the real merge commit',
+  );
+  assert.ok(
+    !comment.includes('это черновик') &&
+      !comment.includes('будет опубликован автоматически после push'),
+    'the task comment must contain final evidence, not a draft placeholder',
+  );
   console.log('PASS: the task comment records the cause and the full post-fix evidence');
 }
 
@@ -82,6 +99,14 @@ function testTaskCommentRecordExists() {
       'php wp/plugins/velotok-core/tests/accounts-contract-test.php',
     ),
     'the recorded task comment must include the mandatory acceptance command',
+  );
+  assert.ok(
+    record.includes('42492889252'),
+    'the recorded task comment must link the real completed recovery run',
+  );
+  assert.ok(
+    record.includes('6a14f53349e6f7da967e1bd1aded48c12deb82be'),
+    'the recorded task comment must record the real merge commit',
   );
   console.log('PASS: the recorded task comment contains the verified evidence');
 }

@@ -46,6 +46,15 @@ const MERGED_PR = {
   head: { sha: TARGET_SHA },
 };
 
+const GREEN_STATUSES = [
+  {
+    context: 'ci/recover',
+    state: 'success',
+    target_url: RUN_URL,
+    description: 'Recovered checks passed for the pull request',
+  },
+];
+
 function response(status, body) {
   return {
     ok: status >= 200 && status < 300,
@@ -162,7 +171,11 @@ async function testCompletedRunPublishesFinalEvidence() {
       return response(200, { total_count: GREEN_CHECKS.length, check_runs: GREEN_CHECKS });
     }
     if (url.includes(`/commits/${TARGET_SHA}/status`) && method === 'GET') {
-      return response(200, { state: 'success', total_count: 1, statuses: [] });
+      return response(200, {
+        state: 'success',
+        total_count: GREEN_STATUSES.length,
+        statuses: GREEN_STATUSES,
+      });
     }
     if (url.includes('/issues/') && url.includes('/comments') && method === 'GET') {
       return response(200, [{ id: 1, body: stale }]);
@@ -350,7 +363,11 @@ async function testFinalizerFollowsTriggerShaInsteadOfItself() {
       });
     }
     if (url.includes(`/commits/${TARGET_SHA}/status`) && method === 'GET') {
-      return response(200, { state: 'success', total_count: 1, statuses: [] });
+      return response(200, {
+        state: 'success',
+        total_count: GREEN_STATUSES.length,
+        statuses: GREEN_STATUSES,
+      });
     }
     if (url.includes('/issues/') && url.includes('/comments') && method === 'GET') {
       return response(200, []);
