@@ -97,6 +97,8 @@ function main() {
   testBrokenWorkflowIsRed();
   testRepositoryWorkflowIsGreen();
   testBrokenRecoveryWorkflowIsRed();
+  testPr60RecoveryWorkflowIsGreen();
+  testPr60FinalizerIsGreen();
   testRecoveryPr62WorkflowIsGreen();
   testRecoveryPr73WorkflowIsGreen();
   testFinalizerWorkflowIsGreen();
@@ -682,4 +684,108 @@ function testPr78FinalizerIsGreen() {
     'the PR #78 finalizer must only publish a completed successful run',
   );
   console.log('PASS: PR #78 finalizer waits for completion and publishes final evidence');
+}
+
+function testPr60RecoveryWorkflowIsGreen() {
+  const text = readFileSync(
+    path.join(repoRoot, '.github/workflows/recover-pr60.yml'),
+    'utf8',
+  );
+  const analysis = analyzeWorkflow(text);
+  const permissions = analyzePermissions(text);
+  const env = analyzeEnv(text);
+
+  assert.ok(analysis.triggers.includes('push'), 'PR #60 recovery must run on push');
+  assert.ok(
+    analysis.triggers.includes('workflow_dispatch'),
+    'PR #60 recovery must be manually dispatchable',
+  );
+  assert.strictEqual(analysis.hasPathsFilter, false);
+  assert.strictEqual(permissions['checks'], 'write');
+  assert.strictEqual(permissions['statuses'], 'write');
+  assert.strictEqual(permissions['pull-requests'], 'write');
+  assert.strictEqual(permissions['contents'], 'write');
+  assert.strictEqual(env.TARGET_PR, '60');
+  assert.strictEqual(
+    env.INCIDENT_SHA,
+    'b1b0871d6ebb4f7ce25a987c956c7b1431eef379',
+    'the PR #60 incident commit must stay recorded for auditing',
+  );
+  assert.ok(
+    text.includes('scripts/ci/resolve-pr-target.mjs'),
+    'PR #60 recovery must resolve the current head at run time',
+  );
+  assert.ok(
+    /ref:\s*\$\{\{\s*steps\.target\.outputs\.sha\s*\}\}/.test(text),
+    'PR #60 recovery must check out the resolved head',
+  );
+  assert.ok(
+    !/TARGET_SHA:\s*['"]?b1b0871/.test(text) &&
+      !/--sha\s+['"]?b1b0871/.test(text),
+    'PR #60 recovery must not pin the incident SHA as the target',
+  );
+  assert.ok(
+    text.includes('scripts/ci/run-checks.sh'),
+    'PR #60 recovery must run the same checks as CI',
+  );
+  assert.ok(
+    text.includes('scripts/ci/recover-pr.mjs'),
+    'PR #60 recovery must publish checks and complete the deferred merge',
+  );
+  assert.ok(
+    text.includes('scripts/ci/request-evidence-finalize.mjs'),
+    'PR #60 recovery must hand evidence publication to the finalizer',
+  );
+  assert.ok(
+    !text.includes('--allow-running'),
+    'PR #60 recovery must not publish an in-progress run as final evidence',
+  );
+  assert.ok(
+    /^name:\s*["'].*#60.*["']\s*$/m.test(text),
+    'the PR #60 recovery name must be quoted so "#60" is not a YAML comment',
+  );
+  assert.ok(
+    /^run-name:\s*["'].*#60.*["']\s*$/m.test(text),
+    'the PR #60 run name must be quoted and identify the pull request',
+  );
+  console.log('PASS: PR #60 recovery resolves the current head and completes the merge');
+}
+
+function testPr60FinalizerIsGreen() {
+  const text = readFileSync(
+    path.join(repoRoot, '.github/workflows/finalize-pr60-evidence.yml'),
+    'utf8',
+  );
+  const analysis = analyzeWorkflow(text);
+  const permissions = analyzePermissions(text);
+
+  assert.ok(
+    analysis.triggers.includes('push'),
+    'the PR #60 finalizer must run from the same push as recovery',
+  );
+  assert.ok(
+    analysis.triggers.includes('workflow_dispatch'),
+    'the PR #60 finalizer must be manually dispatchable',
+  );
+  assert.strictEqual(analysis.hasPathsFilter, false);
+  assert.strictEqual(permissions['actions'], 'read');
+  assert.strictEqual(permissions['issues'], 'write');
+  assert.strictEqual(permissions['pull-requests'], 'write');
+  assert.ok(
+    text.includes('scripts/ci/wait-and-publish-evidence.mjs'),
+    'the PR #60 finalizer must wait for the recovery run to complete',
+  );
+  assert.ok(
+    text.includes('--trigger-sha'),
+    'the PR #60 finalizer must discover recovery by the triggering commit',
+  );
+  assert.ok(
+    text.includes('--comment-file docs/testeb-64-comment.md'),
+    'the PR #60 finalizer must update the TESTEB-64 evidence comment',
+  );
+  assert.ok(
+    !text.includes('--allow-running'),
+    'the PR #60 finalizer must only publish a completed successful run',
+  );
+  console.log('PASS: PR #60 finalizer waits for completion and publishes final evidence');
 }
