@@ -17,6 +17,7 @@ $velotok_includes = array(
 	'inc/design-variants.php',
 	'inc/customizer.php',
 	'inc/enqueue.php',
+	'inc/localization.php',
 	'inc/security.php',
 	'inc/woocommerce.php',
 );

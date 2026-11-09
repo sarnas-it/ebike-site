@@ -83,8 +83,16 @@ fi
 wp_cli option update home "$SITE_URL" >/dev/null
 wp_cli option update siteurl "$SITE_URL" >/dev/null
 wp_cli option update blogdescription "Магазин и мастерская электровелосипедов" >/dev/null
+
+log "Installing Russian locale"
+wp_cli language core install ru_RU --activate >/dev/null 2>&1 \
+	|| log "WARNING: ru_RU language pack could not be installed (offline environment?)"
+wp_cli site switch-language ru_RU >/dev/null 2>&1 || true
+wp_cli option update WPLANG "ru_RU" >/dev/null 2>&1 || true
 wp_cli option update timezone_string "Europe/Moscow" >/dev/null 2>&1 || true
 wp_cli option update date_format "d.m.Y" >/dev/null 2>&1 || true
+wp_cli option update time_format "H:i" >/dev/null 2>&1 || true
+wp_cli option update start_of_week "1" >/dev/null 2>&1 || true
 wp_cli option update permalink_structure "/%postname%/" >/dev/null 2>&1 || true
 wp_cli rewrite flush --hard >/dev/null 2>&1 || true
 
@@ -111,11 +119,22 @@ fi
 
 if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	log "Configuring WooCommerce"
+	log "Installing WooCommerce Russian translations"
+	wp_cli language plugin install woocommerce ru_RU >/dev/null 2>&1 \
+		|| log "WARNING: WooCommerce ru_RU translation could not be installed (offline environment?)"
 	wp_cli eval 'if ( class_exists( "WC_Install" ) ) { WC_Install::create_pages(); }' >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_currency "RUB" >/dev/null 2>&1 || true
+	wp_cli option update woocommerce_currency_symbol "₽" >/dev/null 2>&1 || true
+	wp_cli option update woocommerce_price_num_decimals "0" >/dev/null 2>&1 || true
+	wp_cli option update woocommerce_price_decimal_sep "," >/dev/null 2>&1 || true
+	wp_cli option update woocommerce_price_thousand_sep " " >/dev/null 2>&1 || true
+	wp_cli option update woocommerce_price_format '%1$s %2$s' >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_enable_guest_checkout "yes" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_cod_settings '{"enabled":"yes","title":"Оплата при получении","description":"Оплата наличными или картой при получении заказа.","instructions":"Менеджер свяжется для подтверждения заказа и доставки."}' --format=json >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_default_country "RU:MOW" >/dev/null 2>&1 || true
+
+	log "Localizing WooCommerce pages"
+	wp_cli eval 'if ( function_exists( "velotok_localize_store" ) ) { velotok_localize_store(); }' >/dev/null 2>&1 || true
 
 	log "Seeding demo catalog"
 	wp_cli eval-file "/opt/velotok/cli/seed.php" \
