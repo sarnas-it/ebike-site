@@ -220,6 +220,12 @@ function velotok_core_catalog_contract() {
 			'required' => false,
 			'mocked'   => true,
 		),
+		'date'              => array(
+			'label'    => 'Дата публикации',
+			'type'     => 'string',
+			'required' => false,
+			'mocked'   => true,
+		),
 	);
 
 	$products = array(
@@ -238,6 +244,7 @@ function velotok_core_catalog_contract() {
 			'wheel'             => '28″',
 			'badge'             => 'Хит',
 			'image'             => 'model-city-classic-1-web.jpg',
+			'date'              => '2025-01-10',
 			'product_type'      => 'electric_bicycle',
 			'state'             => 'publish',
 			'mocked'            => true,
@@ -257,6 +264,7 @@ function velotok_core_catalog_contract() {
 			'wheel'             => '700C',
 			'badge'             => 'Новинка',
 			'image'             => 'model-city-sport-1-web.jpg',
+			'date'              => '2025-02-15',
 			'product_type'      => 'electric_bicycle',
 			'state'             => 'publish',
 			'mocked'            => true,
@@ -276,6 +284,7 @@ function velotok_core_catalog_contract() {
 			'wheel'             => '29″',
 			'badge'             => 'Для гор',
 			'image'             => 'model-mountain-pro-1-web.jpg',
+			'date'              => '2025-03-20',
 			'product_type'      => 'electric_bicycle',
 			'state'             => 'publish',
 			'mocked'            => true,
@@ -295,6 +304,7 @@ function velotok_core_catalog_contract() {
 			'wheel'             => '27,5″',
 			'badge'             => 'Выбор механиков',
 			'image'             => 'model-mountain-hardtail-1-web.jpg',
+			'date'              => '2025-04-05',
 			'product_type'      => 'electric_bicycle',
 			'state'             => 'publish',
 			'mocked'            => true,
@@ -314,6 +324,7 @@ function velotok_core_catalog_contract() {
 			'wheel'             => '20″ / 26″',
 			'badge'             => 'Для семьи',
 			'image'             => 'model-cargo-family-1-web.jpg',
+			'date'              => '2025-05-12',
 			'product_type'      => 'electric_bicycle',
 			'state'             => 'publish',
 			'mocked'            => true,
@@ -333,6 +344,7 @@ function velotok_core_catalog_contract() {
 			'wheel'             => '20″',
 			'badge'             => 'Для работы',
 			'image'             => 'model-cargo-courier-1-web.jpg',
+			'date'              => '2025-06-18',
 			'product_type'      => 'electric_bicycle',
 			'state'             => 'publish',
 			'mocked'            => true,
@@ -352,6 +364,7 @@ function velotok_core_catalog_contract() {
 			'wheel'             => '20″',
 			'badge'             => 'В багажник',
 			'image'             => 'model-folding-compact-1-web.jpg',
+			'date'              => '2025-07-01',
 			'product_type'      => 'electric_bicycle',
 			'state'             => 'publish',
 			'mocked'            => true,
@@ -404,7 +417,7 @@ function velotok_core_catalog_contract() {
 		'product_type'        => 'electric_bicycle',
 		'currency'            => 'RUB',
 		'required_fields'     => array( 'state', 'slug', 'name', 'price', 'category' ),
-		'optional_fields'     => array( 'old_price', 'short_description', 'description', 'tagline', 'range_km', 'motor_w', 'weight_kg', 'wheel', 'badge', 'image', 'product_type' ),
+		'optional_fields'     => array( 'old_price', 'short_description', 'description', 'tagline', 'range_km', 'motor_w', 'weight_kg', 'wheel', 'badge', 'image', 'date', 'product_type' ),
 		'fields'              => $fields,
 		'attributes'          => $fields,
 		'required_attributes' => array( 'state', 'slug', 'name', 'price', 'category' ),
@@ -448,7 +461,15 @@ function velotok_core_catalog_contract() {
 		'required_categories' => array_keys( $categories ),
 		'products'            => $products,
 		'product_count'       => count( $products ),
+		'sorting_requirement' => 'TESTEB-21',
+		'sorting_parameter'   => 'orderby',
+		'sorting'             => velotok_core_catalog_sorting_options(),
+		'sorting_options'     => velotok_core_catalog_sorting_options(),
+		'sorting_values'      => velotok_core_catalog_sorting_keys(),
+		'sorting_keys'        => velotok_core_catalog_sorting_keys(),
+		'allowed_sorting'     => velotok_core_catalog_sorting_keys(),
 		'default_sort'        => 'menu_order',
+		'default_orderby'     => 'menu_order',
 		'product_not_found'   => 'CATALOG_PRODUCT_NOT_FOUND',
 		'category_unknown'    => 'CATALOG_CATEGORY_UNKNOWN',
 		'empty_catalog'       => 'CATALOG_EMPTY',
@@ -1460,6 +1481,252 @@ function velotok_core_catalog_product_matches_search( $product, $query ) {
 }
 
 /**
+ * Fixed catalog sorting values.
+ *
+ * The catalog accepts only values from this set. Price sorting is available in
+ * both directions and novelty sorting orders products by publication date.
+ *
+ * @return array<string,string>
+ */
+function velotok_core_catalog_sorting_options() {
+	return array(
+		'menu_order' => 'По умолчанию',
+		'popularity' => 'По популярности',
+		'rating'     => 'По рейтингу',
+		'date'       => 'По новинкам',
+		'price'      => 'Цена: по возрастанию',
+		'price-desc' => 'Цена: по убыванию',
+	);
+}
+
+/**
+ * Alias for the fixed catalog sorting set.
+ *
+ * @return array<string,string>
+ */
+function velotok_core_catalog_sorting() {
+	return velotok_core_catalog_sorting_options();
+}
+
+/**
+ * Alias for the fixed catalog sorting set.
+ *
+ * @return array<string,string>
+ */
+function velotok_core_catalog_sort_options() {
+	return velotok_core_catalog_sorting_options();
+}
+
+/**
+ * Alias for the fixed catalog sorting set.
+ *
+ * @return array<string,string>
+ */
+function velotok_core_catalog_orderby_options() {
+	return velotok_core_catalog_sorting_options();
+}
+
+/**
+ * Allowed orderby values.
+ *
+ * @return string[]
+ */
+function velotok_core_catalog_sorting_keys() {
+	return array_keys( velotok_core_catalog_sorting_options() );
+}
+
+/**
+ * Alias for allowed orderby values.
+ *
+ * @return string[]
+ */
+function velotok_core_catalog_sort_values() {
+	return velotok_core_catalog_sorting_keys();
+}
+
+/**
+ * Alias for allowed orderby values.
+ *
+ * @return string[]
+ */
+function velotok_core_catalog_sorting_values() {
+	return velotok_core_catalog_sorting_keys();
+}
+
+/**
+ * Alias for allowed orderby values.
+ *
+ * @return string[]
+ */
+function velotok_core_catalog_allowed_sorting() {
+	return velotok_core_catalog_sorting_keys();
+}
+
+/**
+ * Default catalog sorting.
+ *
+ * @return string
+ */
+function velotok_core_catalog_default_orderby() {
+	return 'menu_order';
+}
+
+/**
+ * Normalize an orderby value to the fixed catalog sorting set.
+ *
+ * @param mixed $orderby Raw orderby value.
+ * @return string
+ */
+function velotok_core_catalog_normalize_orderby( $orderby ) {
+	if ( is_array( $orderby ) || is_object( $orderby ) ) {
+		return velotok_core_catalog_default_orderby();
+	}
+
+	$orderby = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $orderby ) : strtolower( preg_replace( '/[^a-z0-9_\-]/', '', (string) $orderby ) );
+
+	$aliases = array(
+		'newest'      => 'date',
+		'new'         => 'date',
+		'novelty'     => 'date',
+		'price_asc'   => 'price',
+		'price-asc'   => 'price',
+		'priceasc'    => 'price',
+		'price_desc'  => 'price-desc',
+		'pricedesc'   => 'price-desc',
+	);
+
+	if ( isset( $aliases[ $orderby ] ) ) {
+		$orderby = $aliases[ $orderby ];
+	}
+
+	if ( isset( velotok_core_catalog_sorting_options()[ $orderby ] ) ) {
+		return $orderby;
+	}
+
+	return velotok_core_catalog_default_orderby();
+}
+
+/**
+ * Alias for orderby normalization.
+ *
+ * @param mixed $orderby Raw orderby value.
+ * @return string
+ */
+function velotok_core_catalog_sanitize_orderby( $orderby ) {
+	return velotok_core_catalog_normalize_orderby( $orderby );
+}
+
+/**
+ * Read the normalized orderby value from a request source.
+ *
+ * @param mixed $source Source array (defaults to $_GET).
+ * @return string
+ */
+function velotok_core_catalog_request_orderby( $source = null ) {
+	if ( null === $source ) {
+		$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичная сортировка каталога.
+	}
+
+	if ( ! is_array( $source ) ) {
+		return velotok_core_catalog_default_orderby();
+	}
+
+	if ( ! isset( $source['orderby'] ) ) {
+		return velotok_core_catalog_default_orderby();
+	}
+
+	return velotok_core_catalog_normalize_orderby( $source['orderby'] );
+}
+
+/**
+ * Sort catalog products by a contract orderby value.
+ *
+ * Price sorting supports both directions and novelty sorts by the publication
+ * date, newest first. Unknown values keep the original catalog order.
+ *
+ * @param array  $products Product list.
+ * @param mixed  $orderby  Orderby value.
+ * @param string $order    Optional explicit direction (asc|desc).
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_catalog_sort_products( $products, $orderby = 'menu_order', $order = '' ) {
+	if ( ! is_array( $products ) ) {
+		return array();
+	}
+
+	$orderby   = velotok_core_catalog_normalize_orderby( $orderby );
+	$raw_order = strtolower( (string) $order );
+	$order     = 'desc' === $raw_order ? 'desc' : 'asc';
+
+	if ( 'menu_order' === $orderby ) {
+		return array_values( $products );
+	}
+
+	if ( 'date' === $orderby ) {
+		$direction = '' === $raw_order ? 'desc' : $order;
+	} elseif ( 'price-desc' === $orderby ) {
+		$direction = 'desc';
+	} else {
+		$direction = $order;
+	}
+
+	$position = 0;
+
+	foreach ( $products as $index => $product ) {
+		$products[ $index ]['_velotok_sort_position'] = $position;
+		$position++;
+	}
+
+	usort(
+		$products,
+		static function ( $left, $right ) use ( $orderby, $direction ) {
+			if ( 'price' === $orderby || 'price-desc' === $orderby ) {
+				$result = (float) ( isset( $left['price'] ) ? $left['price'] : 0 ) <=> (float) ( isset( $right['price'] ) ? $right['price'] : 0 );
+			} elseif ( 'date' === $orderby ) {
+				$left_date  = isset( $left['date'] ) ? strtotime( (string) $left['date'] ) : false;
+				$right_date = isset( $right['date'] ) ? strtotime( (string) $right['date'] ) : false;
+
+				if ( false === $left_date || false === $right_date ) {
+					$result = (int) $left['_velotok_sort_position'] <=> (int) $right['_velotok_sort_position'];
+				} else {
+					$result = $left_date <=> $right_date;
+				}
+			} elseif ( 'popularity' === $orderby ) {
+				$result = (float) ( isset( $left['total_sales'] ) ? $left['total_sales'] : 0 ) <=> (float) ( isset( $right['total_sales'] ) ? $right['total_sales'] : 0 );
+			} elseif ( 'rating' === $orderby ) {
+				$result = (float) ( isset( $left['rating'] ) ? $left['rating'] : 0 ) <=> (float) ( isset( $right['rating'] ) ? $right['rating'] : 0 );
+			} else {
+				$result = (int) $left['_velotok_sort_position'] <=> (int) $right['_velotok_sort_position'];
+			}
+
+			if ( 0 === $result ) {
+				$result = (int) $left['_velotok_sort_position'] <=> (int) $right['_velotok_sort_position'];
+			}
+
+			return 'desc' === $direction ? -$result : $result;
+		}
+	);
+
+	foreach ( $products as $index => $product ) {
+		unset( $products[ $index ]['_velotok_sort_position'] );
+	}
+
+	return array_values( $products );
+}
+
+/**
+ * Alias for catalog product sorting.
+ *
+ * @param array  $products Product list.
+ * @param mixed  $orderby  Orderby value.
+ * @param string $order    Optional direction.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_catalog_sort( $products, $orderby = 'menu_order', $order = '' ) {
+	return velotok_core_catalog_sort_products( $products, $orderby, $order );
+}
+
+/**
  * Return the fixed mocked catalog products.
  *
  * Supports filtering by category plus optional limit, offset and ordering. Only
@@ -1532,26 +1799,21 @@ function velotok_core_catalog_products( $category = '', $args = array() ) {
 	}
 
 	$orderby = isset( $args['orderby'] ) ? (string) $args['orderby'] : '';
-	$order   = isset( $args['order'] ) && 'desc' === strtolower( (string) $args['order'] ) ? 'desc' : 'asc';
+	$order   = isset( $args['order'] ) ? (string) $args['order'] : '';
 
-	if ( 'price' === $orderby ) {
+	if ( 'name' === $orderby ) {
+		$direction = 'desc' === strtolower( $order ) ? 'desc' : 'asc';
+
 		usort(
 			$products,
-			static function ( $left, $right ) use ( $order ) {
-				$result = (float) $left['price'] <=> (float) $right['price'];
-
-				return 'desc' === $order ? -$result : $result;
-			}
-		);
-	} elseif ( 'name' === $orderby ) {
-		usort(
-			$products,
-			static function ( $left, $right ) use ( $order ) {
+			static function ( $left, $right ) use ( $direction ) {
 				$result = strcmp( (string) $left['name'], (string) $right['name'] );
 
-				return 'desc' === $order ? -$result : $result;
+				return 'desc' === $direction ? -$result : $result;
 			}
 		);
+	} else {
+		$products = velotok_core_catalog_sort_products( $products, $orderby, $order );
 	}
 
 	$offset = isset( $args['offset'] ) ? max( 0, (int) $args['offset'] ) : 0;
