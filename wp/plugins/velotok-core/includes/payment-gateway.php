@@ -1578,72 +1578,96 @@ trait Velotok_Yookassa_Gateway_Behavior {
 	}
 }
 
-if ( class_exists( 'WC_Payment_Gateway' ) ) {
-	/**
-	 * ЮKassa WooCommerce payment gateway.
-	 */
-	class Velotok_Yookassa_Gateway extends WC_Payment_Gateway {
-		use Velotok_Yookassa_Gateway_Behavior;
+/**
+ * Define the gateway class once WooCommerce is loaded.
+ *
+ * velotok-core is included before WooCommerce (plugin order is alphabetical), so
+ * WC_Payment_Gateway does not exist yet at include time. Defining the standalone
+ * fallback there left WooCommerce without a real gateway: the class was not a
+ * WC_Payment_Gateway, was never registered, and PHP 8.2 reported every gateway
+ * property as dynamic. When WC_Payment_Gateway is already available (contract
+ * tests stub it, or WooCommerce loaded first) the class is defined immediately.
+ *
+ * @return void
+ */
+function velotok_core_define_payment_gateway() {
+	if ( class_exists( 'Velotok_Yookassa_Gateway' ) ) {
+		return;
+	}
 
+	if ( class_exists( 'WC_Payment_Gateway' ) ) {
 		/**
-		 * Constructor.
+		 * ЮKassa WooCommerce payment gateway.
 		 */
-		public function __construct() {
-			$this->id                 = 'velotok_yookassa';
-			$this->method_title       = 'ЮKassa';
-			$this->method_description = 'Оплата через ЮKassa API v3.';
-			$this->has_fields         = false;
-			$this->supports           = array( 'products', 'refunds' );
+		class Velotok_Yookassa_Gateway extends WC_Payment_Gateway {
+			use Velotok_Yookassa_Gateway_Behavior;
 
-			$this->init_form_fields();
-			parent::__construct();
-			$this->velotok_setup_gateway();
+			/**
+			 * Constructor.
+			 */
+			public function __construct() {
+				$this->id                 = 'velotok_yookassa';
+				$this->method_title       = 'ЮKassa';
+				$this->method_description = 'Оплата через ЮKassa API v3.';
+				$this->has_fields         = false;
+				$this->supports           = array( 'products', 'refunds' );
+
+				$this->init_form_fields();
+				parent::__construct();
+				$this->velotok_setup_gateway();
+			}
+		}
+	} else {
+		/**
+		 * Standalone fallback used by contract tests outside WordPress.
+		 */
+		class Velotok_Yookassa_Gateway {
+			use Velotok_Yookassa_Gateway_Behavior;
+
+			/**
+			 * Settings.
+			 *
+			 * @var array
+			 */
+			public $settings = array();
+			public $form_fields = array();
+
+			/**
+			 * Constructor.
+			 */
+			public function __construct() {
+				$this->velotok_setup_gateway();
+				$this->init_form_fields();
+			}
+
+			/**
+			 * Read a setting.
+			 *
+			 * @param string $key     Key.
+			 * @param mixed  $default Default value.
+			 * @return mixed
+			 */
+			public function get_option( $key, $default = '' ) {
+				return isset( $this->settings[ $key ] ) ? $this->settings[ $key ] : $default;
+			}
 		}
 	}
+
+	if ( ! class_exists( 'Velotok_Payment_Gateway' ) ) {
+		class_alias( 'Velotok_Yookassa_Gateway', 'Velotok_Payment_Gateway' );
+	}
+	if ( ! class_exists( 'Velotok_Gateway_Yookassa' ) ) {
+		class_alias( 'Velotok_Yookassa_Gateway', 'Velotok_Gateway_Yookassa' );
+	}
+	if ( ! class_exists( 'Velotok_WC_Yookassa_Gateway' ) ) {
+		class_alias( 'Velotok_Yookassa_Gateway', 'Velotok_WC_Yookassa_Gateway' );
+	}
+}
+
+if ( class_exists( 'WC_Payment_Gateway' ) || ! function_exists( 'add_action' ) ) {
+	velotok_core_define_payment_gateway();
 } else {
-	/**
-	 * Standalone fallback used by contract tests outside WordPress.
-	 */
-	class Velotok_Yookassa_Gateway {
-		use Velotok_Yookassa_Gateway_Behavior;
-
-		/**
-		 * Settings.
-		 *
-		 * @var array
-		 */
-		public $settings = array();
-		public $form_fields = array();
-
-		/**
-		 * Constructor.
-		 */
-		public function __construct() {
-			$this->velotok_setup_gateway();
-			$this->init_form_fields();
-		}
-
-		/**
-		 * Read a setting.
-		 *
-		 * @param string $key     Key.
-		 * @param mixed  $default Default value.
-		 * @return mixed
-		 */
-		public function get_option( $key, $default = '' ) {
-			return isset( $this->settings[ $key ] ) ? $this->settings[ $key ] : $default;
-		}
-	}
-}
-
-if ( ! class_exists( 'Velotok_Payment_Gateway' ) ) {
-	class_alias( 'Velotok_Yookassa_Gateway', 'Velotok_Payment_Gateway' );
-}
-if ( ! class_exists( 'Velotok_Gateway_Yookassa' ) ) {
-	class_alias( 'Velotok_Yookassa_Gateway', 'Velotok_Gateway_Yookassa' );
-}
-if ( ! class_exists( 'Velotok_WC_Yookassa_Gateway' ) ) {
-	class_alias( 'Velotok_Yookassa_Gateway', 'Velotok_WC_Yookassa_Gateway' );
+	add_action( 'plugins_loaded', 'velotok_core_define_payment_gateway', 20 );
 }
 
 /**
