@@ -282,6 +282,7 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 				'label'     => 'Модель',
 				'type'      => 'string',
 				'attribute' => 'Модель',
+				'meta'      => '_velotok_model',
 				'search'    => true,
 				'filter'    => true,
 			),
@@ -706,7 +707,17 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 				}
 			}
 
-			return velotok_catalog_product_attribute_row( $product, $definition['attribute'], $definition['label'] );
+			$row_value = velotok_catalog_product_attribute_row( $product, $definition['attribute'], $definition['label'] );
+
+			if ( '' !== $row_value ) {
+				return $row_value;
+			}
+
+			if ( ! empty( $definition['meta'] ) ) {
+				return velotok_catalog_product_meta( $product, $definition['meta'] );
+			}
+
+			return '';
 		}
 
 		if ( 'category' === $key ) {

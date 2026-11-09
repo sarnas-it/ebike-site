@@ -210,6 +210,35 @@ $filtered = velotok_catalog_filter_products(
 velotok_catalog_search_assert( 2 === count( $filtered ), 'Поиск по модели должен находить объект и карточку.' );
 
 /*
+ * 2a. A WooCommerce product may keep its model only in the seller meta field.
+ *     Search must read that meta value too, not just a product attribute row.
+ */
+$meta_product = new WC_Product(
+	array(
+		'id'          => 2,
+		'name'        => 'Ривьера Meta',
+		'slug'        => 'riviera-meta',
+		'sku'         => 'RIV-2',
+		'description' => 'Городской электровелосипед.',
+	)
+);
+
+$GLOBALS['velotok_test_meta'][2] = array( '_velotok_model' => 'Riviera Meta Edition' );
+
+velotok_catalog_search_assert(
+	velotok_catalog_product_matches_search( $meta_product, 'Riviera Meta Edition' ),
+	'Поиск не находит товар по модели из мета-поля _velotok_model.'
+);
+velotok_catalog_search_assert(
+	velotok_catalog_product_matches_search( $meta_product, 'Meta Edition RIV-2' ),
+	'Поиск не сочетает модель из мета-поля со SKU.'
+);
+velotok_catalog_search_assert(
+	'Riviera Meta Edition' === velotok_catalog_product_attribute( $meta_product, 'model' ),
+	'Атрибут модели не читает мета-поле _velotok_model.'
+);
+
+/*
  * 3. The archive search SQL also searches product categories, because a
  *    WooCommerce category term is not part of the post title or content.
  */
@@ -273,6 +302,7 @@ velotok_catalog_search_assert( false !== strpos( $search, 'product_cat' ), 'SQL 
 velotok_catalog_search_assert( false !== strpos( $search, 'velotok_t.name' ), 'SQL поиска не учитывает название категории.' );
 velotok_catalog_search_assert( false !== strpos( $search, 'velotok_t.slug' ), 'SQL поиска не учитывает слаг категории.' );
 velotok_catalog_search_assert( false !== strpos( $search, 'velotok_pm.meta_value' ), 'SQL поиска перестал учитывать SKU и атрибуты.' );
+velotok_catalog_search_assert( false !== strpos( $search, '_velotok_model' ), 'SQL поиска не учитывает мета-поле модели.' );
 velotok_catalog_search_assert( false !== strpos( $search, 'Городские' ), 'Поисковая строка не попадает в SQL.' );
 
 if ( $failures ) {
