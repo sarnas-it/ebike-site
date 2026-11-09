@@ -117,6 +117,31 @@ if wp_cli plugin is-installed velotok-core; then
 	fi
 fi
 
+log "Installing Contact Form 7 and Flamingo"
+for plugin in contact-form-7 flamingo; do
+	if ! wp_cli plugin is-installed "$plugin"; then
+		if ! wp_cli plugin install "$plugin" --activate; then
+			log "WARNING: $plugin could not be installed (offline environment?)"
+		fi
+	else
+		wp_cli plugin activate "$plugin" >/dev/null 2>&1 || true
+	fi
+done
+
+if wp_cli plugin is-active contact-form-7 >/dev/null 2>&1; then
+	log "Installing Contact Form 7 and Flamingo Russian translations"
+	wp_cli language plugin install contact-form-7 ru_RU >/dev/null 2>&1 \
+		|| log "WARNING: Contact Form 7 ru_RU translation could not be installed (offline environment?)"
+	wp_cli language plugin install flamingo ru_RU >/dev/null 2>&1 \
+		|| log "WARNING: Flamingo ru_RU translation could not be installed (offline environment?)"
+
+	log "Configuring lead forms"
+	wp_cli eval-file "/opt/velotok/cli/lead-forms.php" \
+		|| log "WARNING: lead forms setup failed"
+else
+	log "WARNING: Contact Form 7 is not active; lead forms were not created"
+fi
+
 if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	log "Configuring WooCommerce"
 	log "Installing WooCommerce Russian translations"
