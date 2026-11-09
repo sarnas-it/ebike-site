@@ -29,6 +29,12 @@ services:
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress}
       WORDPRESS_DEBUG: "1"
+      # WP_DEBUG сам по себе печатает замечания PHP на страницу (WP_DEBUG_DISPLAY
+      # по умолчанию true). Локальный стенд должен показывать продукт, а не
+      # дамп ошибок: замечания уходят в wp-content/debug.log, на страницу — нет.
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_DEBUG_DISPLAY', false );
+        define( 'WP_DEBUG_LOG', true );
     volumes:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
