@@ -344,6 +344,14 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			'sort_requirement'     => 'TESTEB-59',
 			'pagination_parameter' => 'paged',
 			'pagination_requirement' => 'TESTEB-60',
+			'validation_requirement' => 'TESTEB-61',
+			'price_validation_requirement' => 'TESTEB-62',
+			'validation'           => array(
+				'requirement'         => 'TESTEB-61',
+				'server_side'         => true,
+				'required_attributes' => array( 'photo', 'name', 'description', 'price' ),
+				'invalid_price_code'  => 'PRODUCT_PRICE_INVALID',
+			),
 			'missing_value'        => '',
 		);
 
