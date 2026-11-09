@@ -37,6 +37,9 @@ if ( is_product_category() ) {
 		$velotok_sort_action = $velotok_term_link;
 	}
 }
+$velotok_search            = function_exists( 'velotok_catalog_request_search' ) ? velotok_catalog_request_search() : '';
+$velotok_filter_values     = function_exists( 'velotok_catalog_request_filters' ) ? velotok_catalog_request_filters() : array();
+$velotok_filter_attributes = function_exists( 'velotok_catalog_filter_contract_attributes' ) ? velotok_catalog_filter_contract_attributes() : array();
 ?>
 <main id="main" class="page-main" tabindex="-1">
 	<section class="catalog-head">
@@ -73,6 +76,46 @@ if ( is_product_category() ) {
 					</form>
 				</div>
 			</div>
+
+			<form class="catalog-filter-form" method="get" action="<?php echo esc_url( $velotok_sort_action ); ?>" role="search">
+				<div class="catalog-filter-search">
+					<label for="velotok-catalog-search"><?php esc_html_e( 'Поиск по каталогу', 'velotok' ); ?></label>
+					<input type="search" id="velotok-catalog-search" name="s" value="<?php echo esc_attr( $velotok_search ); ?>" placeholder="<?php esc_attr_e( 'Название, характеристика, бейдж…', 'velotok' ); ?>">
+				</div>
+				<?php foreach ( $velotok_filter_attributes as $velotok_filter_key => $velotok_filter_attribute ) : ?>
+					<?php
+					if ( empty( $velotok_filter_attribute['filter'] ) || 'category' === $velotok_filter_key ) {
+						continue;
+					}
+
+					$velotok_filter_value = isset( $velotok_filter_values[ $velotok_filter_key ] ) ? $velotok_filter_values[ $velotok_filter_key ] : '';
+					$velotok_filter_label = isset( $velotok_filter_attribute['label'] ) ? $velotok_filter_attribute['label'] : $velotok_filter_key;
+					?>
+					<?php if ( 'number' === $velotok_filter_attribute['type'] && ! empty( $velotok_filter_attribute['range'] ) ) : ?>
+						<fieldset class="catalog-filter-range">
+							<legend><?php echo esc_html( $velotok_filter_label ); ?></legend>
+							<label>
+								<span><?php esc_html_e( 'от', 'velotok' ); ?></span>
+								<input type="number" step="any" name="velotok_filter[<?php echo esc_attr( $velotok_filter_key ); ?>_min]" value="<?php echo esc_attr( is_array( $velotok_filter_value ) && isset( $velotok_filter_value['min'] ) ? $velotok_filter_value['min'] : '' ); ?>">
+							</label>
+							<label>
+								<span><?php esc_html_e( 'до', 'velotok' ); ?></span>
+								<input type="number" step="any" name="velotok_filter[<?php echo esc_attr( $velotok_filter_key ); ?>_max]" value="<?php echo esc_attr( is_array( $velotok_filter_value ) && isset( $velotok_filter_value['max'] ) ? $velotok_filter_value['max'] : '' ); ?>">
+							</label>
+						</fieldset>
+					<?php else : ?>
+						<label class="catalog-filter-field">
+							<span><?php echo esc_html( $velotok_filter_label ); ?></span>
+							<input type="text" name="velotok_filter[<?php echo esc_attr( $velotok_filter_key ); ?>]" value="<?php echo esc_attr( is_array( $velotok_filter_value ) ? implode( ', ', $velotok_filter_value ) : $velotok_filter_value ); ?>">
+						</label>
+					<?php endif; ?>
+				<?php endforeach; ?>
+				<input type="hidden" name="orderby" value="<?php echo esc_attr( $velotok_orderby ); ?>">
+				<div class="catalog-filter-actions">
+					<button type="submit" class="button"><?php esc_html_e( 'Применить', 'velotok' ); ?></button>
+					<a class="text-link" href="<?php echo esc_url( $velotok_shop_url ); ?>"><?php esc_html_e( 'Сбросить', 'velotok' ); ?></a>
+				</div>
+			</form>
 
 			<?php
 			if ( function_exists( 'wc_setup_loop' ) ) {
