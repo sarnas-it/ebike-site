@@ -22,10 +22,7 @@ $velotok_phone = velotok_get_option( 'phone' );
 <header class="site-header">
 	<div class="wrap header-inner">
 		<a class="logo" href="<?php echo esc_url( home_url( '/' ) ); ?>" rel="home" aria-label="<?php esc_attr_e( 'ВЕЛОТОК — на главную', 'velotok' ); ?>">
-			<svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true">
-				<circle cx="20" cy="20" r="19" fill="#12211a"/>
-				<path d="M22.6 8.5 13 22.1h6.2l-1.8 9.4L27.2 17h-6.3l1.7-8.5Z" fill="#d8f26a"/>
-			</svg>
+			<?php echo velotok_brand_logo_svg( 'header' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- значения экранируются внутри функции. ?>
 			<span class="logo-text"><?php echo esc_html( get_bloginfo( 'name' ) ); ?><small><?php esc_html_e( 'электровелосипеды', 'velotok' ); ?></small></span>
 		</a>
 

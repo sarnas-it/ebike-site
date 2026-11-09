@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "spec": "theme",
+  "name": "Велоток",
+  "tagline": "электровелосипеды",
+  "theme_color": "ink",
+  "palette": {
+    "ink": "#12211a",
+    "ink-2": "#1d3127",
+    "paper": "#f3f0e7",
+    "card": "#fbf9f3",
+    "muted": "#58655d",
+    "line": "#d9d3c4",
+    "lime": "#d8f26a",
+    "lime-soft": "#e9f1c9",
+    "orange": "#d9531f"
+  },
+  "typography": {
+    "sans": "ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif",
+    "serif": "Georgia,\"Times New Roman\",serif",
+    "mono": "ui-monospace,SFMono-Regular,Menlo,Consolas,\"Liberation Mono\",monospace",
+    "base_size": "16px",
+    "line_height": "1.5"
+  },
+  "shape": {
+    "radius": "24px",
+    "pill": "999px"
+  },
+  "layout": {
+    "content_width": "1280px",
+    "padding": "clamp(20px,4.5vw,56px)"
+  },
+  "logo": {
+    "view_box": "0 0 40 40",
+    "circle_radius": "19",
+    "bolt_path": "M22.6 8.5 13 22.1h6.2l-1.8 9.4L27.2 17h-6.3l1.7-8.5Z",
+    "header": {
+      "background": "ink",
+      "foreground": "lime"
+    },
+    "footer": {
+      "background": "lime",
+      "foreground": "ink"
+    }
+  }
+}
