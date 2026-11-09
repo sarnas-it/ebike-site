@@ -13,6 +13,7 @@ if ( ! defined( 'VELOTOK_VERSION' ) ) {
 
 $velotok_includes = array(
 	'inc/setup.php',
+	'inc/brand-style.php',
 	'inc/design-variants.php',
 	'inc/customizer.php',
 	'inc/enqueue.php',
