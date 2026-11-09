@@ -17,8 +17,7 @@ $velotok_terms    = taxonomy_exists( 'product_cat' ) ? get_terms( array(
 	'order'      => 'ASC',
 ) ) : array();
 $velotok_title    = is_product_category() ? single_term_title( '', false ) : __( 'Каталог моделей', 'velotok' );
-$velotok_orderby  = isset( $_GET['orderby'] ) ? sanitize_key( wp_unslash( $_GET['orderby'] ) ) : 'menu_order'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичная сортировка каталога.
-$velotok_sorting  = array(
+$velotok_sorting  = function_exists( 'velotok_catalog_sorting' ) ? velotok_catalog_sorting() : array(
 	'menu_order' => __( 'По умолчанию', 'velotok' ),
 	'popularity' => __( 'По популярности', 'velotok' ),
 	'rating'     => __( 'По рейтингу', 'velotok' ),
@@ -26,6 +25,7 @@ $velotok_sorting  = array(
 	'price'      => __( 'Цена: по возрастанию', 'velotok' ),
 	'price-desc' => __( 'Цена: по убыванию', 'velotok' ),
 );
+$velotok_orderby  = function_exists( 'velotok_catalog_request_orderby' ) ? velotok_catalog_request_orderby() : 'menu_order';
 if ( ! isset( $velotok_sorting[ $velotok_orderby ] ) ) {
 	$velotok_orderby = 'menu_order';
 }
@@ -136,7 +136,13 @@ $velotok_filter_attributes = function_exists( 'velotok_catalog_filter_contract_a
 					endwhile;
 					?>
 				</div>
-				<?php woocommerce_pagination(); ?>
+				<?php
+				if ( function_exists( 'velotok_catalog_pagination' ) ) {
+					velotok_catalog_pagination( array( 'base' => $velotok_sort_action ) );
+				} else {
+					woocommerce_pagination();
+				}
+				?>
 			<?php else : ?>
 				<div class="catalog-empty">
 					<p class="result-empty"><?php esc_html_e( 'В этой категории пока нет моделей.', 'velotok' ); ?></p>

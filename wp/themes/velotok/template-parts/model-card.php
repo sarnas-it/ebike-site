@@ -15,7 +15,7 @@ if ( empty( $velotok_model['name'] ) ) {
 	return;
 }
 ?>
-<article class="model-card" id="<?php echo esc_attr( $velotok_model['card_id'] ); ?>">
+<article class="model-card" id="<?php echo esc_attr( $velotok_model['card_id'] ); ?>"<?php echo ! empty( $velotok_model['sku'] ) ? ' data-sku="' . esc_attr( $velotok_model['sku'] ) . '"' : ''; ?><?php echo ! empty( $velotok_model['id'] ) ? ' data-product-id="' . esc_attr( (string) $velotok_model['id'] ) . '"' : ''; ?>>
 	<div class="model-media">
 		<?php if ( ! empty( $velotok_model['badge'] ) ) : ?>
 			<span class="badge<?php echo ! empty( $velotok_model['badge_lime'] ) ? ' badge--lime' : ''; ?>"><?php echo esc_html( $velotok_model['badge'] ); ?></span>
@@ -28,6 +28,9 @@ if ( empty( $velotok_model['name'] ) ) {
 			<span><?php echo esc_html( $velotok_model['number'] ); ?></span>
 		</div>
 		<h3><a href="<?php echo esc_url( $velotok_model['url'] ); ?>"><?php echo esc_html( $velotok_model['name'] ); ?></a></h3>
+		<?php if ( ! empty( $velotok_model['tagline'] ) && ( empty( $velotok_model['description'] ) || $velotok_model['tagline'] !== $velotok_model['description'] ) ) : ?>
+			<p class="model-tagline"><?php echo esc_html( $velotok_model['tagline'] ); ?></p>
+		<?php endif; ?>
 		<?php if ( ! empty( $velotok_model['description'] ) ) : ?>
 			<p class="model-description"><?php echo esc_html( $velotok_model['description'] ); ?></p>
 		<?php endif; ?>

@@ -8,6 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/catalog-filters.php';
+require_once __DIR__ . '/product-validation.php';
 
 /**
  * Каталог шаблонов WooCommerce внутри темы.
@@ -394,6 +395,32 @@ function velotok_product_card_specs( $product ) {
 		$seen[ $key ] = true;
 	}
 
+	$sku = method_exists( $product, 'get_sku' ) ? trim( (string) $product->get_sku() ) : '';
+
+	if ( '' !== $sku ) {
+		$sku_key = function_exists( 'mb_strtolower' ) ? mb_strtolower( __( 'Артикул', 'velotok' ) ) : strtolower( __( 'Артикул', 'velotok' ) );
+
+		if ( ! isset( $seen[ $sku_key ] ) ) {
+			$seen[ $sku_key ] = true;
+			$specs[]          = array( __( 'Артикул', 'velotok' ), $sku );
+		}
+	}
+
+	$model = function_exists( 'velotok_catalog_product_attribute' ) ? trim( (string) velotok_catalog_product_attribute( $product, 'model' ) ) : '';
+
+	if ( '' === $model ) {
+		$model = trim( (string) get_post_meta( $product->get_id(), '_velotok_model', true ) );
+	}
+
+	if ( '' !== $model ) {
+		$model_key = function_exists( 'mb_strtolower' ) ? mb_strtolower( __( 'Модель', 'velotok' ) ) : strtolower( __( 'Модель', 'velotok' ) );
+
+		if ( ! isset( $seen[ $model_key ] ) ) {
+			$seen[ $model_key ] = true;
+			$specs[]            = array( __( 'Модель', 'velotok' ), $model );
+		}
+	}
+
 	foreach ( velotok_product_extra_attributes( $product ) as $extra ) {
 		$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $extra[0] ) : strtolower( $extra[0] );
 
@@ -558,17 +585,45 @@ function velotok_normalize_product( $product, $index = 0 ) {
 		);
 	}
 
-	$badge = trim( (string) get_post_meta( $product->get_id(), '_velotok_badge', true ) );
+	$badge   = trim( (string) get_post_meta( $product->get_id(), '_velotok_badge', true ) );
+	$tagline = trim( (string) get_post_meta( $product->get_id(), '_velotok_tagline', true ) );
+	$model   = function_exists( 'velotok_catalog_product_attribute' ) ? trim( (string) velotok_catalog_product_attribute( $product, 'model' ) ) : '';
+	$sku     = method_exists( $product, 'get_sku' ) ? trim( (string) $product->get_sku() ) : '';
+
+	if ( '' === $model ) {
+		$model = trim( (string) get_post_meta( $product->get_id(), '_velotok_model', true ) );
+	}
+	$slug    = $product->get_slug();
+	$full    = method_exists( $product, 'get_description' ) ? (string) $product->get_description() : '';
+	$terms   = get_the_terms( $product->get_id(), 'product_cat' );
+	$cat     = '';
+	$cat_label = velotok_product_category_label( $product );
+
+	if ( $terms && ! is_wp_error( $terms ) && isset( $terms[0]->slug ) ) {
+		$cat = (string) $terms[0]->slug;
+	}
+
+	$image_html = velotok_product_image_html( $product, $product->get_name() );
 
 	return array(
 		'id'             => (int) $product->get_id(),
-		'card_id'        => 'model-' . $product->get_slug(),
-		'slug'           => $product->get_slug(),
+		'card_id'        => 'model-' . $slug,
+		'slug'           => $slug,
 		'name'           => $product->get_name(),
+		'title'          => $product->get_name(),
+		'price'          => (float) $price,
 		'url'            => $product->get_permalink(),
-		'image_html'     => velotok_product_image_html( $product, $product->get_name() ),
+		'image_html'     => $image_html,
+		'image'          => $image_html,
+		'photo'          => $image_html,
 		'description'    => velotok_product_description( $product ),
-		'category_label' => velotok_product_category_label( $product ),
+		'full_description' => $full,
+		'tagline'        => $tagline,
+		'sku'            => $sku,
+		'model'          => $model,
+		'category'       => $cat,
+		'category_slug'  => $cat,
+		'category_label' => $cat_label,
 		'badge'          => $badge,
 		'badge_lime'     => in_array( $badge, array( 'Хит', 'Выбор механиков', 'Новинка' ), true ),
 		'number'         => $index ? sprintf( '%02d', (int) $index ) : '',
@@ -736,9 +791,19 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 		'card_id'        => 'model-' . $model['slug'],
 		'slug'           => $model['slug'],
 		'name'           => $model['name'],
+		'title'          => $model['name'],
+		'price'          => (float) $price,
 		'url'            => home_url( '/#model-' . $model['slug'] ),
 		'image_html'     => $image,
+		'image'          => $image,
+		'photo'          => $image,
 		'description'    => isset( $model['description'] ) ? (string) $model['description'] : '',
+		'full_description' => isset( $model['description'] ) ? (string) $model['description'] : '',
+		'tagline'        => isset( $model['tagline'] ) ? (string) $model['tagline'] : '',
+		'sku'            => '',
+		'model'          => '',
+		'category'       => '',
+		'category_slug'  => '',
 		'category_label' => $model['category_label'],
 		'badge'          => $model['badge'],
 		'badge_lime'     => ! empty( $model['badge_lime'] ),
@@ -758,10 +823,199 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 }
 
 /**
+ * Фиксированная модель состояний товара.
+ *
+ * Состояния повторяют статусы записей WooCommerce. Каждое состояние имеет
+ * канонический идентификатор, подпись и признаки публичности и видимости в
+ * каталоге. Товар витрины обязан находиться в одном из состояний этой модели.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function velotok_product_state_model() {
+	static $model = null;
+
+	if ( null !== $model ) {
+		return $model;
+	}
+
+	$states = array(
+		'publish'    => array(
+			'label'   => 'Опубликован',
+			'public'  => true,
+			'catalog' => true,
+		),
+		'draft'      => array(
+			'label'   => 'Черновик',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'pending'    => array(
+			'label'   => 'На проверке',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'private'    => array(
+			'label'   => 'Приватный',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'trash'      => array(
+			'label'   => 'Удалён',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'future'     => array(
+			'label'   => 'Запланирован',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'auto-draft' => array(
+			'label'   => 'Авто-черновик',
+			'public'  => false,
+			'catalog' => false,
+		),
+	);
+
+	$model = array();
+
+	foreach ( $states as $id => $state ) {
+		$model[ $id ] = array_merge(
+			array(
+				'id'    => $id,
+				'code'  => $id,
+				'state' => $id,
+			),
+			$state
+		);
+	}
+
+	return $model;
+}
+
+/**
+ * Список канонических состояний товара.
+ *
+ * @return string[]
+ */
+function velotok_product_states() {
+	return array_keys( velotok_product_state_model() );
+}
+
+/**
+ * Псевдоним модели состояний для кода каталога.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function velotok_catalog_product_states() {
+	return velotok_product_state_model();
+}
+
+/**
+ * Состояния, в которых товар публичен.
+ *
+ * @return string[]
+ */
+function velotok_product_public_states() {
+	$states = array();
+
+	foreach ( velotok_product_state_model() as $id => $state ) {
+		if ( ! empty( $state['public'] ) ) {
+			$states[] = $id;
+		}
+	}
+
+	return $states;
+}
+
+/**
+ * Приводит состояние товара к каноническому идентификатору модели.
+ *
+ * Неизвестное состояние не подменяется на publish: оно возвращается как есть,
+ * чтобы валидация могла отклонить товар вне модели.
+ *
+ * @param mixed $state Состояние товара.
+ * @return string
+ */
+function velotok_product_normalize_state( $state ) {
+	if ( ! is_scalar( $state ) ) {
+		return '';
+	}
+
+	$key = trim( (string) $state );
+	$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $key, 'UTF-8' ) : strtolower( $key );
+
+	$map = array(
+		'publish'     => 'publish',
+		'published'   => 'publish',
+		'public'      => 'publish',
+		'live'        => 'publish',
+		'active'      => 'publish',
+		'опубликован' => 'publish',
+		'draft'       => 'draft',
+		'unpublished' => 'draft',
+		'черновик'    => 'draft',
+		'pending'     => 'pending',
+		'review'      => 'pending',
+		'на проверке' => 'pending',
+		'private'     => 'private',
+		'приватный'   => 'private',
+		'trash'       => 'trash',
+		'deleted'     => 'trash',
+		'удалён'      => 'trash',
+		'удален'      => 'trash',
+		'future'      => 'future',
+		'scheduled'   => 'future',
+		'запланирован' => 'future',
+		'auto-draft'  => 'auto-draft',
+		'auto_draft'  => 'auto-draft',
+		'авто-черновик' => 'auto-draft',
+	);
+
+	return isset( $map[ $key ] ) ? $map[ $key ] : $key;
+}
+
+/**
+ * Входит ли состояние товара в фиксированную модель.
+ *
+ * @param mixed $state Состояние товара.
+ * @return bool
+ */
+function velotok_product_state_is_valid( $state ) {
+	$model = velotok_product_state_model();
+	$key   = velotok_product_normalize_state( $state );
+
+	return '' !== $key && isset( $model[ $key ] );
+}
+
+/**
+ * Псевдоним проверки состояния для обратной совместимости.
+ *
+ * @param mixed $state Состояние товара.
+ * @return bool
+ */
+function velotok_product_status_is_valid( $state ) {
+	return velotok_product_state_is_valid( $state );
+}
+
+/**
+ * Является ли состояние публичным.
+ *
+ * @param mixed $state Состояние товара.
+ * @return bool
+ */
+function velotok_product_state_is_public( $state ) {
+	$model = velotok_product_state_model();
+	$key   = velotok_product_normalize_state( $state );
+
+	return isset( $model[ $key ] ) && ! empty( $model[ $key ]['public'] );
+}
+
+/**
  * Возвращает состояние товара из модели WooCommerce.
  *
  * Товары старых тестовых двойников могут не иметь get_status(); для них
  * состояние берётся из записи, а при отсутствии источника считается publish.
+ * Полученное состояние нормализуется по фиксированной модели.
  *
  * @param WC_Product $product Товар.
  * @return string
@@ -775,7 +1029,7 @@ function velotok_product_status( $product ) {
 		$status = (string) $product->get_status();
 
 		if ( '' !== $status ) {
-			return $status;
+			return velotok_product_normalize_state( $status );
 		}
 	}
 
@@ -783,7 +1037,7 @@ function velotok_product_status( $product ) {
 		$status = get_post_status( (int) $product->get_id() );
 
 		if ( is_string( $status ) && '' !== $status ) {
-			return $status;
+			return velotok_product_normalize_state( $status );
 		}
 	}
 
@@ -793,11 +1047,16 @@ function velotok_product_status( $product ) {
 /**
  * Опубликован ли товар.
  *
+ * Товар считается опубликованным только если его состояние входит в модель и
+ * является публичным (publish).
+ *
  * @param WC_Product $product Товар.
  * @return bool
  */
 function velotok_product_is_published( $product ) {
-	return 'publish' === velotok_product_status( $product );
+	$status = velotok_product_status( $product );
+
+	return velotok_product_state_is_valid( $status ) && velotok_product_state_is_public( $status );
 }
 
 /**
