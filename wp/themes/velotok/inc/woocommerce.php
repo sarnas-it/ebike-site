@@ -395,6 +395,32 @@ function velotok_product_card_specs( $product ) {
 		$seen[ $key ] = true;
 	}
 
+	$sku = method_exists( $product, 'get_sku' ) ? trim( (string) $product->get_sku() ) : '';
+
+	if ( '' !== $sku ) {
+		$sku_key = function_exists( 'mb_strtolower' ) ? mb_strtolower( __( 'Артикул', 'velotok' ) ) : strtolower( __( 'Артикул', 'velotok' ) );
+
+		if ( ! isset( $seen[ $sku_key ] ) ) {
+			$seen[ $sku_key ] = true;
+			$specs[]          = array( __( 'Артикул', 'velotok' ), $sku );
+		}
+	}
+
+	$model = function_exists( 'velotok_catalog_product_attribute' ) ? trim( (string) velotok_catalog_product_attribute( $product, 'model' ) ) : '';
+
+	if ( '' === $model ) {
+		$model = trim( (string) get_post_meta( $product->get_id(), '_velotok_model', true ) );
+	}
+
+	if ( '' !== $model ) {
+		$model_key = function_exists( 'mb_strtolower' ) ? mb_strtolower( __( 'Модель', 'velotok' ) ) : strtolower( __( 'Модель', 'velotok' ) );
+
+		if ( ! isset( $seen[ $model_key ] ) ) {
+			$seen[ $model_key ] = true;
+			$specs[]            = array( __( 'Модель', 'velotok' ), $model );
+		}
+	}
+
 	foreach ( velotok_product_extra_attributes( $product ) as $extra ) {
 		$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $extra[0] ) : strtolower( $extra[0] );
 
@@ -559,17 +585,45 @@ function velotok_normalize_product( $product, $index = 0 ) {
 		);
 	}
 
-	$badge = trim( (string) get_post_meta( $product->get_id(), '_velotok_badge', true ) );
+	$badge   = trim( (string) get_post_meta( $product->get_id(), '_velotok_badge', true ) );
+	$tagline = trim( (string) get_post_meta( $product->get_id(), '_velotok_tagline', true ) );
+	$model   = function_exists( 'velotok_catalog_product_attribute' ) ? trim( (string) velotok_catalog_product_attribute( $product, 'model' ) ) : '';
+	$sku     = method_exists( $product, 'get_sku' ) ? trim( (string) $product->get_sku() ) : '';
+
+	if ( '' === $model ) {
+		$model = trim( (string) get_post_meta( $product->get_id(), '_velotok_model', true ) );
+	}
+	$slug    = $product->get_slug();
+	$full    = method_exists( $product, 'get_description' ) ? (string) $product->get_description() : '';
+	$terms   = get_the_terms( $product->get_id(), 'product_cat' );
+	$cat     = '';
+	$cat_label = velotok_product_category_label( $product );
+
+	if ( $terms && ! is_wp_error( $terms ) && isset( $terms[0]->slug ) ) {
+		$cat = (string) $terms[0]->slug;
+	}
+
+	$image_html = velotok_product_image_html( $product, $product->get_name() );
 
 	return array(
 		'id'             => (int) $product->get_id(),
-		'card_id'        => 'model-' . $product->get_slug(),
-		'slug'           => $product->get_slug(),
+		'card_id'        => 'model-' . $slug,
+		'slug'           => $slug,
 		'name'           => $product->get_name(),
+		'title'          => $product->get_name(),
+		'price'          => (float) $price,
 		'url'            => $product->get_permalink(),
-		'image_html'     => velotok_product_image_html( $product, $product->get_name() ),
+		'image_html'     => $image_html,
+		'image'          => $image_html,
+		'photo'          => $image_html,
 		'description'    => velotok_product_description( $product ),
-		'category_label' => velotok_product_category_label( $product ),
+		'full_description' => $full,
+		'tagline'        => $tagline,
+		'sku'            => $sku,
+		'model'          => $model,
+		'category'       => $cat,
+		'category_slug'  => $cat,
+		'category_label' => $cat_label,
 		'badge'          => $badge,
 		'badge_lime'     => in_array( $badge, array( 'Хит', 'Выбор механиков', 'Новинка' ), true ),
 		'number'         => $index ? sprintf( '%02d', (int) $index ) : '',
@@ -737,9 +791,19 @@ function velotok_normalize_fallback_model( $model, $index = 0 ) {
 		'card_id'        => 'model-' . $model['slug'],
 		'slug'           => $model['slug'],
 		'name'           => $model['name'],
+		'title'          => $model['name'],
+		'price'          => (float) $price,
 		'url'            => home_url( '/#model-' . $model['slug'] ),
 		'image_html'     => $image,
+		'image'          => $image,
+		'photo'          => $image,
 		'description'    => isset( $model['description'] ) ? (string) $model['description'] : '',
+		'full_description' => isset( $model['description'] ) ? (string) $model['description'] : '',
+		'tagline'        => isset( $model['tagline'] ) ? (string) $model['tagline'] : '',
+		'sku'            => '',
+		'model'          => '',
+		'category'       => '',
+		'category_slug'  => '',
 		'category_label' => $model['category_label'],
 		'badge'          => $model['badge'],
 		'badge_lime'     => ! empty( $model['badge_lime'] ),

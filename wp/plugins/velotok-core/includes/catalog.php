@@ -369,6 +369,12 @@ function velotok_core_catalog_contract() {
 		'default_product_state' => 'publish',
 		'product_state_requirement' => 'TESTEB-16',
 		'validation_requirement' => 'TESTEB-17',
+		'card_requirement'    => 'TESTEB-18',
+		'card'                => array(
+			'requirement'         => 'TESTEB-18',
+			'required_attributes' => array( 'photo', 'name', 'description', 'price' ),
+			'fields'              => array( 'name', 'price', 'description', 'category', 'image', 'badge', 'range_km', 'motor_w', 'weight_kg', 'wheel', 'model', 'sku', 'attributes' ),
+		),
 		'validation'          => array(
 			'requirement'            => 'TESTEB-17',
 			'server_side'            => true,
@@ -1150,6 +1156,512 @@ function velotok_core_catalog_count( $category = '' ) {
 }
 
 /**
+ * Escape a value for the catalog card HTML.
+ *
+ * The helper keeps the card renderer usable in isolated tests where the
+ * WordPress escaping functions are not loaded.
+ *
+ * @param mixed $value Source value.
+ * @return string
+ */
+function velotok_core_catalog_card_escape( $value ) {
+	if ( function_exists( 'esc_html' ) ) {
+		return (string) esc_html( (string) $value );
+	}
+
+	return htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
+}
+
+/**
+ * Read a scalar value from a catalog product by candidate keys.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @param string[]            $keys    Candidate keys.
+ * @param mixed               $default Default value.
+ * @return mixed
+ */
+function velotok_core_catalog_card_value( $product, $keys, $default = '' ) {
+	if ( ! is_array( $product ) ) {
+		return $default;
+	}
+
+	foreach ( $keys as $key ) {
+		if ( isset( $product[ $key ] ) && is_scalar( $product[ $key ] ) && '' !== trim( (string) $product[ $key ] ) ) {
+			return $product[ $key ];
+		}
+	}
+
+	return $default;
+}
+
+/**
+ * Format a catalog product price for the card.
+ *
+ * @param mixed $price Price value.
+ * @return string
+ */
+function velotok_core_catalog_card_price( $price ) {
+	if ( ! is_numeric( $price ) ) {
+		return '';
+	}
+
+	$number = (float) $price;
+
+	if ( function_exists( 'number_format_i18n' ) ) {
+		return (string) number_format_i18n( $number, 0 );
+	}
+
+	return number_format( $number, 0, '.', ' ' );
+}
+
+/**
+ * Build the HTML image for a catalog product card.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @param string              $alt     Alternative text.
+ * @return string
+ */
+function velotok_core_catalog_card_image_html( $product, $alt ) {
+	$image = velotok_core_catalog_card_value( $product, array( 'image_html', 'photo_html' ), '' );
+
+	if ( '' !== $image ) {
+		return (string) $image;
+	}
+
+	$image = velotok_core_catalog_card_value( $product, array( 'image', 'photo', 'image_url' ), '' );
+
+	if ( '' === $image ) {
+		return '';
+	}
+
+	if ( false !== strpos( (string) $image, '<img' ) ) {
+		return (string) $image;
+	}
+
+	$url = (string) $image;
+
+	if ( function_exists( 'get_template_directory_uri' ) && false === strpos( $url, '://' ) ) {
+		$url = get_template_directory_uri() . '/assets/img/' . ltrim( $url, '/' );
+	}
+
+	return sprintf(
+		'<img src="%1$s" width="800" height="600" alt="%2$s" loading="lazy" decoding="async" class="model-photo">',
+		velotok_core_catalog_card_escape( $url ),
+		velotok_core_catalog_card_escape( $alt )
+	);
+}
+
+/**
+ * Return the label/value rows that a catalog product card must show.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @return array<int,array{0:string,1:string}>
+ */
+function velotok_core_catalog_card_specs( $product ) {
+	if ( ! is_array( $product ) ) {
+		return array();
+	}
+
+	$rows = array();
+	$seen = array();
+
+	$add = static function ( $label, $value ) use ( &$rows, &$seen ) {
+		$label = trim( (string) $label );
+		$value = trim( (string) $value );
+
+		if ( '' === $label || '' === $value ) {
+			return;
+		}
+
+		$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $label, 'UTF-8' ) : strtolower( $label );
+
+		if ( isset( $seen[ $key ] ) ) {
+			return;
+		}
+
+		$seen[ $key ] = true;
+		$rows[]       = array( $label, $value );
+	};
+
+	$range  = velotok_core_catalog_card_value( $product, array( 'range_km', 'range' ), '' );
+	$motor  = velotok_core_catalog_card_value( $product, array( 'motor_w', 'motor' ), '' );
+	$weight = velotok_core_catalog_card_value( $product, array( 'weight_kg', 'weight' ), '' );
+	$wheel  = velotok_core_catalog_card_value( $product, array( 'wheel' ), '' );
+	$model  = velotok_core_catalog_card_value( $product, array( 'model', '_model', '_velotok_model' ), '' );
+	$sku    = velotok_core_catalog_card_value( $product, array( 'sku', '_sku' ), '' );
+
+	if ( '' !== $range ) {
+		$add( 'Запас хода', 'до ' . $range . ' км' );
+	}
+	if ( '' !== $motor ) {
+		$add( 'Мотор', $motor . ' Вт' );
+	}
+	if ( '' !== $wheel ) {
+		$add( 'Колёса', $wheel );
+	}
+	if ( '' !== $weight ) {
+		$add( 'Вес', $weight . ' кг' );
+	}
+	if ( '' !== $model ) {
+		$add( 'Модель', $model );
+	}
+	if ( '' !== $sku ) {
+		$add( 'Артикул', $sku );
+	}
+
+	foreach ( array(
+		'frame'    => 'Рама',
+		'warranty' => 'Гарантия',
+		'max_load' => 'Максимальная нагрузка',
+	) as $key => $label ) {
+		$value = velotok_core_catalog_card_value( $product, array( $key ), '' );
+
+		if ( '' !== $value ) {
+			$add( $label, $value );
+		}
+	}
+
+	if ( isset( $product['attributes'] ) && is_array( $product['attributes'] ) ) {
+		foreach ( $product['attributes'] as $key => $attribute ) {
+			if ( is_array( $attribute ) ) {
+				$label = isset( $attribute['label'] ) ? $attribute['label'] : ( isset( $attribute[0] ) ? $attribute[0] : $key );
+				$value = isset( $attribute['value'] ) ? $attribute['value'] : ( isset( $attribute[1] ) ? $attribute[1] : '' );
+
+				if ( is_array( $value ) ) {
+					$value = implode( ', ', array_filter( array_map( 'strval', $value ) ) );
+				}
+
+				$add( $label, $value );
+			} elseif ( is_scalar( $attribute ) ) {
+				$add( $key, $attribute );
+			}
+		}
+	}
+
+	return $rows;
+}
+
+/**
+ * Return the fixed field list of a catalog product card.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function velotok_core_catalog_card_fields() {
+	return array(
+		'name'        => array(
+			'label'    => 'Название',
+			'type'     => 'string',
+			'required' => true,
+		),
+		'price'       => array(
+			'label'    => 'Цена',
+			'type'     => 'number',
+			'required' => true,
+		),
+		'description' => array(
+			'label'    => 'Описание',
+			'type'     => 'string',
+			'required' => true,
+		),
+		'category'    => array(
+			'label'    => 'Категория',
+			'type'     => 'string',
+			'required' => false,
+		),
+		'image'       => array(
+			'label'    => 'Фото',
+			'type'     => 'string',
+			'required' => true,
+		),
+		'badge'       => array(
+			'label'    => 'Бейдж',
+			'type'     => 'string',
+			'required' => false,
+		),
+		'range_km'    => array(
+			'label'    => 'Запас хода, км',
+			'type'     => 'number',
+			'required' => false,
+		),
+		'motor_w'     => array(
+			'label'    => 'Мотор, Вт',
+			'type'     => 'number',
+			'required' => false,
+		),
+		'weight_kg'   => array(
+			'label'    => 'Вес, кг',
+			'type'     => 'number',
+			'required' => false,
+		),
+		'wheel'       => array(
+			'label'    => 'Колёса',
+			'type'     => 'string',
+			'required' => false,
+		),
+		'model'       => array(
+			'label'    => 'Модель',
+			'type'     => 'string',
+			'required' => false,
+		),
+		'sku'         => array(
+			'label'    => 'Артикул',
+			'type'     => 'string',
+			'required' => false,
+		),
+		'attributes'  => array(
+			'label'    => 'Характеристики',
+			'type'     => 'array',
+			'required' => false,
+		),
+	);
+}
+
+/**
+ * Return the product card contract.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_card_contract() {
+	$contract = velotok_core_catalog_contract();
+	$fields   = velotok_core_catalog_card_fields();
+
+	return array(
+		'spec'                      => $contract['spec'],
+		'requirement'               => 'TESTEB-18',
+		'source'                    => 'stub',
+		'mocked'                    => true,
+		'fields'                    => $fields,
+		'attributes'                => $fields,
+		'required_attributes'       => array( 'photo', 'name', 'description', 'price' ),
+		'card_mandatory_attributes' => array( 'photo', 'name', 'description', 'price' ),
+		'optional_attributes'       => array( 'category', 'badge', 'range_km', 'motor_w', 'weight_kg', 'wheel', 'model', 'sku', 'attributes' ),
+		'missing_product'           => 'empty_string',
+		'future_source'             => 'woocommerce',
+	);
+}
+
+/**
+ * Alias for the product card field list.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function velotok_core_catalog_product_card_fields() {
+	return velotok_core_catalog_card_fields();
+}
+
+/**
+ * Return the display-ready data of a catalog product card.
+ *
+ * The card contains every field of the catalog contract, so templates and
+ * consumers do not have to read the product stub directly. The accessor
+ * accepts a product slug/name or an already resolved catalog product array.
+ *
+ * @param mixed $product Product slug, name or catalog product data.
+ * @return array<string,mixed>|null Null when the product is not found.
+ */
+function velotok_core_catalog_product_card( $product = null ) {
+	if ( is_string( $product ) || is_int( $product ) ) {
+		$product = velotok_core_catalog_product( $product );
+	}
+
+	if ( ! is_array( $product ) || empty( $product ) ) {
+		return null;
+	}
+
+	$contract = velotok_core_catalog_contract();
+
+	$slug     = velotok_core_catalog_card_value( $product, array( 'slug' ), '' );
+	$name     = velotok_core_catalog_card_value( $product, array( 'name', 'title', 'product_name' ), '' );
+	$category = velotok_core_catalog_card_value( $product, array( 'category', 'category_slug' ), '' );
+	$category = velotok_core_catalog_normalize_key( $category );
+	$label    = '' !== $category ? velotok_core_catalog_category_label( $category ) : '';
+	$price    = velotok_core_catalog_card_value( $product, array( 'price', 'regular_price' ), '' );
+	$short    = velotok_core_catalog_card_value( $product, array( 'short_description', 'summary' ), '' );
+	$long     = velotok_core_catalog_card_value( $product, array( 'description' ), '' );
+	$tagline  = velotok_core_catalog_card_value( $product, array( 'tagline' ), '' );
+	$image    = velotok_core_catalog_card_value( $product, array( 'image', 'photo', 'image_url' ), '' );
+	$state    = velotok_core_catalog_product_state( $product );
+	$formatted_price = velotok_core_catalog_card_price( $price );
+	$price_html = '' !== $formatted_price ? $formatted_price . ' ₽' : '';
+	$description = '' !== $long ? $long : ( '' !== $short ? $short : $tagline );
+	$specs       = velotok_core_catalog_card_specs( $product );
+	$spec_rows   = array();
+
+	$attribute_values = array();
+
+	foreach ( $specs as $spec ) {
+		$attribute_values[ $spec[0] ] = $spec[1];
+		$spec_rows[]                  = array(
+			'label' => $spec[0],
+			'value' => $spec[1],
+		);
+	}
+
+	return array(
+		'requirement'       => 'TESTEB-18',
+		'spec'              => $contract['spec'],
+		'valid'             => velotok_core_catalog_product_is_valid( $product ),
+		'is_valid'          => velotok_core_catalog_product_is_valid( $product ),
+		'slug'              => (string) $slug,
+		'id'                => (string) $slug,
+		'name'              => (string) $name,
+		'title'             => (string) $name,
+		'price'             => $price,
+		'price_html'        => $price_html,
+		'currency'          => $contract['currency'],
+		'description'       => (string) $description,
+		'full_description'  => (string) $long,
+		'short_description' => (string) $short,
+		'tagline'           => (string) $tagline,
+		'category'          => (string) $category,
+		'category_slug'     => (string) $category,
+		'category_label'    => (string) $label,
+		'state'             => (string) $state,
+		'image'             => (string) $image,
+		'photo'             => (string) $image,
+		'image_html'        => velotok_core_catalog_card_image_html( $product, (string) $name ),
+		'photo_html'        => velotok_core_catalog_card_image_html( $product, (string) $name ),
+		'url'               => (string) velotok_core_catalog_card_value( $product, array( 'url', 'permalink' ), '' ),
+		'badge'             => (string) velotok_core_catalog_card_value( $product, array( 'badge' ), '' ),
+		'range_km'          => velotok_core_catalog_card_value( $product, array( 'range_km', 'range' ), '' ),
+		'motor_w'           => velotok_core_catalog_card_value( $product, array( 'motor_w', 'motor' ), '' ),
+		'weight_kg'         => velotok_core_catalog_card_value( $product, array( 'weight_kg', 'weight' ), '' ),
+		'wheel'             => velotok_core_catalog_card_value( $product, array( 'wheel' ), '' ),
+		'model'             => (string) velotok_core_catalog_card_value( $product, array( 'model', '_model', '_velotok_model' ), '' ),
+		'sku'               => (string) velotok_core_catalog_card_value( $product, array( 'sku', '_sku' ), '' ),
+		'product_type'      => (string) velotok_core_catalog_card_value( $product, array( 'product_type' ), $contract['product_type'] ),
+		'description_html'  => velotok_core_catalog_card_escape( $description ),
+		'attributes'        => $specs,
+		'specs'             => $specs,
+		'spec_rows'         => $spec_rows,
+		'attribute_rows'    => $specs,
+		'attribute_values'  => $attribute_values,
+		'fields'            => $product,
+		'product'           => $product,
+	);
+}
+
+/**
+ * Alias for the catalog product card data accessor.
+ *
+ * @param mixed $product Product slug, name or catalog product data.
+ * @return array<string,mixed>|null
+ */
+function velotok_core_catalog_card( $product = null ) {
+	return velotok_core_catalog_product_card( $product );
+}
+
+/**
+ * Alias for callers that use the card data wording.
+ *
+ * @param mixed $product Product slug, name or catalog product data.
+ * @return array<string,mixed>|null
+ */
+function velotok_core_catalog_card_data( $product = null ) {
+	return velotok_core_catalog_product_card( $product );
+}
+
+/**
+ * Alias for callers that prefer the get-prefixed name.
+ *
+ * @param mixed $product Product slug, name or catalog product data.
+ * @return array<string,mixed>|null
+ */
+function velotok_core_get_catalog_product_card( $product = null ) {
+	return velotok_core_catalog_product_card( $product );
+}
+
+/**
+ * Render a catalog product card as escaped HTML.
+ *
+ * @param mixed $product Product slug, name or catalog product data.
+ * @return string Empty string when the product is not found.
+ */
+function velotok_core_catalog_render_product_card( $product = null ) {
+	$card = velotok_core_catalog_product_card( $product );
+
+	if ( null === $card ) {
+		return '';
+	}
+
+	$html = '<article class="model-card product-card catalog-product-card" data-slug="' . velotok_core_catalog_card_escape( $card['slug'] ) . '"';
+
+	if ( '' !== $card['sku'] ) {
+		$html .= ' data-sku="' . velotok_core_catalog_card_escape( $card['sku'] ) . '"';
+	}
+
+	$html .= '>';
+
+	if ( '' !== $card['image_html'] ) {
+		$html .= '<div class="model-media">' . $card['image_html'] . '</div>';
+	}
+
+	$html .= '<div class="model-body">';
+
+	if ( '' !== $card['category_label'] ) {
+		$html .= '<span class="model-category">' . velotok_core_catalog_card_escape( $card['category_label'] ) . '</span>';
+	}
+
+	$html .= '<h3><a href="' . velotok_core_catalog_card_escape( $card['url'] ) . '">' . velotok_core_catalog_card_escape( $card['name'] ) . '</a></h3>';
+
+	if ( '' !== $card['description'] ) {
+		$html .= '<p class="model-description">' . velotok_core_catalog_card_escape( $card['description'] ) . '</p>';
+	}
+
+	if ( '' !== $card['sku'] ) {
+		$html .= '<p class="model-sku">Артикул: <span>' . velotok_core_catalog_card_escape( $card['sku'] ) . '</span></p>';
+	}
+
+	if ( ! empty( $card['specs'] ) ) {
+		$html .= '<ul class="specs">';
+
+		foreach ( $card['specs'] as $spec ) {
+			$html .= '<li><span>' . velotok_core_catalog_card_escape( $spec[0] ) . '</span><strong>' . velotok_core_catalog_card_escape( $spec[1] ) . '</strong></li>';
+		}
+
+		$html .= '</ul>';
+	}
+
+	if ( '' !== $card['price_html'] ) {
+		$html .= '<div class="price">' . velotok_core_catalog_card_escape( $card['price_html'] ) . '</div>';
+	}
+
+	$html .= '</div></article>';
+
+	return $html;
+}
+
+/**
+ * Alias for callers that use the card HTML wording.
+ *
+ * @param mixed $product Product slug, name or catalog product data.
+ * @return string
+ */
+function velotok_core_catalog_card_html( $product = null ) {
+	return velotok_core_catalog_render_product_card( $product );
+}
+
+/**
+ * Alias for the catalog card HTML renderer.
+ *
+ * @param mixed $product Product slug, name or catalog product data.
+ * @return string
+ */
+function velotok_core_catalog_render_card( $product = null ) {
+	return velotok_core_catalog_render_product_card( $product );
+}
+
+/**
+ * Alias for the catalog card HTML renderer.
+ *
+ * @param mixed $product Product slug, name or catalog product data.
+ * @return string
+ */
+function velotok_core_render_catalog_product_card( $product = null ) {
+	return velotok_core_catalog_render_product_card( $product );
+}
+
+/**
  * Return the open questions that block a real catalog integration.
  *
  * @return array<string,string>
@@ -1204,6 +1716,100 @@ if ( ! function_exists( 'catalogProduct' ) ) {
 	 */
 	function catalogProduct( $slug ) {
 		return velotok_core_catalog_product( $slug );
+	}
+}
+
+if ( ! function_exists( 'catalogProductCard' ) ) {
+	/**
+	 * Short global alias for catalog product card data.
+	 *
+	 * @param mixed $product Product slug, name or catalog product data.
+	 * @return array<string,mixed>|null
+	 */
+	function catalogProductCard( $product = null ) {
+		return velotok_core_catalog_product_card( $product );
+	}
+}
+
+if ( ! function_exists( 'catalogCard' ) ) {
+	/**
+	 * Short global alias for catalog product card data.
+	 *
+	 * @param mixed $product Product slug, name or catalog product data.
+	 * @return array<string,mixed>|null
+	 */
+	function catalogCard( $product = null ) {
+		return velotok_core_catalog_product_card( $product );
+	}
+}
+
+if ( ! function_exists( 'catalogCardData' ) ) {
+	/**
+	 * Short global alias for catalog product card data.
+	 *
+	 * @param mixed $product Product slug, name or catalog product data.
+	 * @return array<string,mixed>|null
+	 */
+	function catalogCardData( $product = null ) {
+		return velotok_core_catalog_product_card( $product );
+	}
+}
+
+if ( ! function_exists( 'catalogRenderProductCard' ) ) {
+	/**
+	 * Short global alias for the catalog card HTML renderer.
+	 *
+	 * @param mixed $product Product slug, name or catalog product data.
+	 * @return string
+	 */
+	function catalogRenderProductCard( $product = null ) {
+		return velotok_core_catalog_render_product_card( $product );
+	}
+}
+
+if ( ! function_exists( 'catalogProductCardData' ) ) {
+	/**
+	 * Short global alias for catalog product card data.
+	 *
+	 * @param mixed $product Product slug, name or catalog product data.
+	 * @return array<string,mixed>|null
+	 */
+	function catalogProductCardData( $product = null ) {
+		return velotok_core_catalog_product_card( $product );
+	}
+}
+
+if ( ! function_exists( 'catalogCardHtml' ) ) {
+	/**
+	 * Short global alias for the catalog card HTML renderer.
+	 *
+	 * @param mixed $product Product slug, name or catalog product data.
+	 * @return string
+	 */
+	function catalogCardHtml( $product = null ) {
+		return velotok_core_catalog_render_product_card( $product );
+	}
+}
+
+if ( ! function_exists( 'catalogCardContract' ) ) {
+	/**
+	 * Short global alias for the catalog card contract.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function catalogCardContract() {
+		return velotok_core_catalog_card_contract();
+	}
+}
+
+if ( ! function_exists( 'catalogCardFields' ) ) {
+	/**
+	 * Short global alias for the catalog card fields.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	function catalogCardFields() {
+		return velotok_core_catalog_card_fields();
 	}
 }
 
