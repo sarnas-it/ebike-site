@@ -24,65 +24,77 @@ function velotok_asset_version( $relative_path ) {
 }
 
 /**
+ * Модели подборщика из актуального каталога товаров.
+ *
+ * Цены и состав моделей берутся из товаров WooCommerce (или из демо-каталога,
+ * если WooCommerce не установлен), а не из отдельной таблицы в теме.
+ *
+ * @return array<string,array>
+ */
+function velotok_picker_models() {
+	$models = array();
+
+	if ( ! function_exists( 'velotok_get_home_models' ) ) {
+		return $models;
+	}
+
+	$index = 0;
+
+	foreach ( velotok_get_home_models() as $model ) {
+		if ( ! is_array( $model ) ) {
+			continue;
+		}
+
+		$index++;
+		$slug = isset( $model['slug'] ) ? trim( (string) $model['slug'] ) : '';
+
+		if ( '' === $slug ) {
+			$slug = 'model-' . $index;
+		}
+
+		$price   = isset( $model['price'] ) ? (float) $model['price'] : 0;
+		$card_id = isset( $model['card_id'] ) ? trim( (string) $model['card_id'] ) : '';
+
+		if ( '' === $card_id ) {
+			$card_id = 'model-' . $slug;
+		}
+
+		$note = isset( $model['tagline'] ) ? trim( (string) $model['tagline'] ) : '';
+
+		if ( '' === $note ) {
+			$note = isset( $model['description'] ) ? (string) $model['description'] : '';
+		}
+
+		$models[ $slug ] = array(
+			'slug'        => $slug,
+			'name'        => isset( $model['name'] ) ? (string) $model['name'] : '',
+			'price'       => number_format_i18n( $price, 0 ) . ' ₽',
+			'price_value' => $price,
+			'href'        => '#' . $card_id,
+			'note'        => $note,
+			'category'    => isset( $model['category'] ) ? (string) $model['category'] : '',
+		);
+	}
+
+	return $models;
+}
+
+/**
  * Строки, которые использует фронтенд-скрипт.
  *
  * @return array
  */
 function velotok_js_strings() {
-	$models = array(
-		'riviera'      => array(
-			'name'  => __( 'Ривьера', 'velotok' ),
-			'price' => number_format_i18n( 62900, 0 ) . ' ₽',
-			'href'  => '#model-riviera',
-			'note'  => __( 'Лёгкая низкая рама, 90 км запаса хода и спокойный характер — для ежедневных поездок по городу.', 'velotok' ),
-		),
-		'street'       => array(
-			'name'  => __( 'Стрит 7', 'velotok' ),
-			'price' => number_format_i18n( 74900, 0 ) . ' ₽',
-			'href'  => '#model-street',
-			'note'  => __( 'Более быстрый и жёсткий вариант для асфальта: 110 км хода и посадка для активной езды.', 'velotok' ),
-		),
-		'hrebet-pro'   => array(
-			'name'  => __( 'Хребет Pro', 'velotok' ),
-			'price' => number_format_i18n( 149900, 0 ) . ' ₽',
-			'href'  => '#model-hrebet-pro',
-			'note'  => __( 'Полная подвеска и мотор 750 Вт — если в маршруте есть серьёзные подъёмы и спуски.', 'velotok' ),
-		),
-		'hrebet-trail' => array(
-			'name'  => __( 'Хребет Trail', 'velotok' ),
-			'price' => number_format_i18n( 98900, 0 ) . ' ₽',
-			'href'  => '#model-hrebet-trail',
-			'note'  => __( 'Хардтейл для леса и грунта: меньше веса, простая обслуживаемость и уверенный ход.', 'velotok' ),
-		),
-		'family'       => array(
-			'name'  => __( 'Семейный', 'velotok' ),
-			'price' => number_format_i18n( 132900, 0 ) . ' ₽',
-			'href'  => '#model-family',
-			'note'  => __( 'Удлинённая рама и бокс на 80 кг: дети, продукты и всё, что нужно на даче.', 'velotok' ),
-		),
-		'courier'      => array(
-			'name'  => __( 'Курьер', 'velotok' ),
-			'price' => number_format_i18n( 119900, 0 ) . ' ₽',
-			'href'  => '#model-courier',
-			'note'  => __( 'Рама под ежедневные нагрузки: передний и задний багажник, груз до 120 кг.', 'velotok' ),
-		),
-		'sklad'        => array(
-			'name'  => __( 'Складень 20', 'velotok' ),
-			'price' => number_format_i18n( 68900, 0 ) . ' ₽',
-			'href'  => '#model-sklad',
-			'note'  => __( 'Складывается за полминуты и помещается в багажник — для поездов, офиса и лифта.', 'velotok' ),
-		),
-	);
-
 	return array(
-		'menuOpen'       => __( 'Открыть меню', 'velotok' ),
-		'menuClose'      => __( 'Закрыть меню', 'velotok' ),
-		'emptyResult'    => __( 'Ответьте на три вопроса — покажем модель, которая подходит под ваш маршрут и бюджет.', 'velotok' ),
-		'resultKicker'   => __( 'Ваш вариант', 'velotok' ),
-		'viewModel'      => __( 'Смотреть модель', 'velotok' ),
-		'addedToCart'    => __( 'Товар добавлен в корзину', 'velotok' ),
+		'menuOpen'        => __( 'Открыть меню', 'velotok' ),
+		'menuClose'       => __( 'Закрыть меню', 'velotok' ),
+		'emptyResult'     => __( 'Ответьте на три вопроса — покажем модель, которая подходит под ваш маршрут и бюджет.', 'velotok' ),
+		'noModel'         => __( 'В выбранном бюджете пока нет подходящей модели — измените бюджет или свяжитесь с нами.', 'velotok' ),
+		'resultKicker'    => __( 'Ваш вариант', 'velotok' ),
+		'viewModel'       => __( 'Смотреть модель', 'velotok' ),
+		'addedToCart'     => __( 'Товар добавлен в корзину', 'velotok' ),
 		'removedFromCart' => __( 'Товар удалён из корзины', 'velotok' ),
-		'models'         => $models,
+		'models'          => velotok_picker_models(),
 	);
 }
 
@@ -114,9 +126,20 @@ function velotok_enqueue_assets() {
 	);
 
 	wp_enqueue_script(
+		'velotok-picker',
+		get_template_directory_uri() . '/assets/js/picker.js',
+		array(),
+		velotok_asset_version( 'assets/js/picker.js' ),
+		array(
+			'strategy'  => 'defer',
+			'in_footer' => true,
+		)
+	);
+
+	wp_enqueue_script(
 		'velotok-main',
 		get_template_directory_uri() . '/assets/js/main.js',
-		array(),
+		array( 'velotok-picker' ),
 		velotok_asset_version( 'assets/js/main.js' ),
 		array(
 			'strategy'  => 'defer',
