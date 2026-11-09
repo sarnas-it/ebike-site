@@ -1643,6 +1643,45 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 	}
 
 	/**
+	 * Удаляет параметры запроса из URL без зависимости от WordPress.
+	 *
+	 * @param string $url  Исходный URL.
+	 * @param array  $keys Имена удаляемых параметров.
+	 * @return string
+	 */
+	function velotok_catalog_remove_query_args( $url, $keys ) {
+		$url      = (string) $url;
+		$fragment = '';
+
+		if ( false !== strpos( $url, '#' ) ) {
+			list( $url, $fragment ) = explode( '#', $url, 2 );
+			$fragment = '#' . $fragment;
+		}
+
+		$query = '';
+
+		if ( false !== strpos( $url, '?' ) ) {
+			list( $url, $query ) = explode( '?', $url, 2 );
+		}
+
+		if ( '' === $query ) {
+			return $url . $fragment;
+		}
+
+		$existing = array();
+
+		parse_str( $query, $existing );
+
+		foreach ( (array) $keys as $key ) {
+			unset( $existing[ $key ] );
+		}
+
+		$query = http_build_query( $existing, '', '&', PHP_QUERY_RFC3986 );
+
+		return $url . ( '' !== $query ? '?' . $query : '' ) . $fragment;
+	}
+
+	/**
 	 * Ссылка на страницу каталога с сохранением поиска, фильтров и сортировки.
 	 *
 	 * @param int    $page   Номер страницы.
@@ -1657,6 +1696,7 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			$base = function_exists( 'home_url' ) ? home_url( '/' ) : '/';
 		}
 
+		$base = velotok_catalog_remove_query_args( $base, array( 'paged', 'page' ) );
 		$args = velotok_catalog_pagination_query_args( $source );
 
 		if ( $page > 1 ) {
@@ -1729,6 +1769,7 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			$base = function_exists( 'home_url' ) ? home_url( '/' ) : '/';
 		}
 
+		$base   = velotok_catalog_remove_query_args( $base, array( 'paged', 'page' ) );
 		$source = array_key_exists( 'source', $args ) ? $args['source'] : null;
 		$params = velotok_catalog_pagination_query_args( $source );
 
