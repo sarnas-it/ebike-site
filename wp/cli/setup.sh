@@ -128,7 +128,7 @@ if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	wp_cli option update woocommerce_price_num_decimals "0" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_price_decimal_sep "," >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_price_thousand_sep " " >/dev/null 2>&1 || true
-	wp_cli option update woocommerce_price_format '%1$s %2$s' >/dev/null 2>&1 || true
+	wp_cli option update woocommerce_price_format '%2$s %1$s' >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_enable_guest_checkout "yes" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_cod_settings '{"enabled":"yes","title":"Оплата при получении","description":"Оплата наличными или картой при получении заказа.","instructions":"Менеджер свяжется для подтверждения заказа и доставки."}' --format=json >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_default_country "RU:MOW" >/dev/null 2>&1 || true

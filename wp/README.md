@@ -34,6 +34,7 @@ php wp/themes/velotok/tests/catalog-render-test.php
 php wp/themes/velotok/tests/catalog-display-test.php
 php wp/themes/velotok/tests/catalog-all-products-test.php
 php wp/themes/velotok/tests/catalog-published-products-test.php
+php wp/themes/velotok/tests/localization-ru-test.php
 php wp/plugins/velotok-core/tests/product-attributes-contract-test.php
 php wp/plugins/velotok-core/tests/product-attributes-card-test.php
 php wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
@@ -108,6 +109,8 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/themes/velotok/tests/catalog-display-test.php` — тест вывода всего каталога;
 * `wp/themes/velotok/tests/catalog-all-products-test.php` — тест полноты каталога и описания;
 * `wp/themes/velotok/tests/catalog-published-products-test.php` — тест опубликованных валидных товаров и пустого каталога;
+* `wp/themes/velotok/tests/localization-ru-test.php` — тест русской локали, переводов WooCommerce и форматов цен/дат;
+* `wp/themes/velotok/inc/localization.php` — русская локаль, переводы служебных страниц и форматы цен/дат;
 * `wp/plugins/velotok-core/tests/product-attributes-contract-test.php` — тест контракта дополнительных атрибутов;
 * `wp/plugins/velotok-core/tests/product-attributes-card-test.php` — тест вывода дополнительных атрибутов в карточке;
 * `wp/tests/smoke.sh` — дымовой тест локального запуска.
