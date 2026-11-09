@@ -51,7 +51,7 @@ function velotok_core_cart_woocommerce_contract() {
 		'parent_spec'      => 'ecommerce-store',
 		'requirement'      => 'TESTEB-7',
 		'task'             => 'TESTEB-7',
-		'requirement_ids'  => array( 'TESTEB-7', 'TESTEB-8', 'TESTEB-9', 'TESTEB-10', 'TESTEB-13' ),
+		'requirement_ids'  => array( 'TESTEB-7', 'TESTEB-8', 'TESTEB-9', 'TESTEB-10', 'TESTEB-13', 'TESTEB-14' ),
 		'requirements'     => array(
 			'woocommerce_cart'  => 'Система SHALL вести корзину на WooCommerce',
 			'guest_transfer'    => 'Гостевая корзина SHALL переноситься при входе',
@@ -919,6 +919,11 @@ function velotok_core_wc_cart_remove_item( $key ) {
 	}
 
 	$cart->remove_cart_item( $key );
+
+	if ( empty( velotok_core_wc_cart_items() ) ) {
+		velotok_core_wc_cart_clear_guest_snapshot();
+		velotok_core_wc_cart_clear_user_snapshot();
+	}
 
 	return velotok_core_wc_cart_summary(
 		array(
