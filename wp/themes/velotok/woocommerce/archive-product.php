@@ -136,7 +136,13 @@ $velotok_filter_attributes = function_exists( 'velotok_catalog_filter_contract_a
 					endwhile;
 					?>
 				</div>
-				<?php woocommerce_pagination(); ?>
+				<?php
+				if ( function_exists( 'velotok_catalog_pagination' ) ) {
+					velotok_catalog_pagination( array( 'base' => $velotok_sort_action ) );
+				} else {
+					woocommerce_pagination();
+				}
+				?>
 			<?php else : ?>
 				<div class="catalog-empty">
 					<p class="result-empty"><?php esc_html_e( 'В этой категории пока нет моделей.', 'velotok' ); ?></p>
