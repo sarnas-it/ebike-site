@@ -1,5 +1,72 @@
 # CI
 
+## Причина `no_checks` по PR #60 (TESTEB-64)
+
+Застрявший коммит `b1b0871d6ebb4f7ce25a987c956c7b1431eef379` (head ветки
+`feat/ebike-site-testeb-28`) не содержит `.github/workflows` в своём дереве.
+Это проверено по содержимому самого коммита: `GET /contents/.github/workflows`
+для этого SHA возвращает `404`, а patch PR #60 меняет только файлы внутри
+`wp/**`.
+
+Проблема не только в head: в базовой ветке `main` на момент открытия и
+последнего push PR #60 тоже не было `.github/workflows`. Head `main` на момент
+постановки — `efe1bc4` (мерж PR #62), и его дерево также состояло только из
+`wp/**`; корневой `.github/` отсутствовал. Для события `pull_request` GitHub
+ищет workflow-файл в дереве PR (merge-дерево head + base). Ни в head, ни в base
+файла не было, поэтому запускать было нечего — отсюда `no checks reported for
+the pull request`.
+
+GitHub не запускает workflow задним числом: появление файла в другой ветке или
+позже в `main` не создаёт прогон для уже существующего неизменённого head PR.
+Нужен либо новый коммит в head (новое событие `pull_request`/`synchronize`),
+либо отдельный прогон, который явно проверит актуальный head PR.
+
+Проверенные данные:
+
+* PR #60 — `open`, `merged: false`, `merge_commit_sha: null`, head
+  `b1b0871d6ebb4f7ce25a987c956c7b1431eef379`, base `main`;
+* в дереве `b1b0871` нет `.github/workflows` (raw/contents возвращает `404`);
+* в `main` на момент постановки (`efe1bc4`) нет `.github/workflows` и вообще
+  нет корневых файлов, только `wp/**`;
+* patch PR #60 добавляет/меняет только `wp/**`, workflow не добавляет;
+* фильтров по путям и веткам в CI нет: триггер `pull_request` широкий, без
+  `paths`;
+* очередь раннеров и лимит минут не при чём: прогон для этого SHA вообще не
+  создавался;
+* allow-list интеграции содержит `sarnas-it/ebike-site`, иначе PR #60 не был
+  бы создан.
+
+### Восстановление PR #60
+
+`.github/workflows/recover-pr60.yml` запускается на `push` и вручную:
+
+1. разрешает **актуальный head PR #60** через GitHub API
+   (`scripts/ci/resolve-pr-target.mjs`) и выкачивает именно его
+   (`git rev-parse HEAD` сверяется с разрешённым SHA). SHA из инцидента
+   `b1b0871d6ebb4f7ce25a987c956c7b1431eef379` остаётся только в
+   `INCIDENT_SHA` для аудита: recovery не привязан к нему и не пропускает
+   мерж, если head уехал;
+2. прогоняет на разрешённом коммите общий набор проверок через
+   `scripts/ci/run-checks.sh` (`php-lint`, `php-tests`, `php-plugin-tests`,
+   `plugin-tests`, `ci-repair-tests`);
+3. публикует результаты как check runs на этот же SHA и завершает отложенный
+   мерж PR #60, если все проверки зелёные и head PR всё ещё равен проверенному
+   коммиту;
+4. `.github/workflows/finalize-pr60-evidence.yml` запускается тем же `push`,
+   находит recovery-прогон по точному SHA триггера (`--trigger-sha`), ждёт его
+   завершения и только затем публикует итоговый комментарий
+   `docs/testeb-64-comment.md` с маркером `<!-- testeb-64-recovery -->`.
+   Самодиспатч финализатора из recovery не обязателен и не считается
+   доказательством: GitHub отклоняет `workflow_dispatch`, пока финализатор не
+   появился в базовой ветке.
+
+Фактический результат: recovery-прогон
+[#42469606322](https://github.com/sarnas-it/ebike-site/actions/runs/42469606322)
+завершился `completed/success`, на проверяемом head опубликованы зелёные
+проверки, а отложенный мерж PR #60 выполнен без ручного вмешательства
+`2026-11-08T10:01:27Z` (merge commit
+`4f8dce6768556a015b4f284c09d1c336c2cba292`).
+
 ## Причина `no_checks` по PR #62 (TESTEB-63)
 
 Застрявший коммит `578e87b5a8587d6078aade92d26bd449448dd1d3` (head ветки
