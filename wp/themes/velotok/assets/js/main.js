@@ -67,6 +67,7 @@
 	}
 
 	var models = l10n.models || {};
+	var picker = window.velotokPicker || {};
 	var answers = {};
 	var resultEl = document.getElementById("quiz-result");
 	var resetBtn = document.getElementById("quiz-reset");
@@ -85,28 +86,11 @@
 	}
 
 	function pickModel() {
-		var place = answers.place;
-		var need = answers.need;
-		var budget = answers.budget;
-		if (place === "mountain") {
-			return budget === "high" ? "hrebet-pro" : "hrebet-trail";
+		if (typeof picker.pickModel !== "function") {
+			return null;
 		}
-		if (place === "family") {
-			return budget === "low" ? "sklad" : "family";
-		}
-		if (need === "cargo") {
-			return "courier";
-		}
-		if (need === "compact") {
-			return "sklad";
-		}
-		if (place === "commute") {
-			return budget === "low" ? "riviera" : "street";
-		}
-		if (budget === "high" || need === "speed") {
-			return "street";
-		}
-		return "riviera";
+
+		return picker.pickModel(models, answers);
 	}
 
 	function renderResult() {
@@ -120,8 +104,13 @@
 			}
 			return;
 		}
-		var model = models[pickModel()];
+		var modelKey = pickModel();
+		var model = modelKey ? models[modelKey] : null;
 		if (!model) {
+			resultEl.innerHTML = '<p class="result-empty">' + escapeHtml(l10n.noModel || l10n.emptyResult || "") + '</p>';
+			if (resetBtn) {
+				resetBtn.hidden = false;
+			}
 			return;
 		}
 		var href = model.href || "#models";
