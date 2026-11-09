@@ -17,6 +17,178 @@ defined( 'ABSPATH' ) || exit;
 
 if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 	/**
+	 * Фиксированный набор сортировок каталога.
+	 *
+	 * Сортировка принимает только значения из этого набора. Неизвестное
+	 * значение не доходит до WooCommerce и заменяется сортировкой по умолчанию.
+	 *
+	 * @return array<string,string>
+	 */
+	function velotok_catalog_sorting_options() {
+		return array(
+			'menu_order' => __( 'По умолчанию', 'velotok' ),
+			'popularity' => __( 'По популярности', 'velotok' ),
+			'rating'     => __( 'По рейтингу', 'velotok' ),
+			'date'       => __( 'По новинкам', 'velotok' ),
+			'price'      => __( 'Цена: по возрастанию', 'velotok' ),
+			'price-desc' => __( 'Цена: по убыванию', 'velotok' ),
+		);
+	}
+
+	/**
+	 * Псевдоним фиксированного набора сортировок для шаблонов.
+	 *
+	 * @return array<string,string>
+	 */
+	function velotok_catalog_sorting() {
+		return velotok_catalog_sorting_options();
+	}
+
+	/**
+	 * Допустимые значения orderby.
+	 *
+	 * @return string[]
+	 */
+	function velotok_catalog_sort_values() {
+		return array_keys( velotok_catalog_sorting_options() );
+	}
+
+	/**
+	 * Контракт сортировки каталога.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_catalog_sorting_contract() {
+		$options = velotok_catalog_sorting_options();
+
+		return array(
+			'requirement' => 'TESTEB-59',
+			'parameter'   => 'orderby',
+			'options'     => $options,
+			'values'      => array_keys( $options ),
+			'default'     => velotok_catalog_default_orderby(),
+		);
+	}
+
+	/**
+	 * Псевдоним контракта сортировки.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_catalog_sort_contract() {
+		return velotok_catalog_sorting_contract();
+	}
+
+	/**
+	 * Псевдоним фиксированного набора сортировок.
+	 *
+	 * @return array<string,string>
+	 */
+	function velotok_catalog_sort_options() {
+		return velotok_catalog_sorting_options();
+	}
+
+	/**
+	 * Псевдоним фиксированного набора сортировок.
+	 *
+	 * @return array<string,string>
+	 */
+	function velotok_catalog_orderby_options() {
+		return velotok_catalog_sorting_options();
+	}
+
+	/**
+	 * Допустимые значения параметра orderby.
+	 *
+	 * @return string[]
+	 */
+	function velotok_catalog_sorting_keys() {
+		return array_keys( velotok_catalog_sorting_options() );
+	}
+
+	/**
+	 * Псевдоним допустимых значений orderby.
+	 *
+	 * @return string[]
+	 */
+	function velotok_catalog_sorting_values() {
+		return velotok_catalog_sorting_keys();
+	}
+
+	/**
+	 * Псевдоним допустимых значений orderby.
+	 *
+	 * @return string[]
+	 */
+	function velotok_catalog_allowed_sorting() {
+		return velotok_catalog_sorting_keys();
+	}
+
+	/**
+	 * Сортировка по умолчанию.
+	 *
+	 * @return string
+	 */
+	function velotok_catalog_default_orderby() {
+		return 'menu_order';
+	}
+
+	/**
+	 * Приводит orderby к значению из фиксированного набора.
+	 *
+	 * @param mixed $orderby Исходное значение.
+	 * @return string
+	 */
+	function velotok_catalog_normalize_orderby( $orderby ) {
+		if ( is_array( $orderby ) || is_object( $orderby ) ) {
+			return velotok_catalog_default_orderby();
+		}
+
+		$orderby = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $orderby ) : strtolower( preg_replace( '/[^a-z0-9_\-]/', '', (string) $orderby ) );
+
+		if ( isset( velotok_catalog_sorting_options()[ $orderby ] ) ) {
+			return $orderby;
+		}
+
+		return velotok_catalog_default_orderby();
+	}
+
+	/**
+	 * Псевдоним нормализации orderby.
+	 *
+	 * @param mixed $orderby Исходное значение.
+	 * @return string
+	 */
+	function velotok_catalog_sanitize_orderby( $orderby ) {
+		return velotok_catalog_normalize_orderby( $orderby );
+	}
+
+	/**
+	 * Сортировка из запроса.
+	 *
+	 * @param mixed $source Источник (по умолчанию $_GET).
+	 * @return string
+	 */
+	function velotok_catalog_request_orderby( $source = null ) {
+		if ( null === $source ) {
+			$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичная сортировка каталога.
+		}
+
+		if ( ! is_array( $source ) ) {
+			return velotok_catalog_default_orderby();
+		}
+
+		$contract = velotok_catalog_filter_contract();
+		$key      = isset( $contract['sorting_parameter'] ) ? $contract['sorting_parameter'] : 'orderby';
+
+		if ( ! isset( $source[ $key ] ) ) {
+			return velotok_catalog_default_orderby();
+		}
+
+		return velotok_catalog_normalize_orderby( $source[ $key ] );
+	}
+
+	/**
 	 * Контракт поиска и фильтров каталога.
 	 *
 	 * @return array<string,mixed>
@@ -149,6 +321,8 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			}
 		}
 
+		$sorting = velotok_catalog_sorting_options();
+
 		$contract = array(
 			'spec'                 => 'theme',
 			'requirement'          => 'TESTEB-58',
@@ -158,6 +332,16 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			'filterable_attributes' => $filterable,
 			'search_parameter'     => 's',
 			'filter_parameter'     => 'velotok_filter',
+			'sorting_parameter'    => 'orderby',
+			'sorting'              => $sorting,
+			'sorting_options'      => $sorting,
+			'sorting_values'       => array_keys( $sorting ),
+			'sorting_keys'         => array_keys( $sorting ),
+			'allowed_sorting'      => array_keys( $sorting ),
+			'sort_values'          => array_keys( $sorting ),
+			'default_sort'         => velotok_catalog_default_orderby(),
+			'default_orderby'      => velotok_catalog_default_orderby(),
+			'sort_requirement'     => 'TESTEB-59',
 			'missing_value'        => '',
 		);
 
@@ -1100,6 +1284,7 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 		return array(
 			'search'  => velotok_catalog_request_search( $source ),
 			'filters' => velotok_catalog_request_filters( $source ),
+			'orderby' => velotok_catalog_request_orderby( $source ),
 		);
 	}
 
@@ -1267,6 +1452,73 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 	}
 
 	/**
+	 * Параметры запроса WooCommerce для сортировки из фиксированного набора.
+	 *
+	 * @param mixed $orderby Значение orderby.
+	 * @return array<string,string>
+	 */
+	function velotok_catalog_orderby_query_vars( $orderby ) {
+		switch ( velotok_catalog_normalize_orderby( $orderby ) ) {
+			case 'price':
+				return array(
+					'meta_key' => '_price',
+					'orderby'  => 'meta_value_num',
+					'order'    => 'ASC',
+				);
+			case 'price-desc':
+				return array(
+					'meta_key' => '_price',
+					'orderby'  => 'meta_value_num',
+					'order'    => 'DESC',
+				);
+			case 'popularity':
+				return array(
+					'meta_key' => 'total_sales',
+					'orderby'  => 'meta_value_num',
+					'order'    => 'DESC',
+				);
+			case 'rating':
+				return array(
+					'meta_key' => '_wc_average_rating',
+					'orderby'  => 'meta_value_num',
+					'order'    => 'DESC',
+				);
+			case 'date':
+				return array(
+					'orderby' => 'date',
+					'order'   => 'DESC',
+				);
+			case 'menu_order':
+			default:
+				return array(
+					'orderby' => 'menu_order',
+					'order'   => 'ASC',
+				);
+		}
+	}
+
+	/**
+	 * Применяет сортировку из фиксированного набора к запросу.
+	 *
+	 * @param mixed $query   WP_Query.
+	 * @param mixed $orderby Значение orderby.
+	 * @return void
+	 */
+	function velotok_catalog_apply_sorting( $query, $orderby = null ) {
+		if ( ! is_object( $query ) || ! method_exists( $query, 'set' ) ) {
+			return;
+		}
+
+		if ( null === $orderby ) {
+			$orderby = velotok_catalog_request_orderby();
+		}
+
+		foreach ( velotok_catalog_orderby_query_vars( $orderby ) as $key => $value ) {
+			$query->set( $key, $value );
+		}
+	}
+
+	/**
 	 * Добавляет фильтры контракта к основному запросу архива WooCommerce.
 	 *
 	 * @param mixed $query WP_Query.
@@ -1291,6 +1543,11 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 
 		if ( ! $is_product ) {
 			return;
+		}
+
+		$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичная сортировка каталога.
+		if ( isset( $source['orderby'] ) ) {
+			velotok_catalog_apply_sorting( $query, velotok_catalog_request_orderby( $source ) );
 		}
 
 		$filters = velotok_catalog_request_filters();
