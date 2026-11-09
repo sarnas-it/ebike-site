@@ -394,10 +394,12 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			'validation_requirement' => 'TESTEB-61',
 			'price_validation_requirement' => 'TESTEB-62',
 			'validation'           => array(
-				'requirement'         => 'TESTEB-61',
-				'server_side'         => true,
-				'required_attributes' => array( 'photo', 'name', 'description', 'price' ),
-				'invalid_price_code'  => 'PRODUCT_PRICE_INVALID',
+				'requirement'          => 'TESTEB-61',
+				'price_requirement'    => 'TESTEB-62',
+				'server_side'          => true,
+				'required_attributes'  => array( 'photo', 'name', 'description', 'price' ),
+				'invalid_price_code'   => 'PRODUCT_PRICE_INVALID',
+				'invalid_price_message' => 'Цена товара должна быть неотрицательным числом.',
 			),
 			'missing_value'        => '',
 		);

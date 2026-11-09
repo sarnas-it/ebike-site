@@ -85,6 +85,11 @@ function velotok_core_product_validation_contract() {
 				'format'   => 'PRICE_INVALID_FORMAT',
 				'negative' => 'PRICE_NEGATIVE',
 			),
+			'error_messages'   => array(
+				'required' => 'Укажите цену товара.',
+				'format'   => 'Цена товара должна быть числом.',
+				'negative' => 'Цена товара не может быть отрицательной.',
+			),
 		),
 	);
 
@@ -100,6 +105,12 @@ function velotok_core_product_validation_contract() {
 		'spec'                         => 'clarify-41b1da6d',
 		'requirement'                  => 'TESTEB-61',
 		'price_requirement'            => 'TESTEB-62',
+		'messages'                     => array(
+			'price_required' => 'Укажите цену товара.',
+			'price_format'   => 'Цена товара должна быть числом.',
+			'price_negative' => 'Цена товара не может быть отрицательной.',
+			'invalid_price'  => 'Цена товара не может быть отрицательной.',
+		),
 		'server_side'                  => true,
 		'validated_on_server'          => true,
 		'source'                       => 'stub',
@@ -300,19 +311,22 @@ function velotok_core_validation_strlen( $value ) {
  * @param string|null $code    First error code, if any.
  * @param mixed       $value   Original value.
  * @param string[]    $errors  Error codes.
+ * @param string      $message Concrete human-readable message.
  * @return array<string,mixed>
  */
-function velotok_core_validation_result( $valid, $code, $value, $errors = array() ) {
+function velotok_core_validation_result( $valid, $code, $value, $errors = array(), $message = '' ) {
 	if ( null !== $code && ! $errors ) {
 		$errors = array( $code );
 	}
 
 	return array(
-		'valid'  => (bool) $valid,
-		'code'   => $code,
-		'error'  => $code,
-		'errors' => array_values( $errors ),
-		'value'  => $value,
+		'valid'   => (bool) $valid,
+		'code'    => $code,
+		'error'   => $code,
+		'errors'  => array_values( $errors ),
+		'value'   => $value,
+		'message' => $valid ? '' : (string) $message,
+		'status'  => $valid ? 'valid' : 'invalid',
 	);
 }
 
@@ -434,27 +448,36 @@ function velotok_core_price_validation_contract() {
  */
 function velotok_core_validate_product_price( $price ) {
 	$rule = velotok_core_price_validation_contract();
+	$messages = isset( $rule['error_messages'] ) ? $rule['error_messages'] : array();
 
 	if ( null === $price || ( is_string( $price ) && '' === trim( $price ) ) ) {
-		return velotok_core_validation_result( false, $rule['error_codes']['required'], $price );
+		$message = isset( $messages['required'] ) ? $messages['required'] : 'Укажите цену товара.';
+
+		return velotok_core_validation_result( false, $rule['error_codes']['required'], $price, array(), $message );
 	}
 
 	if ( is_string( $price ) ) {
 		$normalized = trim( $price );
 
 		if ( ! preg_match( '/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/', $normalized ) ) {
-			return velotok_core_validation_result( false, $rule['error_codes']['format'], $price );
+			$message = isset( $messages['format'] ) ? $messages['format'] : 'Цена товара должна быть числом.';
+
+			return velotok_core_validation_result( false, $rule['error_codes']['format'], $price, array(), $message );
 		}
 
 		$number = (float) str_replace( ',', '.', $normalized );
 	} elseif ( is_int( $price ) || ( is_float( $price ) && is_finite( $price ) ) ) {
 		$number = (float) $price;
 	} else {
-		return velotok_core_validation_result( false, $rule['error_codes']['format'], $price );
+		$message = isset( $messages['format'] ) ? $messages['format'] : 'Цена товара должна быть числом.';
+
+		return velotok_core_validation_result( false, $rule['error_codes']['format'], $price, array(), $message );
 	}
 
 	if ( $number < 0 ) {
-		return velotok_core_validation_result( false, $rule['error_codes']['negative'], $price );
+		$message = isset( $messages['negative'] ) ? $messages['negative'] : 'Цена товара не может быть отрицательной.';
+
+		return velotok_core_validation_result( false, $rule['error_codes']['negative'], $price, array(), $message );
 	}
 
 	return velotok_core_validation_result( true, null, $price );
@@ -637,6 +660,7 @@ function velotok_core_validate_product( $product, $category = '' ) {
 	);
 
 	$errors_by_attribute = array();
+	$messages_by_attribute = array();
 	$errors              = array();
 	$missing             = array();
 
@@ -649,10 +673,21 @@ function velotok_core_validate_product( $product, $category = '' ) {
 		$errors[]                         = $code;
 		$errors_by_attribute[ $attribute ] = $code;
 		$missing[]                        = $attribute;
+
+		if ( ! empty( $results[ $attribute ]['message'] ) ) {
+			$messages_by_attribute[ $attribute ] = $results[ $attribute ]['message'];
+		}
+	}
+
+	$message = '';
+
+	if ( $errors && isset( $results[ $missing[0] ]['message'] ) ) {
+		$message = (string) $results[ $missing[0] ]['message'];
 	}
 
 	return array(
 		'valid'              => array() === $errors,
+		'status'             => $errors ? 'invalid' : 'valid',
 		'spec'               => 'clarify-41b1da6d',
 		'mocked'             => true,
 		'category'           => $category,
@@ -662,6 +697,8 @@ function velotok_core_validate_product( $product, $category = '' ) {
 		'error_codes'        => array_values( $errors ),
 		'codes'              => array_values( $errors ),
 		'error'              => $errors ? $errors[0] : null,
+		'message'            => $message,
+		'messages'           => $messages_by_attribute,
 		'errors_by_attribute' => $errors_by_attribute,
 		'missing'            => array_values( $missing ),
 		'missing_attributes' => array_values( $missing ),
