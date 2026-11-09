@@ -428,13 +428,123 @@ function velotok_core_catalog_category_label( $category ) {
 }
 
 /**
+ * Normalize catalog text for case-insensitive search.
+ *
+ * @param mixed $value Source value.
+ * @return string
+ */
+function velotok_core_catalog_normalize_search_text( $value ) {
+	if ( is_array( $value ) || is_object( $value ) ) {
+		return '';
+	}
+
+	$value = trim( strip_tags( (string) $value ) );
+	$value = function_exists( 'mb_strtolower' ) ? mb_strtolower( $value, 'UTF-8' ) : strtolower( $value );
+	$value = str_replace( 'ё', 'е', $value );
+	$value = preg_replace( '/\s+/u', ' ', $value );
+
+	return trim( (string) $value );
+}
+
+/**
+ * Return every searchable value of a catalog product.
+ *
+ * Search reads the product name, descriptions, model, SKU, category and all
+ * other scalar attributes, including optional fields added by a future
+ * WooCommerce source.
+ *
+ * @param mixed $product Catalog product.
+ * @return string[]
+ */
+function velotok_core_catalog_product_search_values( $product ) {
+	if ( ! is_array( $product ) ) {
+		return array();
+	}
+
+	$values = array();
+
+	foreach ( $product as $value ) {
+		if ( is_scalar( $value ) ) {
+			$values[] = (string) $value;
+		} elseif ( is_array( $value ) ) {
+			foreach ( $value as $item ) {
+				if ( is_scalar( $item ) ) {
+					$values[] = (string) $item;
+				} elseif ( is_array( $item ) ) {
+					foreach ( $item as $part ) {
+						if ( is_scalar( $part ) ) {
+							$values[] = (string) $part;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if ( isset( $product['category'] ) ) {
+		$definition = velotok_core_catalog_category( $product['category'] );
+
+		if ( is_array( $definition ) ) {
+			foreach ( array( 'slug', 'name', 'label', 'description' ) as $field ) {
+				if ( isset( $definition[ $field ] ) && is_scalar( $definition[ $field ] ) ) {
+					$values[] = (string) $definition[ $field ];
+				}
+			}
+		}
+	}
+
+	return array_values( array_unique( array_filter( $values, 'is_string' ) ) );
+}
+
+/**
+ * Check whether a catalog product matches a search query.
+ *
+ * The whole query is matched first, then every whitespace-separated token.
+ * Matching is case-insensitive and covers name, description, model, SKU and
+ * category.
+ *
+ * @param mixed  $product Catalog product.
+ * @param string $query   Search query.
+ * @return bool
+ */
+function velotok_core_catalog_product_matches_search( $product, $query ) {
+	$query = velotok_core_catalog_normalize_search_text( $query );
+
+	if ( '' === $query ) {
+		return true;
+	}
+
+	$values = velotok_core_catalog_product_search_values( $product );
+	$haystack = velotok_core_catalog_normalize_search_text( implode( ' ', $values ) );
+
+	if ( '' === $haystack ) {
+		return false;
+	}
+
+	if ( false !== strpos( $haystack, $query ) ) {
+		return true;
+	}
+
+	$tokens = preg_split( '/\s+/u', $query );
+	$tokens = is_array( $tokens ) ? array_filter( $tokens ) : array();
+
+	foreach ( $tokens as $token ) {
+		if ( false === strpos( $haystack, $token ) ) {
+			return false;
+		}
+	}
+
+	return ! empty( $tokens );
+}
+
+/**
  * Return the fixed mocked catalog products.
  *
  * Supports filtering by category plus optional limit, offset and ordering. Only
  * in-memory data is used; WooCommerce, files and remote services are not read.
  *
  * @param string|array $category Category slug or an arguments array.
- * @param array        $args     Optional arguments: category, limit, offset, orderby, order.
+ * @param array        $args     Optional arguments: category, search, limit, offset, orderby, order.
  * @return array<int,array<string,mixed>>
  */
 function velotok_core_catalog_products( $category = '', $args = array() ) {
@@ -460,8 +570,21 @@ function velotok_core_catalog_products( $category = '', $args = array() ) {
 		return array();
 	}
 
+	$search = '';
+
+	foreach ( array( 'search', 's', 'query' ) as $search_key ) {
+		if ( isset( $args[ $search_key ] ) && is_scalar( $args[ $search_key ] ) ) {
+			$search = (string) $args[ $search_key ];
+			break;
+		}
+	}
+
 	foreach ( $contract['products'] as $product ) {
 		if ( '' !== $key && ( ! isset( $product['category'] ) || $product['category'] !== $key ) ) {
+			continue;
+		}
+
+		if ( '' !== trim( $search ) && ! velotok_core_catalog_product_matches_search( $product, $search ) ) {
 			continue;
 		}
 
