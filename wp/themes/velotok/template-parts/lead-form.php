@@ -11,7 +11,10 @@ $velotok_phone   = velotok_get_option( 'phone' );
 $velotok_email   = velotok_get_option( 'email' );
 $velotok_address = velotok_get_option( 'address' );
 $velotok_hours   = velotok_get_option( 'hours' );
-$velotok_has_cf7 = shortcode_exists( 'contact-form-7' );
+$velotok_has_cf7 = shortcode_exists( 'contact-form-7' )
+	&& function_exists( 'wpcf7_get_contact_form_by_title' )
+	&& wpcf7_get_contact_form_by_title( 'test-drive' )
+	&& wpcf7_get_contact_form_by_title( 'consultation' );
 ?>
 <section class="section section--lead" id="lead" aria-labelledby="lead-title">
 	<div class="wrap">

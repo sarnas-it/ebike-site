@@ -39,6 +39,7 @@ services:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
       - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
+      - ./wp/cli:/opt/velotok/cli:ro
       - ./scripts:/var/www/html/scripts:ro
       - ./content:/var/www/html/content:ro
       - ./assets:/var/www/html/assets:ro
@@ -62,6 +63,7 @@ services:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
       - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
+      - ./wp/cli:/opt/velotok/cli:ro
       - ./scripts:/var/www/html/scripts:ro
       - ./content:/var/www/html/content:ro
       - ./assets:/var/www/html/assets:ro
@@ -79,12 +81,21 @@ services:
           sleep 3
         done
         wp plugin install woocommerce --activate --allow-root >/dev/null 2>&1 || true
+        wp plugin install contact-form-7 --activate --allow-root >/dev/null 2>&1 || true
+        wp plugin install flamingo --activate --allow-root >/dev/null 2>&1 || true
+        wp plugin activate contact-form-7 flamingo --allow-root >/dev/null 2>&1 || true
         wp plugin activate velotok-core --allow-root >/dev/null 2>&1 || true
         wp theme activate velotok --allow-root >/dev/null 2>&1 || true
         wp language core install ru_RU --activate --allow-root >/dev/null 2>&1 || true
         wp site switch-language ru_RU --allow-root >/dev/null 2>&1 || true
         wp option update WPLANG ru_RU --allow-root >/dev/null 2>&1 || true
         wp language plugin install woocommerce ru_RU --allow-root >/dev/null 2>&1 || true
+        wp language plugin install contact-form-7 ru_RU --allow-root >/dev/null 2>&1 || true
+        wp language plugin install flamingo ru_RU --allow-root >/dev/null 2>&1 || true
+        if wp plugin is-active contact-form-7 --allow-root >/dev/null 2>&1; then
+          echo "Configuring lead forms:"
+          wp eval-file /opt/velotok/cli/lead-forms.php --allow-root || true
+        fi
         wp option update timezone_string 'Europe/Moscow' --allow-root >/dev/null 2>&1 || true
         wp option update date_format 'd.m.Y' --allow-root >/dev/null 2>&1 || true
         wp option update time_format 'H:i' --allow-root >/dev/null 2>&1 || true

@@ -17,7 +17,8 @@ docker compose up -d
   `WORDPRESS_ADMIN_USER`, `WORDPRESS_ADMIN_PASSWORD`, `WORDPRESS_ADMIN_EMAIL`).
 
 Сервис `setup` идемпотентно устанавливает WordPress, активирует тему `velotok` и
-плагин `velotok-core`, устанавливает WooCommerce, создаёт служебные страницы и
+плагин `velotok-core`, устанавливает WooCommerce, Contact Form 7 и Flamingo,
+создаёт формы заявок `test-drive` и `consultation`, служебные страницы и
 заполняет каталог демо-товарами из `wp/data/products.json`. Провижининг
 создаёт зону доставки «Россия» со СДЭК, Почтой РФ и самовывозом из шоурума,
 включает оплату при получении (и ЮKassa при заданных реквизитах), поэтому
@@ -33,6 +34,7 @@ checkout сразу может создавать заказы. Скрипт т�
 docker compose exec wordpress wp plugin list
 docker compose exec wordpress wp theme list
 docker compose run --rm wpcli plugin list
+docker compose run --rm wpcli post list --post_type=wpcf7_contact_form --fields=ID,post_title,post_status
 php wp/themes/velotok/tests/catalog-render-test.php
 php wp/themes/velotok/tests/catalog-display-test.php
 php wp/themes/velotok/tests/catalog-all-products-test.php
@@ -42,6 +44,7 @@ php wp/plugins/velotok-core/tests/product-attributes-contract-test.php
 php wp/plugins/velotok-core/tests/product-attributes-card-test.php
 php wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
 node wp/plugins/velotok-core/tests/payment-gateway-contract.test.js
+php wp/plugins/velotok-core/tests/lead-forms-contract-test.php
 php wp/plugins/velotok-core/tests/accounts-contract-test.php
 php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
 node wp/plugins/velotok-core/tests/accounts-contract.test.js
@@ -68,7 +71,10 @@ WooCommerce → список моделей → шаблон каталога �
 `payment-gateway-contract-test.php` проверяет шлюз ЮKassa для WooCommerce:
 создание платежа, подпись и идемпотентность webhook, статусы заказа и полный
 возврат в `refunded`; секреты читаются только из окружения или настроек.
-Дымовой тест дополнительно проверяет эти элементы на реальной главной странице.
+`lead-forms-contract-test.php` проверяет установку Contact Form 7 и Flamingo,
+создание форм `test-drive` и `consultation`, получателя писем и идемпотентность
+их настройки. Дымовой тест дополнительно проверяет эти элементы на реальной
+главной странице.
 
 Тест аккаунтов `accounts-contract-test.php` проверяет регистрацию по email и
 паролю, обязательное подтверждение email, вход существующего пользователя без
@@ -85,6 +91,12 @@ WooCommerce → список моделей → шаблон каталога �
 `accounts-wordpress-integration.test.js` падает, если при регистрации аккаунт
 сразу помечается подтверждённым.
 
+Формы заявок `test-drive` и `consultation` создаёт идемпотентный
+`wp/cli/lead-forms.php`: он задаёт поля, получателя из настройки «Электронная
+почта» и сохраняет каждую отправку через Flamingo в разделе «Flamingo →
+Inbound Messages». Получателя можно переопределить переменной окружения
+`VELOTOK_LEAD_RECIPIENT`.
+
 Тесты `provisioning-contract-test.php` и `provisioning-checkout-test.php`
 проверяют провижининг свежего магазина (EBIKE-23): зона «Россия» со СДЭК,
 Почтой РФ и самовывозом из шоурума, включённые шлюзы COD/ЮKassa и пакет
@@ -94,8 +106,8 @@ WooCommerce → список моделей → шаблон каталога �
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
 
 Дымовой тест поднимает отдельный compose-проект, ждёт ответ главной страницы,
-проверяет активные тему и плагин и наличие товаров, затем удаляет контейнеры и
-тома тестового проекта.
+проверяет активные тему и плагин, наличие товаров, формы заявок, затем удаляет
+контейнеры и тома тестового проекта.
 
 ## Остановка и сброс
 
@@ -114,6 +126,7 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/docker/wordpress/Dockerfile` — локальный образ WordPress с WP-CLI;
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
 * `wp/cli/wp-entrypoint.sh` — обёртка WP-CLI для контейнера `wpcli`;
+* `wp/cli/lead-forms.php` — формы Contact Form 7 и сохранение заявок во Flamingo;
 * `wp/cli/seed.php` — загрузка демо-каталога;
 * `wp/cli/provision.php` — идемпотентный провижининг зон, способов доставки, шлюзов и языка;
 * `wp/plugins/velotok-core/includes/provisioning.php` — конфигурация и применение провижининга;
