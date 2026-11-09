@@ -470,6 +470,21 @@ function velotok_core_catalog_contract() {
 		'allowed_sorting'     => velotok_core_catalog_sorting_keys(),
 		'default_sort'        => 'menu_order',
 		'default_orderby'     => 'menu_order',
+		'search_parameter'    => 's',
+		'pagination_requirement' => 'TESTEB-22',
+		'pagination_parameter' => 'paged',
+		'pagination_page_parameter' => 'paged',
+		'pagination_per_page_parameter' => 'per_page',
+		'per_page_parameter'  => 'per_page',
+		'pagination_default_per_page' => 6,
+		'default_per_page'    => 6,
+		'pagination'          => array(
+			'requirement'      => 'TESTEB-22',
+			'parameter'        => 'paged',
+			'page_parameter'   => 'paged',
+			'per_page_parameter' => 'per_page',
+			'default_per_page' => 6,
+		),
 		'product_not_found'   => 'CATALOG_PRODUCT_NOT_FOUND',
 		'category_unknown'    => 'CATALOG_CATEGORY_UNKNOWN',
 		'empty_catalog'       => 'CATALOG_EMPTY',
@@ -1727,6 +1742,442 @@ function velotok_core_catalog_sort( $products, $orderby = 'menu_order', $order =
 }
 
 /**
+ * Read the search query from a request source.
+ *
+ * @param mixed $source Source array (defaults to $_GET).
+ * @return string
+ */
+function velotok_core_catalog_request_search( $source = null ) {
+	if ( null === $source ) {
+		$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичный поиск каталога.
+	}
+
+	if ( ! is_array( $source ) ) {
+		return '';
+	}
+
+	$contract = velotok_core_catalog_contract();
+	$keys     = array( $contract['search_parameter'], 'search', 'query' );
+
+	foreach ( $keys as $key ) {
+		if ( isset( $source[ $key ] ) && is_scalar( $source[ $key ] ) ) {
+			return trim( strip_tags( (string) $source[ $key ] ) );
+		}
+	}
+
+	if ( isset( $source[ $contract['filter_parameter'] ] ) && is_array( $source[ $contract['filter_parameter'] ] ) ) {
+		foreach ( array( 'search', 's', 'query' ) as $key ) {
+			if ( isset( $source[ $contract['filter_parameter'] ][ $key ] ) && is_scalar( $source[ $contract['filter_parameter'] ][ $key ] ) ) {
+				return trim( strip_tags( (string) $source[ $contract['filter_parameter'] ][ $key ] ) );
+			}
+		}
+	}
+
+	return '';
+}
+
+/**
+ * Read sanitized contract filters from a request source.
+ *
+ * @param mixed $source Source array (defaults to $_GET).
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_request_filters( $source = null ) {
+	if ( null === $source ) {
+		$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичные фильтры каталога.
+	}
+
+	if ( ! is_array( $source ) ) {
+		return array();
+	}
+
+	$contract = velotok_core_catalog_contract();
+	$input    = array();
+
+	if ( isset( $source[ $contract['filter_parameter'] ] ) && is_array( $source[ $contract['filter_parameter'] ] ) ) {
+		$input = array_merge( $input, $source[ $contract['filter_parameter'] ] );
+	}
+
+	$ignored = array(
+		$contract['filter_parameter'],
+		$contract['search_parameter'],
+		$contract['sorting_parameter'],
+		$contract['pagination_parameter'],
+		'search',
+		'query',
+		'paged',
+		'page',
+		'per_page',
+		'limit',
+		'offset',
+	);
+
+	foreach ( $source as $key => $value ) {
+		if ( in_array( $key, $ignored, true ) ) {
+			continue;
+		}
+
+		$input[ $key ] = $value;
+	}
+
+	return velotok_core_catalog_sanitize_filters( $input );
+}
+
+/**
+ * Read search, filters and sorting from a request source.
+ *
+ * @param mixed $source Source array (defaults to $_GET).
+ * @return array{search:string,filters:array<string,mixed>,orderby:string}
+ */
+function velotok_core_catalog_request_query( $source = null ) {
+	return array(
+		'search'  => velotok_core_catalog_request_search( $source ),
+		'filters' => velotok_core_catalog_request_filters( $source ),
+		'orderby' => velotok_core_catalog_request_orderby( $source ),
+	);
+}
+
+/**
+ * Add query arguments to a URL without depending on WordPress.
+ *
+ * @param string $url  Source URL.
+ * @param array  $args Query arguments.
+ * @return string
+ */
+function velotok_core_catalog_add_query_args( $url, $args ) {
+	$url      = (string) $url;
+	$fragment = '';
+
+	if ( false !== strpos( $url, '#' ) ) {
+		list( $url, $fragment ) = explode( '#', $url, 2 );
+		$fragment = '#' . $fragment;
+	}
+
+	$query = '';
+
+	if ( false !== strpos( $url, '?' ) ) {
+		list( $url, $query ) = explode( '?', $url, 2 );
+	}
+
+	$existing = array();
+
+	if ( '' !== $query ) {
+		parse_str( $query, $existing );
+	}
+
+	if ( is_array( $args ) ) {
+		$existing = array_merge( $existing, $args );
+	}
+
+	$query = http_build_query( $existing, '', '&', PHP_QUERY_RFC3986 );
+
+	return $url . ( '' !== $query ? '?' . $query : '' ) . $fragment;
+}
+
+/**
+ * Request arguments that pagination keeps on every catalog page.
+ *
+ * Search, contract filters and sorting are carried to page links unchanged.
+ * Only orderby is normalized: an unsupported value falls back to the default.
+ * The paged argument is not included because the page link supplies it.
+ *
+ * @param mixed $source Source array (defaults to $_GET).
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_pagination_query_args( $source = null ) {
+	if ( null === $source ) {
+		$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичная пагинация каталога.
+	}
+
+	if ( ! is_array( $source ) ) {
+		return array();
+	}
+
+	$contract = velotok_core_catalog_contract();
+	$args     = array();
+
+	$search = velotok_core_catalog_request_search( $source );
+
+	if ( '' !== $search ) {
+		$args[ $contract['search_parameter'] ] = $search;
+	}
+
+	$filters = velotok_core_catalog_request_filters( $source );
+
+	if ( ! empty( $filters ) ) {
+		$args[ $contract['filter_parameter'] ] = $filters;
+	}
+
+	if ( isset( $source[ $contract['sorting_parameter'] ] ) ) {
+		$args[ $contract['sorting_parameter'] ] = velotok_core_catalog_normalize_orderby( $source[ $contract['sorting_parameter'] ] );
+	}
+
+	$per_page_key = isset( $contract['pagination_per_page_parameter'] ) ? $contract['pagination_per_page_parameter'] : 'per_page';
+
+	if ( isset( $source[ $per_page_key ] ) && (int) $source[ $per_page_key ] > 0 ) {
+		$args[ $per_page_key ] = (int) $source[ $per_page_key ];
+	}
+
+	return $args;
+}
+
+/**
+ * Alias for pagination query arguments.
+ *
+ * @param mixed $source Source array.
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_pagination_args( $source = null ) {
+	return velotok_core_catalog_pagination_query_args( $source );
+}
+
+/**
+ * Alias for pagination query arguments.
+ *
+ * @param mixed $source Source array.
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_pagination_params( $source = null ) {
+	return velotok_core_catalog_pagination_query_args( $source );
+}
+
+/**
+ * Build a catalog page URL keeping search, filters and sorting.
+ *
+ * @param int    $page   Page number.
+ * @param string $base   Catalog base URL.
+ * @param mixed  $source Source array.
+ * @return string
+ */
+function velotok_core_catalog_pagination_url( $page, $base = '', $source = null ) {
+	$page = max( 1, (int) $page );
+
+	if ( '' === (string) $base ) {
+		$base = function_exists( 'home_url' ) ? home_url( '/' ) : '/';
+	}
+
+	$args = velotok_core_catalog_pagination_query_args( $source );
+
+	if ( $page > 1 ) {
+		$args['paged'] = $page;
+	}
+
+	if ( function_exists( 'add_query_arg' ) ) {
+		return add_query_arg( $args, $base );
+	}
+
+	return velotok_core_catalog_add_query_args( $base, $args );
+}
+
+/**
+ * Alias for a catalog page URL.
+ *
+ * @param int    $page   Page number.
+ * @param string $base   Catalog base URL.
+ * @param mixed  $source Source array.
+ * @return string
+ */
+function velotok_core_catalog_paginate_url( $page, $base = '', $source = null ) {
+	return velotok_core_catalog_pagination_url( $page, $base, $source );
+}
+
+/**
+ * Build catalog pagination markup keeping search, filters and sorting.
+ *
+ * @param array $args Arguments: base, current, total, source, mid_size.
+ * @return string
+ */
+function velotok_core_catalog_pagination_links( $args = array() ) {
+	if ( ! is_array( $args ) ) {
+		$args = array();
+	}
+
+	$total = isset( $args['total'] ) ? (int) $args['total'] : 0;
+
+	if ( $total < 1 ) {
+		global $wp_query;
+
+		$total = is_object( $wp_query ) && isset( $wp_query->max_num_pages ) ? (int) $wp_query->max_num_pages : 0;
+	}
+
+	if ( $total < 2 ) {
+		return '';
+	}
+
+	$current = isset( $args['current'] ) ? max( 1, (int) $args['current'] ) : 1;
+
+	if ( ! isset( $args['current'] ) && function_exists( 'get_query_var' ) ) {
+		$paged = (int) get_query_var( 'paged' );
+
+		if ( $paged < 1 ) {
+			$paged = (int) get_query_var( 'page' );
+		}
+
+		if ( $paged > 0 ) {
+			$current = $paged;
+		}
+	}
+
+	$base = isset( $args['base'] ) ? (string) $args['base'] : '';
+
+	if ( '' === $base ) {
+		$base = function_exists( 'home_url' ) ? home_url( '/' ) : '/';
+	}
+
+	$source = array_key_exists( 'source', $args ) ? $args['source'] : null;
+	$params = velotok_core_catalog_pagination_query_args( $source );
+
+	if ( function_exists( 'add_query_arg' ) ) {
+		$base = add_query_arg( $params, $base );
+	} else {
+		$base = velotok_core_catalog_add_query_args( $base, $params );
+	}
+
+	$base .= ( false === strpos( $base, '?' ) ? '?' : '&' ) . 'paged=%#%';
+
+	if ( function_exists( 'paginate_links' ) ) {
+		$links = paginate_links( array(
+			'base'      => $base,
+			'format'    => '',
+			'current'   => min( $current, $total ),
+			'total'     => $total,
+			'mid_size'  => isset( $args['mid_size'] ) ? max( 0, (int) $args['mid_size'] ) : 1,
+			'prev_text' => '←',
+			'next_text' => '→',
+			'type'      => 'list',
+		) );
+
+		return is_string( $links ) ? $links : '';
+	}
+
+	$links = '';
+
+	for ( $page = 1; $page <= $total; $page++ ) {
+		if ( $page === $current ) {
+			$links .= '<li><span class="page-numbers current">' . $page . '</span></li>';
+			continue;
+		}
+
+		$url    = velotok_core_catalog_pagination_url( $page, isset( $args['base'] ) ? $args['base'] : '', $source );
+		$links .= '<li><a class="page-numbers" href="' . htmlspecialchars( $url, ENT_QUOTES, 'UTF-8' ) . '">' . $page . '</a></li>';
+	}
+
+	return '<ul class="page-numbers">' . $links . '</ul>';
+}
+
+/**
+ * Output catalog pagination keeping search, filters and sorting.
+ *
+ * @param array $args Pagination arguments.
+ * @return void
+ */
+function velotok_core_catalog_pagination( $args = array() ) {
+	$links = velotok_core_catalog_pagination_links( $args );
+
+	if ( '' === $links ) {
+		return;
+	}
+
+	$label = function_exists( 'esc_attr__' ) ? esc_attr__( 'Постраничная навигация', 'velotok-core' ) : 'Постраничная навигация';
+
+	echo '<nav class="woocommerce-pagination" aria-label="' . $label . '">' . $links . '</nav>';
+}
+
+/**
+ * Slice a catalog product list by page.
+ *
+ * @param array $products Product list.
+ * @param mixed $page     Page number.
+ * @param mixed $per_page Page size.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_catalog_paginate_products( $products, $page = 1, $per_page = 0 ) {
+	if ( ! is_array( $products ) ) {
+		return array();
+	}
+
+	$page     = max( 1, (int) $page );
+	$per_page = max( 0, (int) $per_page );
+
+	if ( $per_page < 1 ) {
+		return array_values( $products );
+	}
+
+	return array_values( array_slice( $products, ( $page - 1 ) * $per_page, $per_page ) );
+}
+
+/**
+ * Alias for product page slicing.
+ *
+ * @param array $products Product list.
+ * @param mixed $page     Page number.
+ * @param mixed $per_page Page size.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_catalog_paginate( $products, $page = 1, $per_page = 0 ) {
+	return velotok_core_catalog_paginate_products( $products, $page, $per_page );
+}
+
+/**
+ * Default catalog page size.
+ *
+ * @return int
+ */
+function velotok_core_catalog_default_per_page() {
+	$contract = velotok_core_catalog_contract();
+
+	return isset( $contract['pagination_default_per_page'] ) ? (int) $contract['pagination_default_per_page'] : 6;
+}
+
+/**
+ * Normalize a page number to a positive integer.
+ *
+ * @param mixed $page Raw page number.
+ * @return int
+ */
+function velotok_core_catalog_sanitize_page( $page ) {
+	return is_numeric( $page ) ? max( 1, (int) $page ) : 1;
+}
+
+/**
+ * Read the current catalog page from a request source.
+ *
+ * @param mixed $source Source array (defaults to $_GET).
+ * @return int
+ */
+function velotok_core_catalog_request_page( $source = null ) {
+	if ( null === $source ) {
+		$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичная пагинация каталога.
+	}
+
+	if ( ! is_array( $source ) ) {
+		return 1;
+	}
+
+	$contract = velotok_core_catalog_contract();
+
+	foreach ( array( $contract['pagination_parameter'], 'page' ) as $key ) {
+		if ( isset( $source[ $key ] ) ) {
+			return velotok_core_catalog_sanitize_page( $source[ $key ] );
+		}
+	}
+
+	return 1;
+}
+
+/**
+ * Alias for a catalog page URL.
+ *
+ * @param int    $page   Page number.
+ * @param string $base   Catalog base URL.
+ * @param mixed  $source Source array.
+ * @return string
+ */
+function velotok_core_catalog_page_url( $page, $base = '', $source = null ) {
+	return velotok_core_catalog_pagination_url( $page, $base, $source );
+}
+
+/**
  * Return the fixed mocked catalog products.
  *
  * Supports filtering by category plus optional limit, offset and ordering. Only
@@ -1818,6 +2269,38 @@ function velotok_core_catalog_products( $category = '', $args = array() ) {
 
 	$offset = isset( $args['offset'] ) ? max( 0, (int) $args['offset'] ) : 0;
 	$limit  = isset( $args['limit'] ) ? max( 0, (int) $args['limit'] ) : 0;
+
+	$page = 0;
+
+	foreach ( array( 'paged', 'page' ) as $page_key ) {
+		if ( isset( $args[ $page_key ] ) && is_numeric( $args[ $page_key ] ) ) {
+			$page = max( 0, (int) $args[ $page_key ] );
+			break;
+		}
+	}
+
+	if ( $page > 0 ) {
+		$per_page = 0;
+
+		foreach ( array( 'per_page', 'limit' ) as $per_page_key ) {
+			if ( isset( $args[ $per_page_key ] ) && (int) $args[ $per_page_key ] > 0 ) {
+				$per_page = (int) $args[ $per_page_key ];
+				break;
+			}
+		}
+
+		if ( $per_page < 1 && isset( $contract['pagination_default_per_page'] ) ) {
+			$per_page = (int) $contract['pagination_default_per_page'];
+		}
+
+		if ( $per_page > 0 ) {
+			if ( ! isset( $args['offset'] ) ) {
+				$offset = ( max( 1, $page ) - 1 ) * $per_page;
+			}
+
+			$limit = $per_page;
+		}
+	}
 
 	if ( $offset > 0 || $limit > 0 ) {
 		$products = array_slice( $products, $offset, $limit > 0 ? $limit : null );
