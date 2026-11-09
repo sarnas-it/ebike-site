@@ -527,7 +527,7 @@ body.is-locked{overflow:hidden}
       </div>
 
       <div class="model-grid">
-        <article class="model-card" id="model-riviera">
+        <article class="model-card" id="model-riviera" data-category="city" data-note="Лёгкая низкая рама, 90 км запаса хода и спокойный характер — для ежедневных поездок по городу.">
           <div class="model-media">
             <span class="badge badge--lime">Хит</span>
             <img src="assets/model-city-classic-1-web.jpg" width="800" height="600" alt="Городской электровелосипед «Ривьера» кремово-оливкового цвета с низкой рамой и кожаным седлом" loading="lazy" decoding="async">
@@ -548,7 +548,7 @@ body.is-locked{overflow:hidden}
           </div>
         </article>
 
-        <article class="model-card" id="model-street">
+        <article class="model-card" id="model-street" data-category="city" data-note="Более быстрый и жёсткий вариант для асфальта: 110 км хода и посадка для активной езды.">
           <div class="model-media">
             <span class="badge">Новинка</span>
             <img src="assets/model-city-sport-1-web.jpg" width="800" height="600" alt="Городской электровелосипед «Стрит 7» тёмно-бирюзового цвета с узкими шинами и багажником" loading="lazy" decoding="async">
@@ -569,7 +569,7 @@ body.is-locked{overflow:hidden}
           </div>
         </article>
 
-        <article class="model-card" id="model-hrebet-pro">
+        <article class="model-card" id="model-hrebet-pro" data-category="mountain" data-note="Полная подвеска и мотор 750 Вт — если в маршруте есть серьёзные подъёмы и спуски.">
           <div class="model-media">
             <span class="badge">Для гор</span>
             <img src="assets/model-mountain-pro-1-web.jpg" width="800" height="600" alt="Горный электровелосипед «Хребет Pro» с полной подвеской, чёрной рамой и оранжевыми акцентами" loading="lazy" decoding="async">
@@ -590,7 +590,7 @@ body.is-locked{overflow:hidden}
           </div>
         </article>
 
-        <article class="model-card" id="model-hrebet-trail">
+        <article class="model-card" id="model-hrebet-trail" data-category="mountain" data-note="Хардтейл для леса и грунта: меньше веса, простая обслуживаемость и уверенный ход.">
           <div class="model-media">
             <span class="badge badge--lime">Выбор механиков</span>
             <img src="assets/model-mountain-hardtail-1-web.jpg" width="800" height="600" alt="Горный электровелосипед «Хребет Trail» с зелёной рамой и широкими грунтовыми шинами" loading="lazy" decoding="async">
@@ -611,7 +611,7 @@ body.is-locked{overflow:hidden}
           </div>
         </article>
 
-        <article class="model-card" id="model-family">
+        <article class="model-card" id="model-family" data-category="cargo" data-note="Удлинённая рама и бокс на 80 кг: дети, продукты и всё, что нужно на даче.">
           <div class="model-media">
             <span class="badge">Для семьи</span>
             <img src="assets/model-cargo-family-1-web.jpg" width="800" height="600" alt="Грузовой электровелосипед «Семейный» с деревянным боксом на удлинённой задней раме" loading="lazy" decoding="async">
@@ -632,7 +632,7 @@ body.is-locked{overflow:hidden}
           </div>
         </article>
 
-        <article class="model-card" id="model-courier">
+        <article class="model-card" id="model-courier" data-category="cargo" data-note="Рама под ежедневные нагрузки: передний и задний багажник, груз до 120 кг.">
           <div class="model-media">
             <span class="badge">Для работы</span>
             <img src="assets/model-cargo-courier-1-web.jpg" width="800" height="600" alt="Грузовой электровелосипед «Курьер» с передним багажником и широкими шинами" loading="lazy" decoding="async">
@@ -653,7 +653,7 @@ body.is-locked{overflow:hidden}
           </div>
         </article>
 
-        <article class="model-card" id="model-sklad">
+        <article class="model-card" id="model-sklad" data-category="folding" data-note="Складывается за полминуты и помещается в багажник — для поездов, офиса и лифта.">
           <div class="model-media">
             <span class="badge">В багажник</span>
             <img src="assets/model-folding-compact-1-web.jpg" width="800" height="600" alt="Складной электровелосипед «Складень 20» с маленькими колёсами и графитовой рамой" loading="lazy" decoding="async">
@@ -1135,45 +1135,169 @@ body.is-locked{overflow:hidden}
     renderCart();
   });
 
-  var models = {
-    riviera: { name: "Ривьера", price: "62 900 ₽", href: "#model-riviera", note: "Лёгкая низкая рама, 90 км запаса хода и спокойный характер — для ежедневных поездок по городу." },
-    street: { name: "Стрит 7", price: "74 900 ₽", href: "#model-street", note: "Более быстрый и жёсткий вариант для асфальта: 110 км хода и посадка для активной езды." },
-    "hrebet-pro": { name: "Хребет Pro", price: "149 900 ₽", href: "#model-hrebet-pro", note: "Полная подвеска и мотор 750 Вт — если в маршруте есть серьёзные подъёмы и спуски." },
-    "hrebet-trail": { name: "Хребет Trail", price: "98 900 ₽", href: "#model-hrebet-trail", note: "Хардтейл для леса и грунта: меньше веса, простая обслуживаемость и уверенный ход." },
-    family: { name: "Семейный", price: "132 900 ₽", href: "#model-family", note: "Удлинённая рама и бокс на 80 кг: дети, продукты и всё, что нужно на даче." },
-    courier: { name: "Курьер", price: "119 900 ₽", href: "#model-courier", note: "Рама под ежедневные нагрузки: передний и задний багажник, груз до 120 кг." },
-    sklad: { name: "Складень 20", price: "68 900 ₽", href: "#model-sklad", note: "Складывается за полминуты и помещается в багажник — для поездов, офиса и лифта." }
+  var BUDGETS = {
+    low: { min: null, max: 80000 },
+    mid: { min: 80000, max: 120000 },
+    high: { min: 120000, max: null }
   };
   var answers = {};
   var resultEl = document.getElementById("quiz-result");
   var resetBtn = document.getElementById("quiz-reset");
   var arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
-  function pickModel(){
-    var place = answers.place;
-    var need = answers.need;
-    var budget = answers.budget;
-    if(place === "mountain"){
-      return budget === "high" ? "hrebet-pro" : "hrebet-trail";
-    }
-    if(place === "family"){
-      return budget === "low" ? "sklad" : "family";
-    }
-    if(need === "cargo"){ return "courier"; }
-    if(need === "compact"){ return "sklad"; }
-    if(place === "commute"){
-      return budget === "low" ? "riviera" : "street";
-    }
-    if(budget === "high" || need === "speed"){ return "street"; }
-    return "riviera";
+  function toNumber(value){
+    if(typeof value === "number"){ return value; }
+    if(value === null || typeof value === "undefined"){ return NaN; }
+    var text = String(value)
+      .replace(/<[^>]*>/g, " ")
+      .replace(/[\s\u00a0\u202f]/g, "")
+      .replace(/[^\d.,-]/g, "")
+      .replace(",", ".");
+    if(text === ""){ return NaN; }
+    return Number(text);
   }
+
+  function readModels(){
+    var result = {};
+    document.querySelectorAll(".model-card").forEach(function(card){
+      var nameEl = card.querySelector("h3");
+      var priceEl = card.querySelector(".price");
+      var addBtn = card.querySelector("[data-price]");
+      var price = addBtn ? toNumber(addBtn.dataset.price) : toNumber(priceEl ? priceEl.textContent : "");
+      var slug = card.id.replace(/^model-/, "");
+      result[slug] = {
+        slug: slug,
+        name: nameEl ? nameEl.textContent.trim() : "",
+        price: isFinite(price) ? money(price) : "",
+        price_value: price,
+        href: "#" + card.id,
+        note: card.dataset.note || "",
+        category: card.dataset.category || ""
+      };
+    });
+    return result;
+  }
+
+  var models = readModels();
+
+  function priceOf(model){
+    if(!model || typeof model !== "object"){ return NaN; }
+    if(typeof model.price_value !== "undefined" && model.price_value !== null && model.price_value !== ""){
+      return toNumber(model.price_value);
+    }
+    return toNumber(model.price);
+  }
+
+  function matchesBudget(price, budget){
+    var rule = BUDGETS[budget];
+    if(!rule || !isFinite(price)){ return true; }
+    if(rule.min !== null && price < rule.min){ return false; }
+    if(rule.max !== null && price > rule.max){ return false; }
+    return true;
+  }
+
+  function kindOf(model){
+    var slug = String((model && (model.slug || model.key)) || "").toLowerCase();
+    var name = String((model && model.name) || "").toLowerCase();
+    var haystack = slug + " " + name;
+    if(haystack.indexOf("hrebet-pro") !== -1 || haystack.indexOf("хребет pro") !== -1){ return "mountain-pro"; }
+    if(haystack.indexOf("hrebet-trail") !== -1 || haystack.indexOf("хребет trail") !== -1){ return "mountain-trail"; }
+    if(haystack.indexOf("street") !== -1 || haystack.indexOf("стрит") !== -1){ return "city-sport"; }
+    if(haystack.indexOf("riviera") !== -1 || haystack.indexOf("ривьера") !== -1){ return "city-classic"; }
+    if(haystack.indexOf("family") !== -1 || haystack.indexOf("семейный") !== -1){ return "cargo-family"; }
+    if(haystack.indexOf("courier") !== -1 || haystack.indexOf("курьер") !== -1){ return "cargo-courier"; }
+    if(haystack.indexOf("sklad") !== -1 || haystack.indexOf("складень") !== -1){ return "folding"; }
+    return String((model && model.category) || "").toLowerCase();
+  }
+
+  function categoryOf(model){
+    var category = String((model && model.category) || "").toLowerCase();
+    if(category !== ""){ return category; }
+    var kind = kindOf(model);
+    if(kind === "folding"){ return "folding"; }
+    if(kind.indexOf("mountain") === 0){ return "mountain"; }
+    if(kind.indexOf("cargo") === 0){ return "cargo"; }
+    if(kind.indexOf("city") === 0){ return "city"; }
+    return "";
+  }
+
+  function categoryPreferences(){
+    var place = answers.place || "";
+    var need = answers.need || "";
+    var order = [];
+    function add(category){
+      if(category && order.indexOf(category) === -1){ order.push(category); }
+    }
+    if(place === "mountain"){ add("mountain"); }
+    else if(place === "family"){ add("cargo"); add("folding"); }
+    if(need === "cargo"){ add("cargo"); }
+    else if(need === "compact"){ add("folding"); }
+    if(place === "commute" || place === "city"){ add("city"); }
+    if(need === "speed"){ add("city"); }
+    else if(need === "range"){ add("mountain"); add("cargo"); }
+    ["city", "mountain", "cargo", "folding"].forEach(add);
+    return order;
+  }
+
+  function kindPreferences(){
+    var place = answers.place || "";
+    var need = answers.need || "";
+    var order = [];
+    function add(kind){
+      if(kind && order.indexOf(kind) === -1){ order.push(kind); }
+    }
+    if(place === "mountain"){ add("mountain-pro"); add("mountain-trail"); }
+    else if(place === "family"){ add("cargo-family"); add("cargo-courier"); }
+    if(need === "cargo"){
+      if(place === "family"){ add("cargo-family"); add("cargo-courier"); }
+      else { add("cargo-courier"); add("cargo-family"); }
+    }else if(need === "compact"){ add("folding"); }
+    else if(need === "range"){
+      add("mountain-pro"); add("mountain-trail"); add("cargo-courier"); add("cargo-family");
+    }
+    if(need === "speed"){ add("city-sport"); }
+    if(place === "commute" || place === "city"){ add("city-classic"); add("city-sport"); }
+    ["city-classic", "city-sport", "mountain-trail", "mountain-pro", "cargo-courier", "cargo-family", "folding", "city", "mountain", "cargo"].forEach(add);
+    return order;
+  }
+
+  function pickModel(){
+    var categories = categoryPreferences();
+    var kinds = kindPreferences();
+    var best = null;
+    var bestCategory = Infinity;
+    var bestKind = Infinity;
+    Object.keys(models).forEach(function(key){
+      var model = models[key];
+      if(!model || !matchesBudget(priceOf(model), answers.budget)){ return; }
+      var category = categoryOf(model);
+      var kind = kindOf(model);
+      var categoryRank = categories.indexOf(category);
+      var kindRank = kinds.indexOf(kind);
+      if(categoryRank === -1){ categoryRank = categories.length; }
+      if(kindRank === -1){ kindRank = kinds.length; }
+      if(!best || categoryRank < bestCategory || (categoryRank === bestCategory && kindRank < bestKind)){
+        best = key;
+        bestCategory = categoryRank;
+        bestKind = kindRank;
+      }
+    });
+    return best;
+  }
+
   function renderResult(){
     if(!answers.place || !answers.need || !answers.budget){
       resultEl.innerHTML = '<p class="result-empty">Ответьте на три вопроса — покажем модель, которая подходит под ваш маршрут и бюджет.</p>';
       resetBtn.hidden = true;
       return;
     }
-    var model = models[pickModel()];
+    var key = pickModel();
+    var model = key ? models[key] : null;
+    if(!model){
+      resultEl.innerHTML = '<p class="result-empty">В выбранном бюджете пока нет подходящей модели — измените бюджет или свяжитесь с нами.</p>';
+      resetBtn.hidden = false;
+      return;
+    }
     resultEl.innerHTML = '<p class="result-kicker">Ваш вариант</p><div class="result-row"><div><h3>' + model.name + '</h3><p class="result-price">' + model.price + '</p></div><a class="btn btn-dark" href="' + model.href + '">Смотреть модель ' + arrow + '</a></div><p class="result-note">' + model.note + '</p>';
     resetBtn.hidden = false;
   }
