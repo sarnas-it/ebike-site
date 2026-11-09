@@ -72,7 +72,65 @@ function velotok_core_catalog_contract() {
 		),
 	);
 
+	$product_states = array(
+		'publish'    => array(
+			'id'      => 'publish',
+			'code'    => 'publish',
+			'label'   => 'Опубликован',
+			'public'  => true,
+			'catalog' => true,
+		),
+		'draft'      => array(
+			'id'      => 'draft',
+			'code'    => 'draft',
+			'label'   => 'Черновик',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'pending'    => array(
+			'id'      => 'pending',
+			'code'    => 'pending',
+			'label'   => 'На проверке',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'private'    => array(
+			'id'      => 'private',
+			'code'    => 'private',
+			'label'   => 'Приватный',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'trash'      => array(
+			'id'      => 'trash',
+			'code'    => 'trash',
+			'label'   => 'Удалён',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'future'     => array(
+			'id'      => 'future',
+			'code'    => 'future',
+			'label'   => 'Запланирован',
+			'public'  => false,
+			'catalog' => false,
+		),
+		'auto-draft' => array(
+			'id'      => 'auto-draft',
+			'code'    => 'auto-draft',
+			'label'   => 'Авто-черновик',
+			'public'  => false,
+			'catalog' => false,
+		),
+	);
+
 	$fields = array(
+		'state'             => array(
+			'label'    => 'Состояние',
+			'type'     => 'string',
+			'required' => true,
+			'mocked'   => true,
+		),
 		'slug'              => array(
 			'label'    => 'Слаг',
 			'type'     => 'string',
@@ -170,6 +228,7 @@ function velotok_core_catalog_contract() {
 			'badge'             => 'Хит',
 			'image'             => 'model-city-classic-1-web.jpg',
 			'product_type'      => 'electric_bicycle',
+			'state'             => 'publish',
 			'mocked'            => true,
 		),
 		array(
@@ -188,6 +247,7 @@ function velotok_core_catalog_contract() {
 			'badge'             => 'Новинка',
 			'image'             => 'model-city-sport-1-web.jpg',
 			'product_type'      => 'electric_bicycle',
+			'state'             => 'publish',
 			'mocked'            => true,
 		),
 		array(
@@ -206,6 +266,7 @@ function velotok_core_catalog_contract() {
 			'badge'             => 'Для гор',
 			'image'             => 'model-mountain-pro-1-web.jpg',
 			'product_type'      => 'electric_bicycle',
+			'state'             => 'publish',
 			'mocked'            => true,
 		),
 		array(
@@ -224,6 +285,7 @@ function velotok_core_catalog_contract() {
 			'badge'             => 'Выбор механиков',
 			'image'             => 'model-mountain-hardtail-1-web.jpg',
 			'product_type'      => 'electric_bicycle',
+			'state'             => 'publish',
 			'mocked'            => true,
 		),
 		array(
@@ -242,6 +304,7 @@ function velotok_core_catalog_contract() {
 			'badge'             => 'Для семьи',
 			'image'             => 'model-cargo-family-1-web.jpg',
 			'product_type'      => 'electric_bicycle',
+			'state'             => 'publish',
 			'mocked'            => true,
 		),
 		array(
@@ -260,6 +323,7 @@ function velotok_core_catalog_contract() {
 			'badge'             => 'Для работы',
 			'image'             => 'model-cargo-courier-1-web.jpg',
 			'product_type'      => 'electric_bicycle',
+			'state'             => 'publish',
 			'mocked'            => true,
 		),
 		array(
@@ -278,6 +342,7 @@ function velotok_core_catalog_contract() {
 			'badge'             => 'В багажник',
 			'image'             => 'model-folding-compact-1-web.jpg',
 			'product_type'      => 'electric_bicycle',
+			'state'             => 'publish',
 			'mocked'            => true,
 		),
 	);
@@ -292,11 +357,17 @@ function velotok_core_catalog_contract() {
 		'catalog_type'        => 'product_catalog',
 		'product_type'        => 'electric_bicycle',
 		'currency'            => 'RUB',
-		'required_fields'     => array( 'slug', 'name', 'price', 'category' ),
+		'required_fields'     => array( 'state', 'slug', 'name', 'price', 'category' ),
 		'optional_fields'     => array( 'old_price', 'short_description', 'description', 'tagline', 'range_km', 'motor_w', 'weight_kg', 'wheel', 'badge', 'image', 'product_type' ),
 		'fields'              => $fields,
 		'attributes'          => $fields,
-		'required_attributes' => array( 'slug', 'name', 'price', 'category' ),
+		'required_attributes' => array( 'state', 'slug', 'name', 'price', 'category' ),
+		'product_states'      => $product_states,
+		'product_state_model' => $product_states,
+		'product_state_keys'  => array_keys( $product_states ),
+		'product_public_states' => array( 'publish' ),
+		'default_product_state' => 'publish',
+		'product_state_requirement' => 'TESTEB-16',
 		'categories'          => $categories,
 		'required_categories' => array_keys( $categories ),
 		'products'            => $products,
@@ -356,6 +427,114 @@ function velotok_core_catalog_category_keys() {
 	$contract = velotok_core_catalog_contract();
 
 	return $contract['required_categories'];
+}
+
+/**
+ * Return the fixed catalog product state model.
+ *
+ * Every catalog product must be in one of these states. Only the public
+ * `publish` state may be shown on the storefront.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function velotok_core_catalog_product_state_model() {
+	$contract = velotok_core_catalog_contract();
+
+	return $contract['product_states'];
+}
+
+/**
+ * Return the canonical catalog product state identifiers.
+ *
+ * @return string[]
+ */
+function velotok_core_catalog_product_states() {
+	$contract = velotok_core_catalog_contract();
+
+	return $contract['product_state_keys'];
+}
+
+/**
+ * Normalize a catalog product state.
+ *
+ * Unknown states are returned unchanged so validation can reject them; they are
+ * never silently converted to `publish`.
+ *
+ * @param mixed $state Product state.
+ * @return string
+ */
+function velotok_core_catalog_normalize_product_state( $state ) {
+	if ( ! is_scalar( $state ) ) {
+		return '';
+	}
+
+	$key = trim( (string) $state );
+	$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $key, 'UTF-8' ) : strtolower( $key );
+
+	$map = array(
+		'publish'     => 'publish',
+		'published'   => 'publish',
+		'public'      => 'publish',
+		'live'        => 'publish',
+		'active'      => 'publish',
+		'опубликован' => 'publish',
+		'draft'       => 'draft',
+		'unpublished' => 'draft',
+		'черновик'    => 'draft',
+		'pending'     => 'pending',
+		'review'      => 'pending',
+		'на проверке' => 'pending',
+		'private'     => 'private',
+		'приватный'   => 'private',
+		'trash'       => 'trash',
+		'deleted'     => 'trash',
+		'удалён'      => 'trash',
+		'удален'      => 'trash',
+		'future'      => 'future',
+		'scheduled'   => 'future',
+		'запланирован' => 'future',
+		'auto-draft'  => 'auto-draft',
+		'auto_draft'  => 'auto-draft',
+		'авто-черновик' => 'auto-draft',
+	);
+
+	return isset( $map[ $key ] ) ? $map[ $key ] : $key;
+}
+
+/**
+ * Check whether a state belongs to the fixed product state model.
+ *
+ * @param mixed $state Product state.
+ * @return bool
+ */
+function velotok_core_catalog_product_state_is_valid( $state ) {
+	$model = velotok_core_catalog_product_state_model();
+	$key   = velotok_core_catalog_normalize_product_state( $state );
+
+	return '' !== $key && isset( $model[ $key ] );
+}
+
+/**
+ * Return a catalog product state, or an empty string when it is outside model.
+ *
+ * @param mixed $product Catalog product.
+ * @return string
+ */
+function velotok_core_catalog_product_state( $product ) {
+	if ( ! is_array( $product ) ) {
+		return '';
+	}
+
+	$state = '';
+
+	foreach ( array( 'state', 'status' ) as $field ) {
+		if ( isset( $product[ $field ] ) && is_scalar( $product[ $field ] ) && '' !== trim( (string) $product[ $field ] ) ) {
+			$state = velotok_core_catalog_normalize_product_state( $product[ $field ] );
+			break;
+		}
+	}
+
+	return velotok_core_catalog_product_state_is_valid( $state ) ? $state : '';
 }
 
 /**
