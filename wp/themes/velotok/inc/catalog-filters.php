@@ -1,0 +1,1281 @@
+<?php
+/**
+ * Поиск и фильтры каталога по атрибутам контракта.
+ *
+ * Набор атрибутов совпадает с контрактом карточки товара темы: название,
+ * описание, артикул, категория, слоган, запас хода, мотор, вес, колёса, бейдж,
+ * цена и дополнительные атрибуты продавца. Поиск и фильтры не зависят от
+ * плагинов-заглушек и работают как с объектами WooCommerce, так и с массивами
+ * карточки.
+ *
+ * Spec: theme (TESTEB-58).
+ *
+ * @package Velotok
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
+	/**
+	 * Контракт поиска и фильтров каталога.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_catalog_filter_contract() {
+		static $contract = null;
+
+		if ( null !== $contract ) {
+			return $contract;
+		}
+
+		$attributes = array(
+			'name'        => array(
+				'label'  => 'Название',
+				'type'   => 'string',
+				'search' => true,
+				'filter' => false,
+			),
+			'description' => array(
+				'label'  => 'Описание',
+				'type'   => 'text',
+				'search' => true,
+				'filter' => false,
+			),
+			'sku'         => array(
+				'label'  => 'Артикул',
+				'type'   => 'string',
+				'search' => true,
+				'filter' => false,
+			),
+			'category'    => array(
+				'label'    => 'Категория',
+				'type'     => 'taxonomy',
+				'taxonomy' => 'product_cat',
+				'search'   => true,
+				'filter'   => true,
+			),
+			'tagline'     => array(
+				'label'  => 'Слоган',
+				'type'   => 'string',
+				'meta'   => '_velotok_tagline',
+				'search' => true,
+				'filter' => false,
+			),
+			'range_km'    => array(
+				'label'  => 'Запас хода, км',
+				'type'   => 'number',
+				'meta'   => '_velotok_range_km',
+				'search' => true,
+				'filter' => true,
+				'range'  => true,
+			),
+			'motor_w'     => array(
+				'label'  => 'Мотор, Вт',
+				'type'   => 'number',
+				'meta'   => '_velotok_motor_w',
+				'search' => true,
+				'filter' => true,
+			),
+			'weight_kg'   => array(
+				'label'  => 'Вес, кг',
+				'type'   => 'number',
+				'meta'   => '_velotok_weight_kg',
+				'search' => true,
+				'filter' => true,
+				'range'  => true,
+			),
+			'wheel'       => array(
+				'label'  => 'Колёса',
+				'type'   => 'string',
+				'meta'   => '_velotok_wheel',
+				'search' => true,
+				'filter' => true,
+			),
+			'badge'       => array(
+				'label'  => 'Бейдж',
+				'type'   => 'string',
+				'meta'   => '_velotok_badge',
+				'search' => true,
+				'filter' => true,
+			),
+			'price'       => array(
+				'label'  => 'Цена',
+				'type'   => 'number',
+				'meta'   => '_price',
+				'search' => true,
+				'filter' => true,
+				'range'  => true,
+			),
+			'model'       => array(
+				'label'     => 'Модель',
+				'type'      => 'string',
+				'attribute' => 'Модель',
+				'search'    => true,
+				'filter'    => true,
+			),
+			'frame'       => array(
+				'label'     => 'Рама',
+				'type'      => 'string',
+				'attribute' => 'Рама',
+				'search'    => true,
+				'filter'    => true,
+			),
+			'warranty'    => array(
+				'label'     => 'Гарантия',
+				'type'      => 'string',
+				'attribute' => 'Гарантия',
+				'search'    => true,
+				'filter'    => true,
+			),
+			'max_load'    => array(
+				'label'     => 'Максимальная нагрузка',
+				'type'      => 'string',
+				'attribute' => 'Максимальная нагрузка',
+				'search'    => true,
+				'filter'    => true,
+			),
+		);
+
+		$searchable = array();
+		$filterable = array();
+
+		foreach ( $attributes as $key => $attribute ) {
+			if ( ! empty( $attribute['search'] ) ) {
+				$searchable[] = $key;
+			}
+
+			if ( ! empty( $attribute['filter'] ) ) {
+				$filterable[] = $key;
+			}
+		}
+
+		$contract = array(
+			'spec'                 => 'theme',
+			'requirement'          => 'TESTEB-58',
+			'source'               => 'woocommerce',
+			'attributes'           => $attributes,
+			'searchable_attributes' => $searchable,
+			'filterable_attributes' => $filterable,
+			'search_parameter'     => 's',
+			'filter_parameter'     => 'velotok_filter',
+			'missing_value'        => '',
+		);
+
+		return $contract;
+	}
+
+	/**
+	 * Псевдоним контракта для шаблонов.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function velotok_catalog_contract() {
+		return velotok_catalog_filter_contract();
+	}
+
+	/**
+	 * Атрибуты контракта.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	function velotok_catalog_filter_contract_attributes() {
+		$contract = velotok_catalog_filter_contract();
+
+		return $contract['attributes'];
+	}
+
+	/**
+	 * Ключи атрибутов, которые участвуют в поиске.
+	 *
+	 * @return string[]
+	 */
+	function velotok_catalog_searchable_attributes() {
+		$contract = velotok_catalog_filter_contract();
+
+		return $contract['searchable_attributes'];
+	}
+
+	/**
+	 * Ключи атрибутов, которые участвуют в фильтрах.
+	 *
+	 * @return string[]
+	 */
+	function velotok_catalog_filterable_attributes() {
+		$contract = velotok_catalog_filter_contract();
+
+		return $contract['filterable_attributes'];
+	}
+
+	/**
+	 * Нормализует текст для поиска и сравнения.
+	 *
+	 * @param mixed $value Исходное значение.
+	 * @return string
+	 */
+	function velotok_catalog_normalize_text( $value ) {
+		if ( is_array( $value ) || is_object( $value ) ) {
+			return '';
+		}
+
+		$value = function_exists( 'wp_strip_all_tags' ) ? wp_strip_all_tags( (string) $value ) : trim( strip_tags( (string) $value ) );
+		$value = trim( $value );
+
+		if ( function_exists( 'mb_strtolower' ) ) {
+			$value = mb_strtolower( $value, 'UTF-8' );
+		} else {
+			$value = strtolower( $value );
+		}
+
+		$value = str_replace( 'ё', 'е', $value );
+		$value = preg_replace( '/\s+/u', ' ', $value );
+
+		return trim( (string) $value );
+	}
+
+	/**
+	 * Нормализует ключ фильтра.
+	 *
+	 * @param mixed $key Исходный ключ.
+	 * @return string
+	 */
+	function velotok_catalog_normalize_key( $key ) {
+		if ( ! is_scalar( $key ) ) {
+			return '';
+		}
+
+		if ( function_exists( 'sanitize_key' ) ) {
+			return sanitize_key( (string) $key );
+		}
+
+		return strtolower( preg_replace( '/[^a-z0-9_\-]/i', '', (string) $key ) );
+	}
+
+	/**
+	 * Санитизирует строковое значение фильтра.
+	 *
+	 * @param mixed $value Исходное значение.
+	 * @return string
+	 */
+	function velotok_catalog_sanitize_filter_text( $value ) {
+		if ( ! is_scalar( $value ) ) {
+			return '';
+		}
+
+		if ( function_exists( 'sanitize_text_field' ) ) {
+			return sanitize_text_field( (string) $value );
+		}
+
+		return trim( strip_tags( (string) $value ) );
+	}
+
+	/**
+	 * ID товара.
+	 *
+	 * @param mixed $product Товар.
+	 * @return int
+	 */
+	function velotok_catalog_product_id( $product ) {
+		if ( is_array( $product ) ) {
+			return isset( $product['id'] ) ? (int) $product['id'] : 0;
+		}
+
+		if ( is_object( $product ) && method_exists( $product, 'get_id' ) ) {
+			return (int) $product->get_id();
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Значение мета-поля товара.
+	 *
+	 * @param mixed  $product Товар.
+	 * @param string $meta_key Ключ мета-поля.
+	 * @return string
+	 */
+	function velotok_catalog_product_meta( $product, $meta_key ) {
+		$meta_key = (string) $meta_key;
+
+		if ( '' === $meta_key ) {
+			return '';
+		}
+
+		if ( is_array( $product ) ) {
+			return isset( $product[ $meta_key ] ) && is_scalar( $product[ $meta_key ] ) ? (string) $product[ $meta_key ] : '';
+		}
+
+		$id = velotok_catalog_product_id( $product );
+
+		if ( $id > 0 && function_exists( 'get_post_meta' ) ) {
+			$value = get_post_meta( $id, $meta_key, true );
+
+			return is_scalar( $value ) ? (string) $value : '';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Дополнительные атрибуты товара в виде строк контракта.
+	 *
+	 * @param mixed $product Товар.
+	 * @return array<int,array{key:string,label:string,value:string}>
+	 */
+	function velotok_catalog_product_attribute_rows( $product ) {
+		$rows = array();
+
+		if ( function_exists( 'velotok_product_extra_attributes' ) ) {
+			foreach ( (array) velotok_product_extra_attributes( $product ) as $row ) {
+				if ( ! isset( $row[0], $row[1] ) ) {
+					continue;
+				}
+
+				$label = velotok_catalog_normalize_text( $row[0] );
+				$value = velotok_catalog_sanitize_filter_text( $row[1] );
+
+				if ( '' === $label || '' === $value ) {
+					continue;
+				}
+
+				$rows[] = array(
+					'key'   => $label,
+					'label' => (string) $row[0],
+					'value' => $value,
+				);
+			}
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Значение дополнительного атрибута по нормализованной подписи или имени.
+	 *
+	 * @param mixed  $product  Товар.
+	 * @param string $needle   Нормализованный ключ.
+	 * @param string $fallback Дополнительная подпись.
+	 * @return string
+	 */
+	function velotok_catalog_product_attribute_row( $product, $needle, $fallback = '' ) {
+		$needles = array( velotok_catalog_normalize_text( $needle ), velotok_catalog_normalize_text( $fallback ) );
+		$needles = array_values( array_filter( $needles ) );
+
+		foreach ( velotok_catalog_product_attribute_rows( $product ) as $row ) {
+			if ( in_array( $row['key'], $needles, true ) ) {
+				return $row['value'];
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Категории товара (слаги и названия).
+	 *
+	 * @param mixed $product Товар.
+	 * @return string[]
+	 */
+	function velotok_catalog_product_categories( $product ) {
+		$categories = array();
+
+		if ( is_array( $product ) ) {
+			foreach ( array( 'category', 'category_label', 'categories' ) as $key ) {
+				if ( ! isset( $product[ $key ] ) ) {
+					continue;
+				}
+
+				$value = $product[ $key ];
+
+				if ( is_array( $value ) ) {
+					foreach ( $value as $item ) {
+						if ( is_scalar( $item ) ) {
+							$categories[] = (string) $item;
+						}
+					}
+				} elseif ( is_scalar( $value ) ) {
+					$categories[] = (string) $value;
+				}
+			}
+
+			return array_values( array_unique( array_filter( $categories ) ) );
+		}
+
+		$id = velotok_catalog_product_id( $product );
+
+		if ( $id > 0 && function_exists( 'get_the_terms' ) ) {
+			$terms = get_the_terms( $id, 'product_cat' );
+
+			if ( is_array( $terms ) ) {
+				foreach ( $terms as $term ) {
+					if ( is_object( $term ) ) {
+						if ( isset( $term->slug ) ) {
+							$categories[] = (string) $term->slug;
+						}
+						if ( isset( $term->name ) ) {
+							$categories[] = (string) $term->name;
+						}
+					} elseif ( is_scalar( $term ) ) {
+						$categories[] = (string) $term;
+					}
+				}
+			}
+		}
+
+		return array_values( array_unique( array_filter( $categories ) ) );
+	}
+
+	/**
+	 * Значение одного атрибута контракта у товара.
+	 *
+	 * @param mixed  $product   Товар.
+	 * @param string $attribute Ключ атрибута.
+	 * @return string
+	 */
+	function velotok_catalog_product_attribute( $product, $attribute ) {
+		$attributes = velotok_catalog_filter_contract_attributes();
+		$key        = velotok_catalog_normalize_key( $attribute );
+
+		if ( ! isset( $attributes[ $key ] ) ) {
+			return '';
+		}
+
+		$definition = $attributes[ $key ];
+
+		if ( ! empty( $definition['attribute'] ) ) {
+			return velotok_catalog_product_attribute_row( $product, $definition['attribute'], $definition['label'] );
+		}
+
+		if ( 'category' === $key ) {
+			return implode( ', ', velotok_catalog_product_categories( $product ) );
+		}
+
+		if ( is_array( $product ) ) {
+			$aliases = array(
+				'range_km'  => array( 'range', '_velotok_range_km' ),
+				'motor_w'   => array( 'motor', '_velotok_motor_w' ),
+				'weight_kg' => array( 'weight', '_velotok_weight_kg' ),
+				'tagline'   => array( 'tagline' ),
+				'wheel'     => array( 'wheel' ),
+				'badge'     => array( 'badge' ),
+				'price'     => array( 'price' ),
+				'name'      => array( 'name' ),
+				'description' => array( 'description', 'short_description' ),
+				'sku'       => array( 'sku' ),
+			);
+
+			$candidates = isset( $aliases[ $key ] ) ? $aliases[ $key ] : array();
+
+			if ( isset( $definition['meta'] ) ) {
+				$candidates[] = $definition['meta'];
+			}
+
+			foreach ( $candidates as $candidate ) {
+				if ( isset( $product[ $candidate ] ) && is_scalar( $product[ $candidate ] ) && '' !== trim( (string) $product[ $candidate ] ) ) {
+					return (string) $product[ $candidate ];
+				}
+			}
+
+			return '';
+		}
+
+		if ( ! is_object( $product ) ) {
+			return '';
+		}
+
+		switch ( $key ) {
+			case 'name':
+				return method_exists( $product, 'get_name' ) ? (string) $product->get_name() : '';
+			case 'description':
+				$parts = array();
+				if ( method_exists( $product, 'get_short_description' ) ) {
+					$parts[] = (string) $product->get_short_description();
+				}
+				if ( method_exists( $product, 'get_description' ) ) {
+					$parts[] = (string) $product->get_description();
+				}
+				return trim( implode( ' ', array_filter( $parts ) ) );
+			case 'sku':
+				return method_exists( $product, 'get_sku' ) ? (string) $product->get_sku() : '';
+			case 'price':
+				return method_exists( $product, 'get_price' ) ? (string) $product->get_price() : '';
+		}
+
+		if ( isset( $definition['meta'] ) ) {
+			return velotok_catalog_product_meta( $product, $definition['meta'] );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Все значения товара, участвующие в поиске.
+	 *
+	 * @param mixed $product Товар.
+	 * @return string[]
+	 */
+	function velotok_catalog_product_search_values( $product ) {
+		$values = array();
+
+		foreach ( velotok_catalog_searchable_attributes() as $attribute ) {
+			$value = velotok_catalog_product_attribute( $product, $attribute );
+
+			if ( '' !== $value ) {
+				$values[] = $value;
+			}
+		}
+
+		foreach ( velotok_catalog_product_attribute_rows( $product ) as $row ) {
+			$values[] = $row['label'];
+			$values[] = $row['value'];
+		}
+
+		if ( is_array( $product ) ) {
+			foreach ( array( 'specs', 'category_label', 'slug' ) as $key ) {
+				if ( ! isset( $product[ $key ] ) ) {
+					continue;
+				}
+
+				if ( is_array( $product[ $key ] ) ) {
+					foreach ( $product[ $key ] as $item ) {
+						if ( is_array( $item ) ) {
+							foreach ( $item as $part ) {
+								if ( is_scalar( $part ) ) {
+									$values[] = (string) $part;
+								}
+							}
+						} elseif ( is_scalar( $item ) ) {
+							$values[] = (string) $item;
+						}
+					}
+				} elseif ( is_scalar( $product[ $key ] ) ) {
+					$values[] = (string) $product[ $key ];
+				}
+			}
+		}
+
+		return array_values( array_unique( array_filter( $values, 'is_string' ) ) );
+	}
+
+	/**
+	 * Совпадает ли товар с поисковым запросом по атрибутам контракта.
+	 *
+	 * @param mixed  $product Товар.
+	 * @param string $query   Поисковый запрос.
+	 * @return bool
+	 */
+	function velotok_catalog_product_matches_search( $product, $query ) {
+		$query = velotok_catalog_normalize_text( $query );
+
+		if ( '' === $query ) {
+			return true;
+		}
+
+		$haystack = velotok_catalog_normalize_text( implode( ' ', velotok_catalog_product_search_values( $product ) ) );
+
+		if ( '' === $haystack ) {
+			return false;
+		}
+
+		if ( false !== strpos( $haystack, $query ) ) {
+			return true;
+		}
+
+		$tokens = preg_split( '/\s+/u', $query );
+		$tokens = is_array( $tokens ) ? array_filter( $tokens ) : array();
+
+		foreach ( $tokens as $token ) {
+			if ( false === strpos( $haystack, $token ) ) {
+				return false;
+			}
+		}
+
+		return ! empty( $tokens );
+	}
+
+	/**
+	 * Разбивает строковое значение на части для сравнения.
+	 *
+	 * @param mixed $value Значение.
+	 * @return string[]
+	 */
+	function velotok_catalog_value_parts( $value ) {
+		$value = velotok_catalog_normalize_text( $value );
+
+		if ( '' === $value ) {
+			return array();
+		}
+
+		$parts = preg_split( '/\s*(?:,|\/|\||;)\s*/u', $value );
+		$parts = is_array( $parts ) ? array_filter( array_map( 'trim', $parts ) ) : array();
+
+		$parts[] = $value;
+
+		return array_values( array_unique( $parts ) );
+	}
+
+	/**
+	 * Совпадает ли фактическое значение атрибута с ожидаемым.
+	 *
+	 * @param mixed $actual   Фактическое значение.
+	 * @param mixed $expected Ожидаемое значение.
+	 * @return bool
+	 */
+	function velotok_catalog_value_matches( $actual, $expected ) {
+		$actual_parts = velotok_catalog_value_parts( $actual );
+
+		foreach ( (array) $expected as $candidate ) {
+			$candidate = velotok_catalog_normalize_text( $candidate );
+
+			if ( '' === $candidate ) {
+				continue;
+			}
+
+			if ( in_array( $candidate, $actual_parts, true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Санитизирует фильтры и оставляет только атрибуты контракта.
+	 *
+	 * @param mixed $filters Входные фильтры.
+	 * @return array<string,mixed>
+	 */
+	function velotok_catalog_sanitize_filters( $filters ) {
+		if ( ! is_array( $filters ) ) {
+			return array();
+		}
+
+		$attributes = velotok_catalog_filter_contract_attributes();
+		$clean      = array();
+
+		foreach ( $filters as $raw_key => $raw_value ) {
+			$key = velotok_catalog_normalize_key( $raw_key );
+
+			if ( in_array( $key, array( 'product_cat', 'product_category', 'cat' ), true ) ) {
+				$key = 'category';
+			}
+
+			if ( in_array( $key, array( 'min_price', 'price_from' ), true ) ) {
+				$key = 'price_min';
+			}
+
+			if ( in_array( $key, array( 'max_price', 'price_to' ), true ) ) {
+				$key = 'price_max';
+			}
+
+			if ( 'attributes' === $key ) {
+				if ( ! is_array( $raw_value ) ) {
+					continue;
+				}
+
+				$attribute_filters = array();
+
+				foreach ( $raw_value as $attribute_key => $attribute_value ) {
+					$attribute_key = velotok_catalog_normalize_key( $attribute_key );
+
+					if ( '' === $attribute_key ) {
+						continue;
+					}
+
+					if ( is_array( $attribute_value ) ) {
+						$values = array();
+
+						foreach ( $attribute_value as $item ) {
+							$item = velotok_catalog_sanitize_filter_text( $item );
+
+							if ( '' !== $item ) {
+								$values[] = $item;
+							}
+						}
+
+						if ( ! empty( $values ) ) {
+							$attribute_filters[ $attribute_key ] = $values;
+						}
+					} else {
+						$attribute_value = velotok_catalog_sanitize_filter_text( $attribute_value );
+
+						if ( '' !== $attribute_value ) {
+							$attribute_filters[ $attribute_key ] = $attribute_value;
+						}
+					}
+				}
+
+				if ( ! empty( $attribute_filters ) ) {
+					$clean['attributes'] = $attribute_filters;
+				}
+
+				continue;
+			}
+
+			$base  = $key;
+			$bound = '';
+
+			if ( preg_match( '/^(.*)_(min|max)$/', $key, $matches ) ) {
+				$base  = $matches[1];
+				$bound = $matches[2];
+			}
+
+			if ( ! isset( $attributes[ $base ] ) || empty( $attributes[ $base ]['filter'] ) ) {
+				continue;
+			}
+
+			$definition = $attributes[ $base ];
+
+			if ( 'number' === $definition['type'] ) {
+				if ( '' !== $bound ) {
+					if ( is_numeric( $raw_value ) ) {
+						$clean[ $base ][ $bound ] = (float) $raw_value;
+					}
+					continue;
+				}
+
+				if ( is_array( $raw_value ) ) {
+					foreach ( array( 'min', 'max', 'value' ) as $nested_key ) {
+						if ( isset( $raw_value[ $nested_key ] ) && is_numeric( $raw_value[ $nested_key ] ) ) {
+							$clean[ $base ][ 'value' === $nested_key ? 'min' : $nested_key ] = (float) $raw_value[ $nested_key ];
+						}
+					}
+					continue;
+				}
+
+				if ( is_numeric( $raw_value ) ) {
+					$clean[ $base ] = (float) $raw_value;
+				}
+
+				continue;
+			}
+
+			if ( '' !== $bound ) {
+				continue;
+			}
+
+			if ( is_array( $raw_value ) ) {
+				$values = array();
+
+				foreach ( $raw_value as $item ) {
+					$item = velotok_catalog_sanitize_filter_text( $item );
+
+					if ( '' !== $item ) {
+						$values[] = $item;
+					}
+				}
+
+				if ( ! empty( $values ) ) {
+					$clean[ $base ] = $values;
+				}
+			} else {
+				$raw_value = velotok_catalog_sanitize_filter_text( $raw_value );
+
+				if ( '' !== $raw_value ) {
+					$clean[ $base ] = $raw_value;
+				}
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Совпадает ли товар с фильтрами контракта.
+	 *
+	 * @param mixed $product Товар.
+	 * @param mixed $filters Фильтры.
+	 * @return bool
+	 */
+	function velotok_catalog_product_matches_filters( $product, $filters ) {
+		$filters = velotok_catalog_sanitize_filters( $filters );
+
+		if ( empty( $filters ) ) {
+			return true;
+		}
+
+		$attributes = velotok_catalog_filter_contract_attributes();
+
+		foreach ( $filters as $key => $expected ) {
+			if ( 'attributes' === $key ) {
+				foreach ( (array) $expected as $attribute_key => $attribute_value ) {
+					if ( isset( $attributes[ $attribute_key ] ) && ! empty( $attributes[ $attribute_key ]['attribute'] ) ) {
+						$actual = velotok_catalog_product_attribute( $product, $attribute_key );
+					} else {
+						$actual = velotok_catalog_product_attribute_row( $product, $attribute_key, $attribute_key );
+					}
+
+					if ( '' === $actual || ! velotok_catalog_value_matches( $actual, $attribute_value ) ) {
+						return false;
+					}
+				}
+				continue;
+			}
+
+			if ( ! isset( $attributes[ $key ] ) ) {
+				return false;
+			}
+
+			if ( 'category' === $key ) {
+				$actual = velotok_catalog_product_categories( $product );
+
+				if ( ! velotok_catalog_value_matches( implode( ', ', $actual ), $expected ) ) {
+					return false;
+				}
+
+				continue;
+			}
+
+			$actual = velotok_catalog_product_attribute( $product, $key );
+
+			if ( 'number' === $attributes[ $key ]['type'] ) {
+				if ( '' === trim( (string) $actual ) || ! is_numeric( $actual ) ) {
+					return false;
+				}
+
+				$actual = (float) $actual;
+
+				if ( is_array( $expected ) ) {
+					if ( isset( $expected['min'] ) && $actual < (float) $expected['min'] ) {
+						return false;
+					}
+
+					if ( isset( $expected['max'] ) && $actual > (float) $expected['max'] ) {
+						return false;
+					}
+				} elseif ( (float) $expected !== $actual ) {
+					return false;
+				}
+
+				continue;
+			}
+
+			if ( ! velotok_catalog_value_matches( $actual, $expected ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Применяет поиск и фильтры к списку товаров.
+	 *
+	 * @param mixed $products Товары.
+	 * @param mixed $args     Аргументы: search, filters, filter, s.
+	 * @return array<int,mixed>
+	 */
+	function velotok_catalog_filter_products( $products, $args = array() ) {
+		if ( ! is_array( $products ) ) {
+			return array();
+		}
+
+		if ( ! is_array( $args ) ) {
+			$args = array();
+		}
+
+		$search  = '';
+		$filters = array();
+
+		if ( isset( $args['search'] ) ) {
+			$search = $args['search'];
+		} elseif ( isset( $args['s'] ) ) {
+			$search = $args['s'];
+		}
+
+		if ( isset( $args['filters'] ) ) {
+			$filters = $args['filters'];
+		} elseif ( isset( $args['filter'] ) ) {
+			$filters = $args['filter'];
+		} else {
+			$filters = $args;
+		}
+
+		unset( $filters['search'], $filters['s'], $filters['filters'], $filters['filter'] );
+
+		$filtered = array();
+
+		foreach ( $products as $product ) {
+			if ( '' !== trim( (string) $search ) && ! velotok_catalog_product_matches_search( $product, $search ) ) {
+				continue;
+			}
+
+			if ( ! velotok_catalog_product_matches_filters( $product, $filters ) ) {
+				continue;
+			}
+
+			$filtered[] = $product;
+		}
+
+		return $filtered;
+	}
+
+	/**
+	 * Проверяет товар по поиску и фильтрам одновременно.
+	 *
+	 * @param mixed $product Товар.
+	 * @param mixed $args    Аргументы.
+	 * @return bool
+	 */
+	function velotok_catalog_product_matches( $product, $args ) {
+		if ( ! is_array( $args ) ) {
+			return true;
+		}
+
+		$matched = velotok_catalog_filter_products( array( $product ), $args );
+
+		return ! empty( $matched );
+	}
+
+	/**
+	 * Значения фильтра, доступные у товаров.
+	 *
+	 * @param string $attribute Ключ атрибута.
+	 * @param mixed  $products  Товары.
+	 * @return string[]
+	 */
+	function velotok_catalog_filter_options( $attribute, $products = array() ) {
+		$values = array();
+
+		foreach ( (array) $products as $product ) {
+			$value = velotok_catalog_product_attribute( $product, $attribute );
+
+			if ( '' !== trim( (string) $value ) ) {
+				$values[] = (string) $value;
+			}
+		}
+
+		$values = array_values( array_unique( $values ) );
+		natcasesort( $values );
+
+		return array_values( $values );
+	}
+
+	/**
+	 * Фильтры из запроса без поисковой строки.
+	 *
+	 * @param mixed $source Источник (по умолчанию $_GET).
+	 * @return array<string,mixed>
+	 */
+	function velotok_catalog_request_filters( $source = null ) {
+		if ( null === $source ) {
+			$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичные фильтры каталога.
+		}
+
+		if ( ! is_array( $source ) ) {
+			return array();
+		}
+
+		$contract = velotok_catalog_filter_contract();
+		$input    = array();
+
+		if ( isset( $source[ $contract['filter_parameter'] ] ) && is_array( $source[ $contract['filter_parameter'] ] ) ) {
+			$input = array_merge( $input, $source[ $contract['filter_parameter'] ] );
+		}
+
+		foreach ( $source as $key => $value ) {
+			if ( in_array( $key, array( $contract['filter_parameter'], $contract['search_parameter'], 'orderby', 'paged' ), true ) ) {
+				continue;
+			}
+
+			$input[ $key ] = $value;
+		}
+
+		return velotok_catalog_sanitize_filters( $input );
+	}
+
+	/**
+	 * Поисковая строка из запроса.
+	 *
+	 * @param mixed $source Источник (по умолчанию $_GET).
+	 * @return string
+	 */
+	function velotok_catalog_request_search( $source = null ) {
+		if ( null === $source ) {
+			$source = isset( $_GET ) && is_array( $_GET ) ? $_GET : array(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- публичный поиск каталога.
+		}
+
+		if ( ! is_array( $source ) ) {
+			return '';
+		}
+
+		$contract = velotok_catalog_filter_contract();
+
+		if ( isset( $source[ $contract['search_parameter'] ] ) ) {
+			return velotok_catalog_sanitize_filter_text( $source[ $contract['search_parameter'] ] );
+		}
+
+		if ( isset( $source['search'] ) ) {
+			return velotok_catalog_sanitize_filter_text( $source['search'] );
+		}
+
+		if ( isset( $source[ $contract['filter_parameter'] ] ) && is_array( $source[ $contract['filter_parameter'] ] ) ) {
+			foreach ( array( 'search', 's' ) as $search_key ) {
+				if ( isset( $source[ $contract['filter_parameter'] ][ $search_key ] ) ) {
+					return velotok_catalog_sanitize_filter_text( $source[ $contract['filter_parameter'] ][ $search_key ] );
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Поиск и фильтры из запроса.
+	 *
+	 * @param mixed $source Источник.
+	 * @return array{search:string,filters:array<string,mixed>}
+	 */
+	function velotok_catalog_request_query( $source = null ) {
+		return array(
+			'search'  => velotok_catalog_request_search( $source ),
+			'filters' => velotok_catalog_request_filters( $source ),
+		);
+	}
+
+	/**
+	 * Псевдоним активных фильтров каталога.
+	 *
+	 * @param mixed $source Источник.
+	 * @return array<string,mixed>
+	 */
+	function velotok_catalog_active_filters( $source = null ) {
+		return velotok_catalog_request_filters( $source );
+	}
+
+	/**
+	 * Проверяет, относится ли запрос к каталогу товаров.
+	 *
+	 * @param mixed $query WP_Query.
+	 * @return bool
+	 */
+	function velotok_catalog_is_product_query( $query ) {
+		if ( ! is_object( $query ) || ! method_exists( $query, 'get' ) ) {
+			return false;
+		}
+
+		if ( function_exists( 'is_admin' ) && is_admin() ) {
+			return false;
+		}
+
+		if ( method_exists( $query, 'is_main_query' ) && ! $query->is_main_query() ) {
+			return false;
+		}
+
+		return 'product' === $query->get( 'post_type' )
+			|| ( method_exists( $query, 'is_post_type_archive' ) && $query->is_post_type_archive( 'product' ) )
+			|| ( method_exists( $query, 'is_tax' ) && $query->is_tax( 'product_cat' ) );
+	}
+
+	/**
+	 * Расширяет поиск WooCommerce атрибутами контракта.
+	 *
+	 * @param string $search SQL-условие поиска WordPress.
+	 * @param mixed  $query  WP_Query.
+	 * @return string
+	 */
+	function velotok_catalog_extend_product_search( $search, $query ) {
+		if ( ! velotok_catalog_is_product_query( $query ) ) {
+			return $search;
+		}
+
+		if ( ! method_exists( $query, 'is_search' ) || ! $query->is_search() ) {
+			return $search;
+		}
+
+		$term = trim( (string) $query->get( 's' ) );
+
+		if ( '' === $term ) {
+			return $search;
+		}
+
+		global $wpdb;
+
+		if ( ! isset( $wpdb->postmeta, $wpdb->posts ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'prepare' ) ) {
+			return $search;
+		}
+
+		$attributes = velotok_catalog_filter_contract_attributes();
+		$meta_keys  = array( '_sku', '_product_attributes' );
+
+		foreach ( $attributes as $attribute ) {
+			if ( ! empty( $attribute['meta'] ) ) {
+				$meta_keys[] = $attribute['meta'];
+			}
+		}
+
+		$meta_keys = array_values( array_unique( $meta_keys ) );
+
+		if ( empty( $meta_keys ) ) {
+			return $search;
+		}
+
+		$like         = '%' . $wpdb->esc_like( $term ) . '%';
+		$placeholders = implode( ', ', array_fill( 0, count( $meta_keys ), '%s' ) );
+		$sql          = $wpdb->prepare(
+			"EXISTS (SELECT 1 FROM {$wpdb->postmeta} velotok_pm WHERE velotok_pm.post_id = {$wpdb->posts}.ID AND velotok_pm.meta_key IN ({$placeholders}) AND velotok_pm.meta_value LIKE %s)",
+			array_merge( $meta_keys, array( $like ) )
+		);
+
+		if ( '' === trim( (string) $search ) ) {
+			return ' AND ' . $sql . ' ';
+		}
+
+		$closing = strrpos( (string) $search, ')' );
+
+		if ( false === $closing ) {
+			return $search . ' AND ' . $sql . ' ';
+		}
+
+		return substr( (string) $search, 0, $closing ) . ' OR ' . $sql . ' ' . substr( (string) $search, $closing );
+	}
+
+	/**
+	 * Применяет полный контрактный поиск и фильтры к найденным товарам архива.
+	 *
+	 * @param mixed $posts Найденные записи.
+	 * @param mixed $query WP_Query.
+	 * @return array<int,mixed>
+	 */
+	function velotok_catalog_filter_archive_posts( $posts, $query ) {
+		if ( ! is_array( $posts ) || ! velotok_catalog_is_product_query( $query ) ) {
+			return $posts;
+		}
+
+		$request = velotok_catalog_request_query();
+
+		if ( '' === $request['search'] && empty( $request['filters'] ) ) {
+			return $posts;
+		}
+
+		$filtered = array();
+
+		foreach ( $posts as $post ) {
+			$product_id = is_object( $post ) && isset( $post->ID ) ? (int) $post->ID : 0;
+			$product    = $product_id > 0 && function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : null;
+
+			if ( ! is_object( $product ) ) {
+				$filtered[] = $post;
+				continue;
+			}
+
+			if ( '' !== $request['search'] && ! velotok_catalog_product_matches_search( $product, $request['search'] ) ) {
+				continue;
+			}
+
+			if ( ! velotok_catalog_product_matches_filters( $product, $request['filters'] ) ) {
+				continue;
+			}
+
+			$filtered[] = $post;
+		}
+
+		return $filtered;
+	}
+
+	/**
+	 * Добавляет фильтры контракта к основному запросу архива WooCommerce.
+	 *
+	 * @param mixed $query WP_Query.
+	 * @return void
+	 */
+	function velotok_catalog_apply_archive_filters( $query ) {
+		if ( ! is_object( $query ) || ! method_exists( $query, 'get' ) ) {
+			return;
+		}
+
+		if ( function_exists( 'is_admin' ) && is_admin() ) {
+			return;
+		}
+
+		if ( method_exists( $query, 'is_main_query' ) && ! $query->is_main_query() ) {
+			return;
+		}
+
+		$is_product = 'product' === $query->get( 'post_type' )
+			|| ( method_exists( $query, 'is_post_type_archive' ) && $query->is_post_type_archive( 'product' ) )
+			|| ( method_exists( $query, 'is_tax' ) && $query->is_tax( 'product_cat' ) );
+
+		if ( ! $is_product ) {
+			return;
+		}
+
+		$filters = velotok_catalog_request_filters();
+
+		if ( empty( $filters ) ) {
+			return;
+		}
+
+		$attributes = velotok_catalog_filter_contract_attributes();
+		$meta_query = $query->get( 'meta_query' );
+		$meta_query = is_array( $meta_query ) ? $meta_query : array();
+
+		foreach ( $filters as $key => $expected ) {
+			if ( 'attributes' === $key || ! isset( $attributes[ $key ] ) || empty( $attributes[ $key ]['meta'] ) ) {
+				continue;
+			}
+
+			$clause = array(
+				'key'  => $attributes[ $key ]['meta'],
+				'type' => 'number' === $attributes[ $key ]['type'] ? 'NUMERIC' : 'CHAR',
+			);
+
+			if ( is_array( $expected ) ) {
+				if ( isset( $expected['min'], $expected['max'] ) ) {
+					$clause['value']   = array( $expected['min'], $expected['max'] );
+					$clause['compare'] = 'BETWEEN';
+				} elseif ( isset( $expected['min'] ) ) {
+					$clause['value']   = $expected['min'];
+					$clause['compare'] = '>=';
+				} elseif ( isset( $expected['max'] ) ) {
+					$clause['value']   = $expected['max'];
+					$clause['compare'] = '<=';
+				} else {
+					$clause['value']   = array_values( $expected );
+					$clause['compare'] = 'IN';
+				}
+			} else {
+				$clause['value']   = $expected;
+				$clause['compare'] = '=';
+			}
+
+			if ( empty( $meta_query ) ) {
+				$meta_query['relation'] = 'AND';
+			}
+
+			$meta_query[] = $clause;
+		}
+
+		if ( ! empty( $meta_query ) && method_exists( $query, 'set' ) ) {
+			$query->set( 'meta_query', $meta_query );
+		}
+
+		if ( isset( $filters['category'] ) && method_exists( $query, 'get' ) && method_exists( $query, 'set' ) ) {
+			$tax_query = $query->get( 'tax_query' );
+			$tax_query = is_array( $tax_query ) ? $tax_query : array();
+			$slugs     = array_values( (array) $filters['category'] );
+
+			if ( ! empty( $slugs ) ) {
+				if ( empty( $tax_query ) ) {
+					$tax_query['relation'] = 'AND';
+				}
+
+				$tax_query[] = array(
+					'taxonomy' => 'product_cat',
+					'field'    => 'slug',
+					'terms'    => $slugs,
+				);
+
+				$query->set( 'tax_query', $tax_query );
+			}
+		}
+	}
+}
+
+if ( function_exists( 'add_action' ) ) {
+	add_action( 'pre_get_posts', 'velotok_catalog_apply_archive_filters' );
+}
+
+if ( function_exists( 'add_filter' ) ) {
+	add_filter( 'posts_search', 'velotok_catalog_extend_product_search', 10, 2 );
+	add_filter( 'the_posts', 'velotok_catalog_filter_archive_posts', 10, 2 );
+}

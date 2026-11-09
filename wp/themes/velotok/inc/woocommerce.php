@@ -7,6 +7,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/catalog-filters.php';
+
 /**
  * Каталог шаблонов WooCommerce внутри темы.
  *
@@ -822,10 +824,14 @@ function velotok_product_is_valid( $product ) {
  *
  * @return array<int,array>
  */
-function velotok_get_home_models() {
+function velotok_get_home_models( $args = array() ) {
 	$models  = array();
 	$queried = false;
 	$raw     = array();
+
+	if ( ! is_array( $args ) ) {
+		$args = array();
+	}
 
 	if ( function_exists( 'wc_get_products' ) ) {
 		$queried  = true;
@@ -845,7 +851,7 @@ function velotok_get_home_models() {
 	$index = 0;
 
 	foreach ( $raw as $product ) {
-		if ( velotok_product_is_valid( $product ) ) {
+		if ( velotok_product_is_valid( $product ) && ( empty( $args ) || velotok_catalog_product_matches( $product, $args ) ) ) {
 			$index++;
 			$models[] = velotok_normalize_product( $product, $index );
 		}
@@ -859,6 +865,10 @@ function velotok_get_home_models() {
 			$index++;
 			$models[] = velotok_normalize_fallback_model( $model, $index );
 		}
+
+		if ( ! empty( $args ) ) {
+			$models = velotok_catalog_filter_products( $models, $args );
+		}
 	}
 
 	return $models;
@@ -868,11 +878,17 @@ function velotok_get_home_models() {
  * Товары по категории для блока каталога.
  *
  * @param string $slug Слаг категории.
+ * @param int    $limit Лимит товаров.
+ * @param array  $args  Поиск и фильтры контракта.
  * @return array<int,array>
  */
-function velotok_get_products_by_category( $slug, $limit = 3 ) {
+function velotok_get_products_by_category( $slug, $limit = 3, $args = array() ) {
 	if ( ! function_exists( 'wc_get_products' ) ) {
 		return array();
+	}
+
+	if ( ! is_array( $args ) ) {
+		$args = array();
 	}
 
 	$products = wc_get_products( array(
@@ -889,7 +905,7 @@ function velotok_get_products_by_category( $slug, $limit = 3 ) {
 	$models = array();
 	$index  = 0;
 	foreach ( $products as $product ) {
-		if ( velotok_product_is_valid( $product ) ) {
+		if ( velotok_product_is_valid( $product ) && ( empty( $args ) || velotok_catalog_product_matches( $product, $args ) ) ) {
 			$index++;
 			$models[] = velotok_normalize_product( $product, $index );
 		}
