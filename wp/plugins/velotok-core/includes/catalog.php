@@ -148,12 +148,16 @@ function velotok_core_catalog_contract() {
 			'type'     => 'number',
 			'required' => true,
 			'mocked'   => true,
+			'filter'   => true,
+			'range'    => true,
 		),
 		'category'          => array(
 			'label'    => 'Категория',
 			'type'     => 'string',
 			'required' => true,
 			'mocked'   => true,
+			'filter'   => true,
+			'taxonomy' => 'product_cat',
 		),
 		'short_description' => array(
 			'label'    => 'Краткое описание',
@@ -178,30 +182,37 @@ function velotok_core_catalog_contract() {
 			'type'     => 'number',
 			'required' => false,
 			'mocked'   => true,
+			'filter'   => true,
+			'range'    => true,
 		),
 		'motor_w'           => array(
 			'label'    => 'Мотор, Вт',
 			'type'     => 'number',
 			'required' => false,
 			'mocked'   => true,
+			'filter'   => true,
 		),
 		'weight_kg'         => array(
 			'label'    => 'Вес, кг',
 			'type'     => 'number',
 			'required' => false,
 			'mocked'   => true,
+			'filter'   => true,
+			'range'    => true,
 		),
 		'wheel'             => array(
 			'label'    => 'Колёса',
 			'type'     => 'string',
 			'required' => false,
 			'mocked'   => true,
+			'filter'   => true,
 		),
 		'badge'             => array(
 			'label'    => 'Бейдж',
 			'type'     => 'string',
 			'required' => false,
 			'mocked'   => true,
+			'filter'   => true,
 		),
 		'image'             => array(
 			'label'    => 'Изображение',
@@ -347,6 +358,41 @@ function velotok_core_catalog_contract() {
 		),
 	);
 
+	$filterable = array();
+	$filters    = array();
+
+	foreach ( $fields as $key => $field ) {
+		if ( empty( $field['filter'] ) ) {
+			continue;
+		}
+
+		$filterable[] = $key;
+		$control      = 'text';
+
+		if ( isset( $field['taxonomy'] ) ) {
+			$control = 'taxonomy';
+		} elseif ( 'number' === $field['type'] ) {
+			$control = ! empty( $field['range'] ) ? 'range' : 'number';
+		}
+
+		$filters[ $key ] = array(
+			'key'             => $key,
+			'name'            => $key,
+			'label'           => $field['label'],
+			'type'            => $field['type'],
+			'control'         => $control,
+			'parameter'       => $key,
+			'query_parameter' => 'velotok_filter[' . $key . ']',
+			'range'           => ! empty( $field['range'] ),
+			'multiple'        => in_array( $key, array( 'category', 'wheel', 'badge' ), true ),
+			'requirement'     => 'TESTEB-20',
+		);
+
+		if ( isset( $field['taxonomy'] ) ) {
+			$filters[ $key ]['taxonomy'] = $field['taxonomy'];
+		}
+	}
+
 	$contract = array(
 		'spec'                => 'ecommerce-store',
 		'requirement'         => 'TESTEB-150',
@@ -362,6 +408,14 @@ function velotok_core_catalog_contract() {
 		'fields'              => $fields,
 		'attributes'          => $fields,
 		'required_attributes' => array( 'state', 'slug', 'name', 'price', 'category' ),
+		'filter_requirement'  => 'TESTEB-20',
+		'filter_parameter'    => 'velotok_filter',
+		'filterable_attributes' => $filterable,
+		'filterable'          => $filterable,
+		'filters'             => $filters,
+		'filter_fields'       => $filters,
+		'filter_controls'     => $filters,
+		'filter_definitions'  => $filters,
 		'product_states'      => $product_states,
 		'product_state_model' => $product_states,
 		'product_state_keys'  => array_keys( $product_states ),
@@ -882,6 +936,420 @@ function velotok_core_catalog_validation_contract() {
 }
 
 /**
+ * Return the catalog filter contract.
+ *
+ * Filters are built from the filter definitions declared in the catalog
+ * contract: only filterable attributes are accepted, and each definition
+ * carries its label, type, control and request parameter.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_filter_contract() {
+	return velotok_core_catalog_contract();
+}
+
+/**
+ * Alias for the catalog filter contract.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_filters_contract() {
+	return velotok_core_catalog_filter_contract();
+}
+
+/**
+ * Return the filterable attribute keys from the contract.
+ *
+ * @return string[]
+ */
+function velotok_core_catalog_filterable_attributes() {
+	$contract = velotok_core_catalog_filter_contract();
+
+	return $contract['filterable_attributes'];
+}
+
+/**
+ * Return filter definitions keyed by attribute.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function velotok_core_catalog_filter_definitions() {
+	$contract = velotok_core_catalog_filter_contract();
+
+	return $contract['filters'];
+}
+
+/**
+ * Build filter controls from the contract and available products.
+ *
+ * @param mixed $products Products used to collect available values.
+ * @param mixed $filters  Active filters.
+ * @return array<string,array<string,mixed>>
+ */
+function velotok_core_catalog_filter_controls( $products = null, $filters = array() ) {
+	if ( null === $products ) {
+		$contract = velotok_core_catalog_filter_contract();
+		$products = isset( $contract['products'] ) && is_array( $contract['products'] ) ? $contract['products'] : array();
+	}
+
+	$products = is_array( $products ) ? $products : array();
+
+	if ( empty( $filters ) && ! empty( $products ) && ! isset( $products[0] ) ) {
+		$candidates = array_merge( velotok_core_catalog_filterable_attributes(), array( 'filters', 'filter' ) );
+
+		if ( array_intersect( array_keys( $products ), $candidates ) ) {
+			$filters  = $products;
+			$products = array();
+		}
+	}
+
+	$filters  = velotok_core_catalog_sanitize_filters( $filters );
+	$controls = array();
+
+	foreach ( velotok_core_catalog_filter_definitions() as $key => $definition ) {
+		$control            = $definition;
+		$control['options'] = velotok_core_catalog_filter_options( $key, $products );
+		$control['value']   = isset( $filters[ $key ] ) ? $filters[ $key ] : '';
+
+		$controls[ $key ] = $control;
+	}
+
+	return $controls;
+}
+
+/**
+ * Alias for contract-driven filter controls.
+ *
+ * @param mixed $products Products.
+ * @param mixed $filters  Active filters.
+ * @return array<string,array<string,mixed>>
+ */
+function velotok_core_catalog_filter_fields( $products = array(), $filters = array() ) {
+	return velotok_core_catalog_filter_controls( $products, $filters );
+}
+
+/**
+ * Read a filterable attribute value from a catalog product.
+ *
+ * @param mixed  $product Product data.
+ * @param string $field   Contract field key.
+ * @return string
+ */
+function velotok_core_catalog_filter_value( $product, $field ) {
+	if ( ! is_array( $product ) ) {
+		return '';
+	}
+
+	$key = velotok_core_catalog_normalize_key( $field );
+
+	if ( '' === $key ) {
+		return '';
+	}
+
+	if ( 'category' === $key && isset( $product['category'] ) && is_scalar( $product['category'] ) ) {
+		$category = (string) $product['category'];
+		$label    = velotok_core_catalog_category_label( $category );
+
+		return '' !== $label ? $category . ', ' . $label : $category;
+	}
+
+	if ( isset( $product[ $key ] ) && is_scalar( $product[ $key ] ) ) {
+		return (string) $product[ $key ];
+	}
+
+	return '';
+}
+
+/**
+ * Return available options for a filterable contract attribute.
+ *
+ * @param string $field    Contract field key.
+ * @param mixed  $products Products; defaults to the contract catalog.
+ * @return string[]
+ */
+function velotok_core_catalog_filter_options( $field, $products = null ) {
+	$key        = velotok_core_catalog_normalize_key( $field );
+	$attributes = velotok_core_catalog_filterable_attributes();
+
+	if ( '' === $key || ! in_array( $key, $attributes, true ) ) {
+		return array();
+	}
+
+	if ( null === $products ) {
+		$contract = velotok_core_catalog_filter_contract();
+		$products = isset( $contract['products'] ) && is_array( $contract['products'] ) ? $contract['products'] : array();
+	}
+
+	$values = array();
+
+	foreach ( (array) $products as $product ) {
+		$value = velotok_core_catalog_filter_value( $product, $key );
+
+		foreach ( preg_split( '/\s*,\s*/u', (string) $value ) as $part ) {
+			$part = trim( (string) $part );
+
+			if ( '' !== $part ) {
+				$values[] = $part;
+			}
+		}
+	}
+
+	$values = array_values( array_unique( $values ) );
+	natcasesort( $values );
+
+	return array_values( $values );
+}
+
+/**
+ * Sanitize filter input using only contract filter definitions.
+ *
+ * @param mixed $filters Raw filters.
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_sanitize_filters( $filters ) {
+	if ( ! is_array( $filters ) ) {
+		return array();
+	}
+
+	$contract = velotok_core_catalog_filter_contract();
+
+	if ( isset( $filters[ $contract['filter_parameter'] ] ) && is_array( $filters[ $contract['filter_parameter'] ] ) ) {
+		$filters = array_merge( $filters, $filters[ $contract['filter_parameter'] ] );
+		unset( $filters[ $contract['filter_parameter'] ] );
+	}
+
+	$definitions = velotok_core_catalog_filter_definitions();
+	$clean       = array();
+
+	foreach ( $filters as $raw_key => $raw_value ) {
+		$key = velotok_core_catalog_normalize_key( $raw_key );
+
+		if ( in_array( $key, array( 'product_cat', 'product_category', 'cat' ), true ) ) {
+			$key = 'category';
+		}
+
+		if ( in_array( $key, array( 'min_price', 'price_from' ), true ) ) {
+			$key = 'price_min';
+		}
+
+		if ( in_array( $key, array( 'max_price', 'price_to' ), true ) ) {
+			$key = 'price_max';
+		}
+
+		$base  = $key;
+		$bound = '';
+
+		if ( preg_match( '/^(.*)_(min|max)$/', $key, $matches ) ) {
+			$base  = $matches[1];
+			$bound = $matches[2];
+		}
+
+		if ( ! isset( $definitions[ $base ] ) ) {
+			continue;
+		}
+
+		if ( 'number' === $definitions[ $base ]['type'] ) {
+			if ( '' !== $bound ) {
+				if ( is_numeric( $raw_value ) ) {
+					$clean[ $base ][ $bound ] = (float) $raw_value;
+				}
+
+				continue;
+			}
+
+			if ( is_array( $raw_value ) ) {
+				foreach ( array( 'min', 'max', 'value' ) as $nested_key ) {
+					if ( isset( $raw_value[ $nested_key ] ) && is_numeric( $raw_value[ $nested_key ] ) ) {
+						$clean[ $base ][ 'value' === $nested_key ? 'min' : $nested_key ] = (float) $raw_value[ $nested_key ];
+					}
+				}
+
+				continue;
+			}
+
+			if ( is_numeric( $raw_value ) ) {
+				$clean[ $base ] = (float) $raw_value;
+			}
+
+			continue;
+		}
+
+		if ( '' !== $bound ) {
+			continue;
+		}
+
+		if ( is_array( $raw_value ) ) {
+			$values = array();
+
+			foreach ( $raw_value as $item ) {
+				if ( ! is_scalar( $item ) ) {
+					continue;
+				}
+
+				$item = trim( strip_tags( (string) $item ) );
+
+				if ( '' !== $item ) {
+					$values[] = $item;
+				}
+			}
+
+			if ( ! empty( $values ) ) {
+				$clean[ $base ] = $values;
+			}
+		} elseif ( is_scalar( $raw_value ) ) {
+			$value = trim( strip_tags( (string) $raw_value ) );
+
+			if ( '' !== $value ) {
+				$clean[ $base ] = $value;
+			}
+		}
+	}
+
+	return $clean;
+}
+
+/**
+ * Check whether an actual attribute value matches an expected filter value.
+ *
+ * @param mixed $actual   Actual value.
+ * @param mixed $expected Expected value or values.
+ * @return bool
+ */
+function velotok_core_catalog_filter_value_matches( $actual, $expected ) {
+	$actual = velotok_core_catalog_normalize_search_text( $actual );
+
+	if ( '' === $actual ) {
+		return false;
+	}
+
+	$parts = preg_split( '/\s*(?:,|\/|\||;)\s*/u', $actual );
+	$parts = is_array( $parts ) ? array_filter( array_map( 'trim', $parts ) ) : array();
+	$parts[] = $actual;
+
+	foreach ( (array) $expected as $candidate ) {
+		$candidate = velotok_core_catalog_normalize_search_text( $candidate );
+
+		if ( '' !== $candidate && in_array( $candidate, $parts, true ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Apply contract filters to one catalog product.
+ *
+ * @param mixed $product Product data.
+ * @param mixed $filters Raw filters.
+ * @return bool
+ */
+function velotok_core_catalog_product_matches_filters( $product, $filters ) {
+	$filters = velotok_core_catalog_sanitize_filters( $filters );
+
+	if ( empty( $filters ) ) {
+		return true;
+	}
+
+	$definitions = velotok_core_catalog_filter_definitions();
+
+	foreach ( $filters as $key => $expected ) {
+		if ( ! isset( $definitions[ $key ] ) ) {
+			return false;
+		}
+
+		$actual = velotok_core_catalog_filter_value( $product, $key );
+
+		if ( 'number' === $definitions[ $key ]['type'] ) {
+			if ( '' === trim( (string) $actual ) || ! is_numeric( $actual ) ) {
+				return false;
+			}
+
+			$actual = (float) $actual;
+
+			if ( is_array( $expected ) ) {
+				if ( isset( $expected['min'] ) && $actual < (float) $expected['min'] ) {
+					return false;
+				}
+
+				if ( isset( $expected['max'] ) && $actual > (float) $expected['max'] ) {
+					return false;
+				}
+			} elseif ( (float) $expected !== $actual ) {
+				return false;
+			}
+
+			continue;
+		}
+
+		if ( ! velotok_core_catalog_filter_value_matches( $actual, $expected ) ) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/**
+ * Filter a product list by the contract.
+ *
+ * @param mixed $products Product list.
+ * @param mixed $args     Arguments: filters/filter, search/s.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_catalog_filter_products( $products, $args = array() ) {
+	if ( ! is_array( $products ) ) {
+		return array();
+	}
+
+	$args = is_array( $args ) ? $args : array();
+
+	if ( isset( $args['filters'] ) ) {
+		$filters = $args['filters'];
+	} elseif ( isset( $args['filter'] ) ) {
+		$filters = $args['filter'];
+	} else {
+		$filters = $args;
+	}
+
+	$search = '';
+
+	foreach ( array( 'search', 's', 'query' ) as $search_key ) {
+		if ( isset( $args[ $search_key ] ) && is_scalar( $args[ $search_key ] ) ) {
+			$search = (string) $args[ $search_key ];
+			break;
+		}
+	}
+
+	$filtered = array();
+
+	foreach ( $products as $product ) {
+		if ( '' !== trim( $search ) && ! velotok_core_catalog_product_matches_search( $product, $search ) ) {
+			continue;
+		}
+
+		if ( ! velotok_core_catalog_product_matches_filters( $product, $filters ) ) {
+			continue;
+		}
+
+		$filtered[] = $product;
+	}
+
+	return $filtered;
+}
+
+/**
+ * Alias for filtering catalog products by contract.
+ *
+ * @param mixed $products Product list.
+ * @param mixed $args     Arguments.
+ * @return array<int,array<string,mixed>>
+ */
+function velotok_core_catalog_filter_products_by_contract( $products, $args = array() ) {
+	return velotok_core_catalog_filter_products( $products, $args );
+}
+
+/**
  * Normalize catalog text for case-insensitive search.
  *
  * @param mixed $value Source value.
@@ -1035,12 +1503,24 @@ function velotok_core_catalog_products( $category = '', $args = array() ) {
 
 	$validate = empty( $args['include_invalid'] );
 
+	if ( isset( $args['filters'] ) ) {
+		$filters = $args['filters'];
+	} elseif ( isset( $args['filter'] ) ) {
+		$filters = $args['filter'];
+	} else {
+		$filters = $args;
+	}
+
 	foreach ( $contract['products'] as $product ) {
 		if ( '' !== $key && ( ! isset( $product['category'] ) || $product['category'] !== $key ) ) {
 			continue;
 		}
 
 		if ( '' !== trim( $search ) && ! velotok_core_catalog_product_matches_search( $product, $search ) ) {
+			continue;
+		}
+
+		if ( ! velotok_core_catalog_product_matches_filters( $product, $filters ) ) {
 			continue;
 		}
 
