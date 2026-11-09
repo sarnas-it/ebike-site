@@ -368,6 +368,22 @@ function velotok_core_catalog_contract() {
 		'product_public_states' => array( 'publish' ),
 		'default_product_state' => 'publish',
 		'product_state_requirement' => 'TESTEB-16',
+		'validation_requirement' => 'TESTEB-17',
+		'validation'          => array(
+			'requirement'            => 'TESTEB-17',
+			'server_side'            => true,
+			'required_attributes'    => array( 'state', 'slug', 'name', 'price', 'category' ),
+			'fields'                 => $fields,
+			'checks_state_model'     => true,
+			'checks_category_directory' => true,
+			'error_codes'            => array(
+				'required' => 'CATALOG_ATTRIBUTE_REQUIRED',
+				'type'     => 'CATALOG_ATTRIBUTE_INVALID_TYPE',
+				'state'    => 'CATALOG_ATTRIBUTE_INVALID_STATE',
+				'category' => 'CATALOG_ATTRIBUTE_UNKNOWN_CATEGORY',
+				'price'    => 'CATALOG_ATTRIBUTE_INVALID_PRICE',
+			),
+		),
 		'categories'          => $categories,
 		'required_categories' => array_keys( $categories ),
 		'products'            => $products,
@@ -607,6 +623,259 @@ function velotok_core_catalog_category_label( $category ) {
 }
 
 /**
+ * Return the declared type of a catalog contract field.
+ *
+ * @param mixed $field Field key.
+ * @return string Empty string for an unknown field.
+ */
+function velotok_core_catalog_field_type( $field ) {
+	$contract = velotok_core_catalog_contract();
+	$key      = velotok_core_catalog_normalize_key( $field );
+
+	if ( '' === $key || ! isset( $contract['fields'][ $key ] ) ) {
+		return '';
+	}
+
+	return isset( $contract['fields'][ $key ]['type'] ) ? (string) $contract['fields'][ $key ]['type'] : '';
+}
+
+/**
+ * Check whether a value is a catalog number.
+ *
+ * Integers, finite floats and numeric strings (with a comma as decimal
+ * separator) are accepted; arrays, objects, booleans and empty strings are not.
+ *
+ * @param mixed $value Value.
+ * @return bool
+ */
+function velotok_core_catalog_number_is_valid( $value ) {
+	if ( is_int( $value ) || ( is_float( $value ) && is_finite( $value ) ) ) {
+		return true;
+	}
+
+	if ( ! is_string( $value ) ) {
+		return false;
+	}
+
+	$value = trim( str_replace( ',', '.', $value ) );
+
+	return '' !== $value && is_numeric( $value );
+}
+
+/**
+ * Check whether a value is a catalog string.
+ *
+ * The contract declares `string` fields, so only actual strings (or integer
+ * identifiers) are accepted; arrays, objects and booleans are rejected.
+ *
+ * @param mixed $value Value.
+ * @return bool
+ */
+function velotok_core_catalog_string_is_valid( $value ) {
+	return is_string( $value ) || is_int( $value );
+}
+
+/**
+ * Build a per-attribute catalog validation result.
+ *
+ * @param string      $field    Field key.
+ * @param string      $type     Declared contract type.
+ * @param bool        $required Whether the field is required.
+ * @param mixed       $value    Original value.
+ * @param bool        $valid    Whether the value is valid.
+ * @param string|null $code     Error code, if any.
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_attribute_result( $field, $type, $required, $value, $valid, $code = null ) {
+	return array(
+		'field'    => $field,
+		'type'     => $type,
+		'required' => (bool) $required,
+		'value'    => $value,
+		'valid'    => (bool) $valid,
+		'code'     => $valid ? null : $code,
+		'error'    => $valid ? null : $code,
+	);
+}
+
+/**
+ * Validate a single catalog product attribute against the contract.
+ *
+ * Validation is driven by the contract: required fields, declared field types,
+ * the fixed state model and the category directory. Optional fields that are
+ * absent or empty are valid; optional numeric fields still have to be numeric
+ * when a value is present.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @param mixed               $field   Field key.
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_validate_attribute( $product, $field ) {
+	$contract = velotok_core_catalog_contract();
+	$key      = velotok_core_catalog_normalize_key( $field );
+	$required = in_array( $key, $contract['required_fields'], true );
+	$type     = velotok_core_catalog_field_type( $key );
+
+	if ( ! is_array( $product ) ) {
+		$product = array();
+	}
+
+	$value      = array_key_exists( $key, $product ) ? $product[ $key ] : null;
+	$is_missing = null === $value
+		|| ( is_string( $value ) && '' === trim( $value ) )
+		|| ( is_array( $value ) && empty( $value ) );
+
+	if ( $is_missing ) {
+		if ( $required ) {
+			return velotok_core_catalog_attribute_result( $key, $type, true, $value, false, $contract['validation']['error_codes']['required'] );
+		}
+
+		return velotok_core_catalog_attribute_result( $key, $type, false, $value, true );
+	}
+
+	if ( 'state' === $key && ! velotok_core_catalog_product_state_is_valid( $value ) ) {
+		return velotok_core_catalog_attribute_result( $key, $type, $required, $value, false, $contract['validation']['error_codes']['state'] );
+	}
+
+	if ( 'category' === $key && ! velotok_core_catalog_has_category( $value ) ) {
+		return velotok_core_catalog_attribute_result( $key, $type, $required, $value, false, $contract['validation']['error_codes']['category'] );
+	}
+
+	if ( 'number' === $type ) {
+		if ( ! velotok_core_catalog_number_is_valid( $value ) ) {
+			return velotok_core_catalog_attribute_result( $key, $type, $required, $value, false, $contract['validation']['error_codes']['type'] );
+		}
+
+		if ( 'price' === $key && (float) str_replace( ',', '.', (string) $value ) < 0 ) {
+			return velotok_core_catalog_attribute_result( $key, $type, $required, $value, false, $contract['validation']['error_codes']['price'] );
+		}
+	} elseif ( 'string' === $type && ! velotok_core_catalog_string_is_valid( $value ) ) {
+		return velotok_core_catalog_attribute_result( $key, $type, $required, $value, false, $contract['validation']['error_codes']['type'] );
+	}
+
+	return velotok_core_catalog_attribute_result( $key, $type, $required, $value, true );
+}
+
+/**
+ * Validate a catalog product against the catalog contract.
+ *
+ * Every required field from the contract is checked for presence and type, the
+ * state must belong to the fixed state model and the category must exist in the
+ * category directory. The result exposes per-attribute results, missing fields,
+ * invalid fields and error codes.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_validate_product( $product ) {
+	$contract = velotok_core_catalog_contract();
+	$required = $contract['required_fields'];
+	$fields   = array_keys( $contract['fields'] );
+	$all      = array_values( array_unique( array_merge( $fields, $required ) ) );
+
+	if ( ! is_array( $product ) ) {
+		$product = array();
+	}
+
+	$attributes = array();
+	$errors     = array();
+	$missing    = array();
+	$invalid    = array();
+
+	foreach ( $all as $field ) {
+		if ( ! in_array( $field, $required, true ) && ! array_key_exists( $field, $product ) ) {
+			continue;
+		}
+
+		$result                  = velotok_core_catalog_validate_attribute( $product, $field );
+		$attributes[ $field ]    = $result;
+
+		if ( ! empty( $result['valid'] ) ) {
+			continue;
+		}
+
+		$code             = (string) $result['code'];
+		$errors[ $field ] = $code;
+
+		if ( $contract['validation']['error_codes']['required'] === $code ) {
+			$missing[] = $field;
+		} else {
+			$invalid[] = $field;
+		}
+	}
+
+	$error_codes = array_values( $errors );
+
+	return array(
+		'valid'              => array() === $errors,
+		'is_valid'           => array() === $errors,
+		'ok'                 => array() === $errors,
+		'spec'               => $contract['spec'],
+		'requirement'        => 'TESTEB-17',
+		'server_side'        => true,
+		'product'            => $product,
+		'slug'               => isset( $product['slug'] ) && is_scalar( $product['slug'] ) ? (string) $product['slug'] : '',
+		'name'               => isset( $product['name'] ) && is_scalar( $product['name'] ) ? (string) $product['name'] : '',
+		'state'              => velotok_core_catalog_product_state( $product ),
+		'category'           => isset( $product['category'] ) && is_scalar( $product['category'] ) ? velotok_core_catalog_normalize_key( $product['category'] ) : '',
+		'required_attributes' => $required,
+		'attributes'         => $attributes,
+		'errors'             => $error_codes,
+		'error_codes'        => $error_codes,
+		'codes'              => $error_codes,
+		'error'              => $error_codes ? $error_codes[0] : null,
+		'errors_by_attribute' => $errors,
+		'missing'            => array_values( $missing ),
+		'missing_attributes' => array_values( $missing ),
+		'invalid'            => array_values( $invalid ),
+		'invalid_attributes' => array_values( $invalid ),
+	);
+}
+
+/**
+ * Alias for full catalog product validation.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_validate_attributes( $product ) {
+	return velotok_core_catalog_validate_product( $product );
+}
+
+/**
+ * Check whether a catalog product is valid by contract.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @return bool
+ */
+function velotok_core_catalog_product_is_valid( $product ) {
+	$result = velotok_core_catalog_validate_product( $product );
+
+	return (bool) $result['valid'];
+}
+
+/**
+ * Alias for the catalog product validity check.
+ *
+ * @param array<string,mixed> $product Product data.
+ * @return bool
+ */
+function velotok_core_is_valid_catalog_product( $product ) {
+	return velotok_core_catalog_product_is_valid( $product );
+}
+
+/**
+ * Return the validation contract for catalog product attributes.
+ *
+ * @return array<string,mixed>
+ */
+function velotok_core_catalog_validation_contract() {
+	$contract = velotok_core_catalog_contract();
+
+	return $contract['validation'];
+}
+
+/**
  * Normalize catalog text for case-insensitive search.
  *
  * @param mixed $value Source value.
@@ -758,12 +1027,18 @@ function velotok_core_catalog_products( $category = '', $args = array() ) {
 		}
 	}
 
+	$validate = empty( $args['include_invalid'] );
+
 	foreach ( $contract['products'] as $product ) {
 		if ( '' !== $key && ( ! isset( $product['category'] ) || $product['category'] !== $key ) ) {
 			continue;
 		}
 
 		if ( '' !== trim( $search ) && ! velotok_core_catalog_product_matches_search( $product, $search ) ) {
+			continue;
+		}
+
+		if ( $validate && ! velotok_core_catalog_product_is_valid( $product ) ) {
 			continue;
 		}
 
@@ -929,5 +1204,41 @@ if ( ! function_exists( 'catalogProduct' ) ) {
 	 */
 	function catalogProduct( $slug ) {
 		return velotok_core_catalog_product( $slug );
+	}
+}
+
+if ( ! function_exists( 'catalogValidateProduct' ) ) {
+	/**
+	 * Short global alias for catalog product validation.
+	 *
+	 * @param array<string,mixed> $product Product data.
+	 * @return array<string,mixed>
+	 */
+	function catalogValidateProduct( $product ) {
+		return velotok_core_catalog_validate_product( $product );
+	}
+}
+
+if ( ! function_exists( 'validateCatalogProduct' ) ) {
+	/**
+	 * Alias for catalog product validation.
+	 *
+	 * @param array<string,mixed> $product Product data.
+	 * @return array<string,mixed>
+	 */
+	function validateCatalogProduct( $product ) {
+		return velotok_core_catalog_validate_product( $product );
+	}
+}
+
+if ( ! function_exists( 'catalogProductIsValid' ) ) {
+	/**
+	 * Short global alias for the catalog product validity check.
+	 *
+	 * @param array<string,mixed> $product Product data.
+	 * @return bool
+	 */
+	function catalogProductIsValid( $product ) {
+		return velotok_core_catalog_product_is_valid( $product );
 	}
 }
