@@ -8,6 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/catalog-filters.php';
+require_once __DIR__ . '/localization.php';
 require_once __DIR__ . '/product-validation.php';
 
 /**
