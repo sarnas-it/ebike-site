@@ -140,9 +140,13 @@ if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	wp_cli eval-file "/opt/velotok/cli/seed.php" \
 		|| log "WARNING: demo catalog seed failed"
 
-	log "Configuring WooCommerce delivery zones"
+	log "Provisioning store: payment gateways, delivery zones and language pack"
+	wp_cli eval-file "/opt/velotok/cli/provision.php" \
+		|| log "WARNING: store provisioning failed"
+
+	log "Ensuring WooCommerce delivery zones (legacy fallback)"
 	wp_cli eval-file "/opt/velotok/cli/delivery-zones.php" \
-		|| log "WARNING: delivery zones setup failed"
+		|| log "WARNING: delivery zones fallback setup failed"
 fi
 
 create_page() {

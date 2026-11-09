@@ -18,7 +18,10 @@ docker compose up -d
 
 Сервис `setup` идемпотентно устанавливает WordPress, активирует тему `velotok` и
 плагин `velotok-core`, устанавливает WooCommerce, создаёт служебные страницы и
-заполняет каталог демо-товарами из `wp/data/products.json`. Скрипт также
+заполняет каталог демо-товарами из `wp/data/products.json`. Провижининг
+создаёт зону доставки «Россия» со СДЭК, Почтой РФ и самовывозом из шоурума,
+включает оплату при получении (и ЮKassa при заданных реквизитах), поэтому
+checkout сразу может создавать заказы. Скрипт также
 включает локаль `ru_RU`, ставит русские пакеты ядра и WooCommerce, переводит
 служебные страницы и задаёт русские форматы цен (`119 900 ₽`) и дат (`дд.мм.гггг`).
 Если сети нет и WooCommerce установить не удалось, сайт всё равно открывается:
@@ -44,6 +47,8 @@ php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
 node wp/plugins/velotok-core/tests/accounts-contract.test.js
 node wp/plugins/velotok-core/tests/accounts-redgreen.test.js
 node wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
+php wp/plugins/velotok-core/tests/provisioning-contract-test.php
+php wp/plugins/velotok-core/tests/provisioning-checkout-test.php
 bash wp/tests/smoke.sh
 ```
 
@@ -80,6 +85,12 @@ WooCommerce → список моделей → шаблон каталога �
 `accounts-wordpress-integration.test.js` падает, если при регистрации аккаунт
 сразу помечается подтверждённым.
 
+Тесты `provisioning-contract-test.php` и `provisioning-checkout-test.php`
+проверяют провижининг свежего магазина (EBIKE-23): зона «Россия» со СДЭК,
+Почтой РФ и самовывозом из шоурума, включённые шлюзы COD/ЮKassa и пакет
+`ru_RU`. Повторный запуск не создаёт дублей, а checkout после провижининга
+создаёт заказ с выбранными оплатой и доставкой.
+
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
 
 Дымовой тест поднимает отдельный compose-проект, ждёт ответ главной страницы,
@@ -104,6 +115,10 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/cli/setup.sh` — идемпотентная первичная настройка сайта;
 * `wp/cli/wp-entrypoint.sh` — обёртка WP-CLI для контейнера `wpcli`;
 * `wp/cli/seed.php` — загрузка демо-каталога;
+* `wp/cli/provision.php` — идемпотентный провижининг зон, способов доставки, шлюзов и языка;
+* `wp/plugins/velotok-core/includes/provisioning.php` — конфигурация и применение провижининга;
+* `wp/plugins/velotok-core/tests/provisioning-contract-test.php` — тест полноты и идемпотентности провижининга;
+* `wp/plugins/velotok-core/tests/provisioning-checkout-test.php` — тест критерия «checkout создаёт заказ»;
 * `wp/data/products.json` — данные товаров;
 * `wp/themes/velotok/tests/catalog-render-test.php` — тест карточек каталога;
 * `wp/themes/velotok/tests/catalog-display-test.php` — тест вывода всего каталога;
