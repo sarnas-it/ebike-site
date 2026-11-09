@@ -1721,3 +1721,145 @@ form.checkout .button:hover {
 .post-navigation a:hover {
 	color: var(--muted);
 }
+
+/* Статьи, рубрики и обсуждения */
+
+.archive-description {
+	margin-top: 16px;
+	max-width: 62ch;
+	font-size: 15px;
+	line-height: 1.6;
+	color: var(--muted);
+}
+
+.archive-description > * + * {
+	margin-top: 10px;
+}
+
+.entry-meta {
+	display: grid;
+	gap: 8px;
+	margin-top: 28px;
+	padding-top: 18px;
+	border-top: 1px solid var(--line);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.entry-meta-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.entry-meta-label {
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: .12em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.entry-meta a {
+	font-weight: 600;
+	border-bottom: 1px solid currentColor;
+}
+
+.entry-meta a:hover {
+	color: var(--muted);
+}
+
+.comments-area {
+	margin-top: 42px;
+	padding-top: 26px;
+	border-top: 1px solid var(--line);
+}
+
+.comments-title,
+.comment-reply-title {
+	font-size: clamp(24px, 3vw, 34px);
+	line-height: 1.1;
+	letter-spacing: -.02em;
+}
+
+.comment-list,
+.comment-list .children {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.comment-list .children {
+	margin-left: 22px;
+}
+
+.comment-list .comment-body {
+	margin-top: 18px;
+	padding: 18px 20px;
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	background: var(--card);
+}
+
+.comment-list .comment-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 14px;
+	font-size: 13px;
+	color: var(--muted);
+}
+
+.comment-list .comment-author img {
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	margin-right: 8px;
+}
+
+.comment-list .comment-content {
+	margin-top: 12px;
+	font-size: 15px;
+	line-height: 1.6;
+}
+
+.comment-respond {
+	margin-top: 30px;
+}
+
+.comment-form {
+	display: grid;
+	gap: 14px;
+	margin-top: 18px;
+}
+
+.comment-form label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 13px;
+	font-weight: 650;
+}
+
+.comment-form input[type="text"],
+.comment-form input[type="email"],
+.comment-form input[type="url"],
+.comment-form textarea {
+	width: 100%;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--card);
+}
+
+.comment-form .submit {
+	justify-self: start;
+	padding: 13px 22px;
+	border: 0;
+	border-radius: 999px;
+	background: var(--ink);
+	color: var(--paper);
+	font-weight: 650;
+}
+
+.comment-form .submit:hover {
+	background: var(--ink-2);
+}

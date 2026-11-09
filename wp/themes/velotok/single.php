@@ -36,12 +36,36 @@ while ( have_posts() ) :
 						) );
 						?>
 					</div>
+
+					<?php
+					$velotok_categories = get_the_category_list( ', ' );
+					$velotok_tags       = get_the_tag_list( '', ', ' );
+					?>
+
+					<?php if ( $velotok_categories || $velotok_tags ) : ?>
+						<footer class="entry-meta">
+							<?php if ( $velotok_categories ) : ?>
+								<p class="entry-meta-row">
+									<span class="entry-meta-label"><?php esc_html_e( 'Рубрики:', 'velotok' ); ?></span>
+									<?php echo wp_kses_post( $velotok_categories ); ?>
+								</p>
+							<?php endif; ?>
+							<?php if ( $velotok_tags ) : ?>
+								<p class="entry-meta-row">
+									<span class="entry-meta-label"><?php esc_html_e( 'Метки:', 'velotok' ); ?></span>
+									<?php echo wp_kses_post( $velotok_tags ); ?>
+								</p>
+							<?php endif; ?>
+						</footer>
+					<?php endif; ?>
 				</article>
 
 				<nav class="post-navigation" aria-label="<?php esc_attr_e( 'Навигация по записям', 'velotok' ); ?>">
 					<div><?php previous_post_link( '%link', '← %title' ); ?></div>
 					<div><?php next_post_link( '%link', '%title →' ); ?></div>
 				</nav>
+
+				<?php comments_template(); ?>
 			</div>
 		</section>
 	</main>
