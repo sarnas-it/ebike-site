@@ -40,6 +40,7 @@ if ( is_product_category() ) {
 $velotok_search            = function_exists( 'velotok_catalog_request_search' ) ? velotok_catalog_request_search() : '';
 $velotok_filter_values     = function_exists( 'velotok_catalog_request_filters' ) ? velotok_catalog_request_filters() : array();
 $velotok_filter_attributes = function_exists( 'velotok_catalog_filter_contract_attributes' ) ? velotok_catalog_filter_contract_attributes() : array();
+$velotok_filter_controls   = function_exists( 'velotok_catalog_filter_controls' ) ? velotok_catalog_filter_controls( array(), $velotok_filter_values ) : array();
 ?>
 <main id="main" class="page-main" tabindex="-1">
 	<section class="catalog-head">
@@ -88,10 +89,13 @@ $velotok_filter_attributes = function_exists( 'velotok_catalog_filter_contract_a
 						continue;
 					}
 
-					$velotok_filter_value = isset( $velotok_filter_values[ $velotok_filter_key ] ) ? $velotok_filter_values[ $velotok_filter_key ] : '';
-					$velotok_filter_label = isset( $velotok_filter_attribute['label'] ) ? $velotok_filter_attribute['label'] : $velotok_filter_key;
+					$velotok_filter_value    = isset( $velotok_filter_values[ $velotok_filter_key ] ) ? $velotok_filter_values[ $velotok_filter_key ] : '';
+					$velotok_filter_label    = isset( $velotok_filter_attribute['label'] ) ? $velotok_filter_attribute['label'] : $velotok_filter_key;
+					$velotok_filter_control  = isset( $velotok_filter_controls[ $velotok_filter_key ] ) ? $velotok_filter_controls[ $velotok_filter_key ] : array();
+					$velotok_filter_is_range = ( isset( $velotok_filter_control['control'] ) && 'range' === $velotok_filter_control['control'] )
+						|| ( 'number' === $velotok_filter_attribute['type'] && ! empty( $velotok_filter_attribute['range'] ) );
 					?>
-					<?php if ( 'number' === $velotok_filter_attribute['type'] && ! empty( $velotok_filter_attribute['range'] ) ) : ?>
+					<?php if ( $velotok_filter_is_range ) : ?>
 						<fieldset class="catalog-filter-range">
 							<legend><?php echo esc_html( $velotok_filter_label ); ?></legend>
 							<label>

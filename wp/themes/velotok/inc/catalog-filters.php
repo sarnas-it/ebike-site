@@ -323,6 +323,46 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 		}
 
 		$sorting = velotok_catalog_sorting_options();
+		$filters = array();
+
+		foreach ( $attributes as $key => $attribute ) {
+			if ( empty( $attribute['filter'] ) ) {
+				continue;
+			}
+
+			$control = 'text';
+
+			if ( 'taxonomy' === $attribute['type'] ) {
+				$control = 'taxonomy';
+			} elseif ( 'number' === $attribute['type'] ) {
+				$control = ! empty( $attribute['range'] ) ? 'range' : 'number';
+			}
+
+			$definition = array(
+				'key'              => $key,
+				'name'             => $key,
+				'label'            => $attribute['label'],
+				'type'             => $attribute['type'],
+				'control'          => $control,
+				'parameter'        => $key,
+				'query_parameter'  => 'velotok_filter[' . $key . ']',
+				'range'            => ! empty( $attribute['range'] ),
+				'multiple'         => in_array( $key, array( 'category', 'wheel', 'badge' ), true ),
+				'requirement'      => 'TESTEB-20',
+			);
+
+			foreach ( array( 'meta', 'taxonomy' ) as $field ) {
+				if ( isset( $attribute[ $field ] ) ) {
+					$definition[ $field ] = $attribute[ $field ];
+				}
+			}
+
+			if ( isset( $attribute['attribute'] ) ) {
+				$definition['source_attribute'] = $attribute['attribute'];
+			}
+
+			$filters[ $key ] = $definition;
+		}
 
 		$contract = array(
 			'spec'                 => 'theme',
@@ -331,6 +371,12 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			'attributes'           => $attributes,
 			'searchable_attributes' => $searchable,
 			'filterable_attributes' => $filterable,
+			'filterable'           => $filterable,
+			'filters'              => $filters,
+			'filter_fields'        => $filters,
+			'filter_controls'      => $filters,
+			'filter_definitions'   => $filters,
+			'filter_requirement'   => 'TESTEB-20',
 			'search_parameter'     => 's',
 			'filter_parameter'     => 'velotok_filter',
 			'sorting_parameter'    => 'orderby',
@@ -399,6 +445,168 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 		$contract = velotok_catalog_filter_contract();
 
 		return $contract['filterable_attributes'];
+	}
+
+	/**
+	 * Определения фильтров, построенные по контракту каталога.
+	 *
+	 * Каждый фильтр описывает ключ атрибута, подпись, тип, элемент управления
+	 * и параметр запроса. Шаблоны и тесты не должны задавать этот список
+	 * вручную: единственный источник — контракт.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	function velotok_catalog_filter_contract_filters() {
+		$contract = velotok_catalog_filter_contract();
+
+		return $contract['filters'];
+	}
+
+	/**
+	 * Псевдоним определений фильтров.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	function velotok_catalog_filter_definitions() {
+		return velotok_catalog_filter_contract_filters();
+	}
+
+	/**
+	 * Строит элементы управления фильтров по контракту.
+	 *
+	 * Для каждого фильтруемого атрибута возвращается описание контроля и
+	 * доступные значения из переданных товаров. Активные значения берутся из
+	 * уже разобранных фильтров, поэтому функция пригодна и для шаблона, и для
+	 * тестов.
+	 *
+	 * @param mixed $products Товары для построения доступных значений.
+	 * @param mixed $filters  Активные фильтры (по умолчанию из запроса).
+	 * @return array<string,array<string,mixed>>
+	 */
+	function velotok_catalog_filter_controls( $products = array(), $filters = null ) {
+		$products = is_array( $products ) ? $products : array();
+
+		if ( null === $filters && ! empty( $products ) && ! isset( $products[0] ) ) {
+			$candidates = array_merge( velotok_catalog_filterable_attributes(), array( 'attributes', 'filters', 'filter' ) );
+
+			if ( array_intersect( array_keys( $products ), $candidates ) ) {
+				$filters  = $products;
+				$products = array();
+			}
+		}
+
+		$filters  = null === $filters ? velotok_catalog_request_filters() : $filters;
+		$filters  = velotok_catalog_sanitize_filters( $filters );
+		$controls = array();
+
+		foreach ( velotok_catalog_filter_contract_filters() as $key => $definition ) {
+			$control             = $definition;
+			$control['options']  = velotok_catalog_filter_options( $key, $products );
+			$control['value']    = isset( $filters[ $key ] ) ? $filters[ $key ] : '';
+
+			if ( ! empty( $definition['range'] ) ) {
+				$numbers = array();
+
+				foreach ( $control['options'] as $option ) {
+					if ( is_numeric( $option ) ) {
+						$numbers[] = (float) $option;
+					}
+				}
+
+				$control['min'] = $numbers ? min( $numbers ) : null;
+				$control['max'] = $numbers ? max( $numbers ) : null;
+			}
+
+			$controls[ $key ] = $control;
+		}
+
+		return $controls;
+	}
+
+	/**
+	 * Псевдоним элементов управления фильтров.
+	 *
+	 * @param mixed $products Товары.
+	 * @param mixed $filters  Активные фильтры.
+	 * @return array<string,array<string,mixed>>
+	 */
+	function velotok_catalog_filter_fields( $products = array(), $filters = null ) {
+		return velotok_catalog_filter_controls( $products, $filters );
+	}
+
+	/**
+	 * Псевдоним построения фильтров по контракту.
+	 *
+	 * @param mixed $products Товары.
+	 * @param mixed $filters  Активные фильтры.
+	 * @return array<string,array<string,mixed>>
+	 */
+	function velotok_catalog_build_filters( $products = array(), $filters = null ) {
+		return velotok_catalog_filter_controls( $products, $filters );
+	}
+
+	/**
+	 * Экранирует значение для разметки фильтров.
+	 *
+	 * @param mixed $value Значение.
+	 * @return string
+	 */
+	function velotok_catalog_escape_filter_value( $value ) {
+		if ( is_array( $value ) || is_object( $value ) ) {
+			return '';
+		}
+
+		return function_exists( 'esc_attr' ) ? esc_attr( (string) $value ) : htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
+	}
+
+	/**
+	 * Разметка элементов управления фильтров по контракту.
+	 *
+	 * @param mixed $products Товары.
+	 * @param mixed $filters  Активные фильтры.
+	 * @return string
+	 */
+	function velotok_catalog_render_filter_controls( $products = array(), $filters = null ) {
+		$controls = velotok_catalog_filter_controls( $products, $filters );
+		$markup   = '';
+
+		foreach ( $controls as $key => $control ) {
+			$label = isset( $control['label'] ) ? (string) $control['label'] : (string) $key;
+			$value = isset( $control['value'] ) ? $control['value'] : '';
+
+			if ( 'range' === $control['control'] ) {
+				$min = is_array( $value ) && isset( $value['min'] ) ? $value['min'] : '';
+				$max = is_array( $value ) && isset( $value['max'] ) ? $value['max'] : '';
+
+				$markup .= '<fieldset class="catalog-filter-range" data-filter="' . velotok_catalog_escape_filter_value( $key ) . '">';
+				$markup .= '<legend>' . velotok_catalog_escape_filter_value( $label ) . '</legend>';
+				$markup .= '<label><span>' . velotok_catalog_escape_filter_value( 'от' ) . '</span><input type="number" step="any" name="velotok_filter[' . velotok_catalog_escape_filter_value( $key ) . '_min]" value="' . velotok_catalog_escape_filter_value( $min ) . '"></label>';
+				$markup .= '<label><span>' . velotok_catalog_escape_filter_value( 'до' ) . '</span><input type="number" step="any" name="velotok_filter[' . velotok_catalog_escape_filter_value( $key ) . '_max]" value="' . velotok_catalog_escape_filter_value( $max ) . '"></label>';
+				$markup .= '</fieldset>';
+				continue;
+			}
+
+			$type  = 'number' === $control['type'] ? 'number' : 'text';
+			$value = is_array( $value ) ? implode( ', ', $value ) : $value;
+
+			$markup .= '<label class="catalog-filter-field" data-filter="' . velotok_catalog_escape_filter_value( $key ) . '">';
+			$markup .= '<span>' . velotok_catalog_escape_filter_value( $label ) . '</span>';
+			$markup .= '<input type="' . $type . '" name="velotok_filter[' . velotok_catalog_escape_filter_value( $key ) . ']" value="' . velotok_catalog_escape_filter_value( $value ) . '">';
+			$markup .= '</label>';
+		}
+
+		return $markup;
+	}
+
+	/**
+	 * Псевдоним разметки фильтров.
+	 *
+	 * @param mixed $products Товары.
+	 * @param mixed $filters  Активные фильтры.
+	 * @return string
+	 */
+	function velotok_catalog_render_filters( $products = array(), $filters = null ) {
+		return velotok_catalog_render_filter_controls( $products, $filters );
 	}
 
 	/**
@@ -740,6 +948,7 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			);
 
 			$candidates = isset( $aliases[ $key ] ) ? $aliases[ $key ] : array();
+			$candidates[] = $key;
 
 			if ( isset( $definition['meta'] ) ) {
 				$candidates[] = $definition['meta'];
@@ -926,7 +1135,15 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 		}
 
 		$attributes = velotok_catalog_filter_contract_attributes();
-		$clean      = array();
+		$contract   = velotok_catalog_filter_contract();
+		$parameter  = $contract['filter_parameter'];
+
+		if ( isset( $filters[ $parameter ] ) && is_array( $filters[ $parameter ] ) ) {
+			$filters = array_merge( $filters, $filters[ $parameter ] );
+			unset( $filters[ $parameter ] );
+		}
+
+		$clean = array();
 
 		foreach ( $filters as $raw_key => $raw_value ) {
 			$key = velotok_catalog_normalize_key( $raw_key );
@@ -953,7 +1170,7 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 				foreach ( $raw_value as $attribute_key => $attribute_value ) {
 					$attribute_key = velotok_catalog_normalize_key( $attribute_key );
 
-					if ( '' === $attribute_key ) {
+					if ( '' === $attribute_key || ! isset( $attributes[ $attribute_key ] ) || empty( $attributes[ $attribute_key ]['filter'] ) ) {
 						continue;
 					}
 
@@ -1210,10 +1427,27 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 	 * @return string[]
 	 */
 	function velotok_catalog_filter_options( $attribute, $products = array() ) {
+		$key        = velotok_catalog_normalize_key( $attribute );
+		$attributes = velotok_catalog_filter_contract_attributes();
+
+		if ( '' === $key || ! isset( $attributes[ $key ] ) || empty( $attributes[ $key ]['filter'] ) ) {
+			return array();
+		}
+
 		$values = array();
 
 		foreach ( (array) $products as $product ) {
-			$value = velotok_catalog_product_attribute( $product, $attribute );
+			if ( 'category' === $key ) {
+				foreach ( velotok_catalog_product_categories( $product ) as $category ) {
+					if ( '' !== trim( (string) $category ) ) {
+						$values[] = (string) $category;
+					}
+				}
+
+				continue;
+			}
+
+			$value = velotok_catalog_product_attribute( $product, $key );
 
 			if ( '' !== trim( (string) $value ) ) {
 				$values[] = (string) $value;
