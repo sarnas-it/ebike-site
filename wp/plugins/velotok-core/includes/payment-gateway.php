@@ -1613,7 +1613,8 @@ function velotok_core_define_payment_gateway() {
 				$this->supports           = array( 'products', 'refunds' );
 
 				$this->init_form_fields();
-				parent::__construct();
+				// WC_Payment_Gateway не объявляет конструктор (WC 11): parent::__construct()
+				// даёт фатал «Cannot call constructor». Настройки инициализирует трейт.
 				$this->velotok_setup_gateway();
 			}
 		}
@@ -1907,8 +1908,16 @@ if ( ! function_exists( 'velotok_core_payment_sync_order_status' ) ) {
 	}
 }
 
-foreach ( array( 'WC_Gateway_Yookassa', 'Velotok_Yookassa_Payment_Gateway', 'Velotok_WC_Gateway_Yookassa' ) as $velotok_payment_class_alias ) {
-	if ( ! class_exists( $velotok_payment_class_alias ) ) {
-		class_alias( 'Velotok_Yookassa_Gateway', $velotok_payment_class_alias );
+function velotok_core_alias_payment_gateway() {
+	foreach ( array( 'WC_Gateway_Yookassa', 'Velotok_Yookassa_Payment_Gateway', 'Velotok_WC_Gateway_Yookassa' ) as $velotok_payment_class_alias ) {
+		if ( ! class_exists( $velotok_payment_class_alias ) && class_exists( 'Velotok_Yookassa_Gateway' ) ) {
+			class_alias( 'Velotok_Yookassa_Gateway', $velotok_payment_class_alias );
+		}
 	}
+}
+
+if ( class_exists( 'Velotok_Yookassa_Gateway' ) ) {
+	velotok_core_alias_payment_gateway();
+} elseif ( function_exists( 'add_action' ) ) {
+	add_action( 'plugins_loaded', 'velotok_core_alias_payment_gateway', 21 );
 }
