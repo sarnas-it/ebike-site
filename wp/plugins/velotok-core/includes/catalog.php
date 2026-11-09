@@ -1875,6 +1875,45 @@ function velotok_core_catalog_add_query_args( $url, $args ) {
 }
 
 /**
+ * Remove query arguments from a URL without depending on WordPress.
+ *
+ * @param string $url  Source URL.
+ * @param array  $keys Query argument names to remove.
+ * @return string
+ */
+function velotok_core_catalog_remove_query_args( $url, $keys ) {
+	$url      = (string) $url;
+	$fragment = '';
+
+	if ( false !== strpos( $url, '#' ) ) {
+		list( $url, $fragment ) = explode( '#', $url, 2 );
+		$fragment = '#' . $fragment;
+	}
+
+	$query = '';
+
+	if ( false !== strpos( $url, '?' ) ) {
+		list( $url, $query ) = explode( '?', $url, 2 );
+	}
+
+	if ( '' === $query ) {
+		return $url . $fragment;
+	}
+
+	$existing = array();
+
+	parse_str( $query, $existing );
+
+	foreach ( (array) $keys as $key ) {
+		unset( $existing[ $key ] );
+	}
+
+	$query = http_build_query( $existing, '', '&', PHP_QUERY_RFC3986 );
+
+	return $url . ( '' !== $query ? '?' . $query : '' ) . $fragment;
+}
+
+/**
  * Request arguments that pagination keeps on every catalog page.
  *
  * Search, contract filters and sorting are carried to page links unchanged.
@@ -1956,6 +1995,7 @@ function velotok_core_catalog_pagination_url( $page, $base = '', $source = null 
 		$base = function_exists( 'home_url' ) ? home_url( '/' ) : '/';
 	}
 
+	$base = velotok_core_catalog_remove_query_args( $base, array( 'paged', 'page' ) );
 	$args = velotok_core_catalog_pagination_query_args( $source );
 
 	if ( $page > 1 ) {
@@ -2024,6 +2064,7 @@ function velotok_core_catalog_pagination_links( $args = array() ) {
 		$base = function_exists( 'home_url' ) ? home_url( '/' ) : '/';
 	}
 
+	$base   = velotok_core_catalog_remove_query_args( $base, array( 'paged', 'page' ) );
 	$source = array_key_exists( 'source', $args ) ? $args['source'] : null;
 	$params = velotok_core_catalog_pagination_query_args( $source );
 

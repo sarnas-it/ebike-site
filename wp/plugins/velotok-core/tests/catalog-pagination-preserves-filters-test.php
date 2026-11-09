@@ -132,6 +132,19 @@ $query    = velotok_core_pagination_url_query( $page_one );
 velotok_core_pagination_assert( ! isset( $query['paged'] ), 'Первая страница не должна содержать paged.' );
 velotok_core_pagination_assert( isset( $query['orderby'] ) && 'price' === $query['orderby'], 'Первая страница потеряла сортировку.' );
 
+$stale = velotok_core_catalog_pagination_url( 1, 'http://example.test/catalog/?paged=2&product_cat=city', $source );
+$query = velotok_core_pagination_url_query( $stale );
+
+velotok_core_pagination_assert( ! isset( $query['paged'] ), 'Старый номер страницы не должен оставаться в базовом URL первой страницы.' );
+velotok_core_pagination_assert( isset( $query['product_cat'] ) && 'city' === $query['product_cat'], 'Пагинация не должна терять посторонние параметры базового URL.' );
+velotok_core_pagination_assert( isset( $query['orderby'] ) && 'price' === $query['orderby'], 'Базовый URL со старой страницей не должен терять сортировку.' );
+
+$stale_three = velotok_core_catalog_pagination_url( 3, 'http://example.test/catalog/?paged=2&page=2', $source );
+$query       = velotok_core_pagination_url_query( $stale_three );
+
+velotok_core_pagination_assert( 3 === (int) $query['paged'], 'Целевая страница должна заменять старый номер страницы.' );
+velotok_core_pagination_assert( ! isset( $query['page'] ), 'Старый параметр page не должен сохраняться в ссылке пагинации.' );
+
 /*
  * 4. The generated pagination markup uses the same URL builder.
  */
@@ -150,6 +163,19 @@ velotok_core_pagination_assert( false !== strpos( $link_base, 'orderby=price' ),
 velotok_core_pagination_assert( false !== strpos( $link_base, 'velotok_filter' ), 'Шаблон пагинации не передаёт фильтры в ссылки.' );
 velotok_core_pagination_assert( false !== strpos( $link_base, 'paged=%#%' ), 'Шаблон пагинации не подставляет номер страницы.' );
 velotok_core_pagination_assert( false === strpos( $link_base, 'paged=2' ), 'Шаблон пагинации не должен сохранять старый номер страницы.' );
+
+velotok_core_catalog_pagination_links( array(
+	'base'    => 'http://example.test/catalog/?paged=2&product_cat=city',
+	'current' => 2,
+	'total'   => 4,
+	'source'  => $source,
+) );
+$stale_link_args = $GLOBALS['velotok_core_pagination_links_args'];
+$stale_link_base = isset( $stale_link_args['base'] ) ? (string) $stale_link_args['base'] : '';
+
+velotok_core_pagination_assert( false === strpos( $stale_link_base, 'paged=2' ), 'Шаблон пагинации не должен оставлять старую страницу базового URL.' );
+velotok_core_pagination_assert( false !== strpos( $stale_link_base, 'product_cat=city' ), 'Шаблон пагинации не должен терять посторонние параметры базового URL.' );
+velotok_core_pagination_assert( false !== strpos( $stale_link_base, 'paged=%#%' ), 'Шаблон пагинации должен подставлять только целевой номер страницы.' );
 
 ob_start();
 velotok_core_catalog_pagination( array(
