@@ -360,6 +360,33 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 		$needles = array( velotok_catalog_normalize_text( $needle ), velotok_catalog_normalize_text( $fallback ) );
 		$needles = array_values( array_filter( $needles ) );
 
+		if ( is_array( $product ) ) {
+			foreach ( array( 'attributes', 'specs', 'extra_attributes' ) as $collection_key ) {
+				if ( empty( $product[ $collection_key ] ) || ! is_array( $product[ $collection_key ] ) ) {
+					continue;
+				}
+
+				foreach ( $product[ $collection_key ] as $row ) {
+					$row_label = '';
+					$row_value = '';
+
+					if ( is_array( $row ) ) {
+						$row_label = isset( $row['label'] ) ? $row['label'] : ( isset( $row[0] ) ? $row[0] : '' );
+						$row_value = isset( $row['value'] ) ? $row['value'] : ( isset( $row[1] ) ? $row[1] : '' );
+					} elseif ( is_object( $row ) ) {
+						$row_label = isset( $row->label ) ? $row->label : ( isset( $row->name ) ? $row->name : '' );
+						$row_value = isset( $row->value ) ? $row->value : '';
+					} else {
+						continue;
+					}
+
+					if ( in_array( velotok_catalog_normalize_text( $row_label ), $needles, true ) && is_scalar( $row_value ) && '' !== trim( (string) $row_value ) ) {
+						return (string) $row_value;
+					}
+				}
+			}
+		}
+
 		foreach ( velotok_catalog_product_attribute_rows( $product ) as $row ) {
 			if ( in_array( $row['key'], $needles, true ) ) {
 				return $row['value'];
@@ -390,6 +417,18 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 					foreach ( $value as $item ) {
 						if ( is_scalar( $item ) ) {
 							$categories[] = (string) $item;
+						} elseif ( is_array( $item ) ) {
+							foreach ( array( 'slug', 'name', 'label' ) as $item_key ) {
+								if ( isset( $item[ $item_key ] ) && is_scalar( $item[ $item_key ] ) ) {
+									$categories[] = (string) $item[ $item_key ];
+								}
+							}
+						} elseif ( is_object( $item ) ) {
+							foreach ( array( 'slug', 'name', 'label' ) as $item_key ) {
+								if ( isset( $item->{$item_key} ) && is_scalar( $item->{$item_key} ) ) {
+									$categories[] = (string) $item->{$item_key};
+								}
+							}
 						}
 					}
 				} elseif ( is_scalar( $value ) ) {
@@ -408,11 +447,16 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 			if ( is_array( $terms ) ) {
 				foreach ( $terms as $term ) {
 					if ( is_object( $term ) ) {
-						if ( isset( $term->slug ) ) {
-							$categories[] = (string) $term->slug;
+						foreach ( array( 'slug', 'name', 'label' ) as $term_key ) {
+							if ( isset( $term->{$term_key} ) && is_scalar( $term->{$term_key} ) ) {
+								$categories[] = (string) $term->{$term_key};
+							}
 						}
-						if ( isset( $term->name ) ) {
-							$categories[] = (string) $term->name;
+					} elseif ( is_array( $term ) ) {
+						foreach ( array( 'slug', 'name', 'label' ) as $term_key ) {
+							if ( isset( $term[ $term_key ] ) && is_scalar( $term[ $term_key ] ) ) {
+								$categories[] = (string) $term[ $term_key ];
+							}
 						}
 					} elseif ( is_scalar( $term ) ) {
 						$categories[] = (string) $term;
@@ -442,6 +486,32 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 		$definition = $attributes[ $key ];
 
 		if ( ! empty( $definition['attribute'] ) ) {
+			if ( is_array( $product ) ) {
+				$direct = array( $key, '_velotok_' . $key, $definition['attribute'] );
+
+				if ( isset( $definition['label'] ) ) {
+					$direct[] = $definition['label'];
+				}
+
+				foreach ( $direct as $candidate ) {
+					if ( isset( $product[ $candidate ] ) && is_scalar( $product[ $candidate ] ) && '' !== trim( (string) $product[ $candidate ] ) ) {
+						return (string) $product[ $candidate ];
+					}
+				}
+
+				$needles = array_map( 'velotok_catalog_normalize_text', $direct );
+
+				foreach ( $product as $product_key => $product_value ) {
+					if ( ! is_scalar( $product_value ) || '' === trim( (string) $product_value ) ) {
+						continue;
+					}
+
+					if ( in_array( velotok_catalog_normalize_text( $product_key ), $needles, true ) ) {
+						return (string) $product_value;
+					}
+				}
+			}
+
 			return velotok_catalog_product_attribute_row( $product, $definition['attribute'], $definition['label'] );
 		}
 
@@ -460,7 +530,8 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 				'price'     => array( 'price' ),
 				'name'      => array( 'name' ),
 				'description' => array( 'description', 'short_description' ),
-				'sku'       => array( 'sku' ),
+				'sku'       => array( 'sku', '_sku' ),
+				'model'     => array( 'model', '_model', '_velotok_model' ),
 			);
 
 			$candidates = isset( $aliases[ $key ] ) ? $aliases[ $key ] : array();
@@ -1090,31 +1161,54 @@ if ( ! function_exists( 'velotok_catalog_filter_contract' ) ) {
 
 		global $wpdb;
 
-		if ( ! isset( $wpdb->postmeta, $wpdb->posts ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'prepare' ) ) {
+		if ( ! is_object( $wpdb ) || ! isset( $wpdb->posts ) || ! method_exists( $wpdb, 'prepare' ) ) {
 			return $search;
 		}
 
-		$attributes = velotok_catalog_filter_contract_attributes();
-		$meta_keys  = array( '_sku', '_product_attributes' );
+		$escape_like = static function ( $value ) use ( $wpdb ) {
+			if ( method_exists( $wpdb, 'esc_like' ) ) {
+				return $wpdb->esc_like( (string) $value );
+			}
 
-		foreach ( $attributes as $attribute ) {
-			if ( ! empty( $attribute['meta'] ) ) {
-				$meta_keys[] = $attribute['meta'];
+			return addcslashes( (string) $value, '_%\\' );
+		};
+
+		$clauses = array();
+		$like    = '%' . $escape_like( $term ) . '%';
+
+		if ( isset( $wpdb->postmeta ) ) {
+			$attributes = velotok_catalog_filter_contract_attributes();
+			$meta_keys  = array( '_sku', '_product_attributes' );
+
+			foreach ( $attributes as $attribute ) {
+				if ( ! empty( $attribute['meta'] ) ) {
+					$meta_keys[] = $attribute['meta'];
+				}
+			}
+
+			$meta_keys = array_values( array_unique( $meta_keys ) );
+
+			if ( ! empty( $meta_keys ) ) {
+				$placeholders = implode( ', ', array_fill( 0, count( $meta_keys ), '%s' ) );
+				$clauses[]    = $wpdb->prepare(
+					"EXISTS (SELECT 1 FROM {$wpdb->postmeta} velotok_pm WHERE velotok_pm.post_id = {$wpdb->posts}.ID AND velotok_pm.meta_key IN ({$placeholders}) AND velotok_pm.meta_value LIKE %s)",
+					array_merge( $meta_keys, array( $like ) )
+				);
 			}
 		}
 
-		$meta_keys = array_values( array_unique( $meta_keys ) );
+		if ( isset( $wpdb->term_relationships, $wpdb->term_taxonomy, $wpdb->terms ) ) {
+			$clauses[] = $wpdb->prepare(
+				"EXISTS (SELECT 1 FROM {$wpdb->term_relationships} velotok_tr INNER JOIN {$wpdb->term_taxonomy} velotok_tt ON velotok_tr.term_taxonomy_id = velotok_tt.term_taxonomy_id INNER JOIN {$wpdb->terms} velotok_t ON velotok_tt.term_id = velotok_t.term_id WHERE velotok_tr.object_id = {$wpdb->posts}.ID AND velotok_tt.taxonomy = %s AND (velotok_t.name LIKE %s OR velotok_t.slug LIKE %s))",
+				array( 'product_cat', $like, $like )
+			);
+		}
 
-		if ( empty( $meta_keys ) ) {
+		if ( empty( $clauses ) ) {
 			return $search;
 		}
 
-		$like         = '%' . $wpdb->esc_like( $term ) . '%';
-		$placeholders = implode( ', ', array_fill( 0, count( $meta_keys ), '%s' ) );
-		$sql          = $wpdb->prepare(
-			"EXISTS (SELECT 1 FROM {$wpdb->postmeta} velotok_pm WHERE velotok_pm.post_id = {$wpdb->posts}.ID AND velotok_pm.meta_key IN ({$placeholders}) AND velotok_pm.meta_value LIKE %s)",
-			array_merge( $meta_keys, array( $like ) )
-		);
+		$sql = '( ' . implode( ' OR ', $clauses ) . ' )';
 
 		if ( '' === trim( (string) $search ) ) {
 			return ' AND ' . $sql . ' ';
