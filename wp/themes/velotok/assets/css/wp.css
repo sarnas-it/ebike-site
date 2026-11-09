@@ -1580,10 +1580,18 @@ form.checkout .button:hover {
 	.catalog-grid {
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
+
+	.post-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
 }
 
 @media (max-width: 1024px) {
 	.catalog-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.post-grid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
@@ -1597,6 +1605,10 @@ form.checkout .button:hover {
 		grid-template-columns: 1fr;
 	}
 
+	.post-grid {
+		grid-template-columns: 1fr;
+	}
+
 	.catalog-sort,
 	.catalog-sort .velotok-ordering,
 	.catalog-sort select {
@@ -1605,6 +1617,11 @@ form.checkout .button:hover {
 }
 
 @media (max-width: 360px) {
+	.catalog-grid,
+	.post-grid {
+		grid-template-columns: 1fr;
+	}
+
 	.catalog-filters {
 		gap: 6px;
 	}
@@ -1612,6 +1629,13 @@ form.checkout .button:hover {
 	.woocommerce-pagination ul,
 	.nav-links {
 		gap: 6px;
+	}
+}
+
+/* На узких планшетах статьи остаются в одну колонку. */
+@media (max-width: 860px) {
+	.post-grid {
+		grid-template-columns: 1fr;
 	}
 }
 
