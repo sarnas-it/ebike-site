@@ -260,7 +260,7 @@ function velotok_localization_price_decimal_separator() {
  * @return string
  */
 function velotok_localization_price_format() {
-	return '%1$s %2$s';
+	return '%2$s %1$s';
 }
 
 /**
@@ -368,7 +368,7 @@ function velotok_localize_store() {
 		'woocommerce_price_num_decimals' => 0,
 		'woocommerce_price_decimal_sep' => ',',
 		'woocommerce_price_thousand_sep' => ' ',
-		'woocommerce_price_format'      => '%1$s %2$s',
+		'woocommerce_price_format'      => '%2$s %1$s',
 		'woocommerce_default_country'   => 'RU:MOW',
 	);
 
