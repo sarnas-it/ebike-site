@@ -1,8 +1,8 @@
 EBIKE-21 — Contact Form 7 + Flamingo: реальная отправка заявок
 ==============================================================
 
-Окружение проверки
-------------------
+Окружение проверки (2026-11-10 UTC)
+-----------------------------------
 Docker CLI/демон в этом workspace недоступен:
 
 $ docker --version
@@ -10,7 +10,7 @@ bash: docker: command not found
 
 Поэтому `docker compose` здесь запустить нельзя. Чтобы критерий «форма
 отправляется и заявка сохраняется» был подтверждён фактически, тот же код
-темы/плагина проверен на реальном WordPress без моков WordPress, CF7 и
+темы/скрипта проверен на настоящем WordPress без моков WordPress, CF7 и
 Flamingo:
 
 - WordPress 7.1.4;
@@ -24,15 +24,6 @@ Flamingo:
 Команды `wp ...` ниже выполнялись локальной обёрткой WP-CLI на этом временном
 стенде; путь к стенду в командах опущен.
 
-Стенд собран из настоящих дистрибутивов:
-
-$ wp core download --version=7.1.4
-$ wp plugin install contact-form-7 --version=6.1.7
-$ wp plugin install flamingo --version=2.6.4
-# SQLite drop-in подключён только как замена MariaDB в локальном стенде;
-# WordPress, Contact Form 7 и Flamingo не подменялись.
-
-
 Плагины и версии
 ----------------
 $ wp plugin list --fields=name,status,version --format=table
@@ -42,6 +33,7 @@ contact-form-7                  active          6.1.7
 flamingo                        active          2.6.4
 hello                           inactive        1.7.2
 sqlite-database-integration     active          3.1.3
+velotok-core                    inactive        1.0.0
 db.php                          dropin
 
 $ wp core version
@@ -50,133 +42,73 @@ $ wp core version
 Формы и получатель
 ------------------
 $ wp eval-file wp/cli/lead-forms.php
-Создана форма «test-drive» (ID 7), получатель shop@example.test.
-Создана форма «consultation» (ID 8), получатель shop@example.test.
-
-Повторный запуск (идемпотентность):
-Обновлена форма «test-drive» (ID 7), получатель shop@example.test.
-Обновлена форма «consultation» (ID 8), получатель shop@example.test.
+Создана форма «test-drive» (ID 24), получатель shop@example.test.
+Создана форма «consultation» (ID 25), получатель shop@example.test.
 
 $ wp post list --post_type=wpcf7_contact_form --fields=ID,post_title,post_status --format=table
 ID      post_title      post_status
-7       test-drive      publish
-8       consultation    publish
+25      consultation    publish
+24      test-drive      publish
 4       Contact form 1  publish
-
-$ wp post meta get 7 _mail --format=json   # извлечён recipient
-shop@example.test
-$ wp post meta get 8 _mail --format=json   # извлечён recipient
-shop@example.test
 
 Реальная отправка через REST API Contact Form 7
 -----------------------------------------------
-Inbound Messages до отправки:
-$ wp post list --post_type=flamingo_inbound --format=count
-0
+RED — формы удалены, E2E обязан упасть:
 
-Форма test-drive:
-$ curl -sS -X POST 'http://127.0.0.1:8100/index.php?rest_route=/contact-form-7/v1/contact-forms/7/feedback' \
-    -F '_wpcf7=7' -F '_wpcf7_version=6.1.7' -F '_wpcf7_locale=ru_RU' \
-    -F '_wpcf7_unit_tag=wpcf7-f7-p1-o1' -F '_wpcf7_container_post=0' \
-    -F 'your-name=EBIKE-21 E2E test-drive 20261110' \
-    -F 'your-phone=+7 999 000-00-00' \
-    -F 'your-email=lead-e2e-test-drive@example.test' \
-    -F 'your-message=EBIKE-21 E2E test-drive 20261110' \
-    -F 'bike-model=Ривьера' -F 'test-drive-date=2030-01-15'
-{"contact_form_id":7,"status":"mail_sent","message":"Спасибо! Заявка отправлена, мы свяжемся с вами в течение рабочего дня.","posted_data_hash":"547d0482e093aa9583bbd0913078e007","into":"#wpcf7-f7-p1-o1","invalid_fields":[]}
+$ wp post delete 18 19 --force
+Success: Deleted post 18.
+Success: Deleted post 19.
 
-Форма consultation:
-$ curl -sS -X POST 'http://127.0.0.1:8100/index.php?rest_route=/contact-form-7/v1/contact-forms/8/feedback' \
-    -F '_wpcf7=8' -F '_wpcf7_version=6.1.7' -F '_wpcf7_locale=ru_RU' \
-    -F '_wpcf7_unit_tag=wpcf7-f8-p1-o1' -F '_wpcf7_container_post=0' \
-    -F 'your-name=EBIKE-21 E2E consultation 20261110' \
-    -F 'your-phone=+7 999 000-00-00' \
-    -F 'your-email=lead-e2e-consultation@example.test' \
-    -F 'your-message=EBIKE-21 E2E consultation 20261110'
-{"contact_form_id":8,"status":"mail_sent","message":"Спасибо! Заявка отправлена, мы свяжемся с вами в течение рабочего дня.","posted_data_hash":"c2dfcc4dd7cc1e97c121a126cf00baba","into":"#wpcf7-f8-p1-o1","invalid_fields":[]}
+$ LEAD_FORMS_E2E_ATTACH=1 COMPOSE_PROJECT_NAME=velotok-lead-e2e \
+    WORDPRESS_PORT=8100 bash wp/tests/lead-forms-e2e.sh
+FAIL: форма Contact Form 7 «test-drive» не создана
+exit: 1
+
+GREEN — формы восстановлены через lead-forms.php, E2E проходит:
+
+POST /contact-form-7/v1/contact-forms/24/feedback (test-drive) -> status=mail_sent
+OK: форма «test-drive» отправлена, Flamingo Inbound Message 27 сохранён (lead-e2e-test-drive-1794279477-52776@example.test), получатель shop@example.test
+POST /contact-form-7/v1/contact-forms/25/feedback (consultation) -> status=mail_sent
+OK: форма «consultation» отправлена, Flamingo Inbound Message 29 сохранён (lead-e2e-consultation-1794279482-52776@example.test), получатель shop@example.test
+ID	post_title	post_status
+29	Заявка на консультацию	publish
+27	Заявка на тест-драйв	publish
+23	Заявка на консультацию	publish
+21	Заявка на тест-драйв	publish
+17	Заявка на консультацию	publish
+15	Заявка на тест-драйв	publish
+12	Заявка на консультацию	publish
+10	Заявка на тест-драйв	publish
+OK: обе формы реально отправлены и сохранены во Flamingo
+exit: 0
 
 Проверка сохранения во Flamingo
 -------------------------------
 $ wp post list --post_type=flamingo_inbound --format=count
-2
+8
 
-$ wp post list --post_type=flamingo_inbound --fields=ID,post_title,post_status --format=table
-ID      post_title                      post_status
-12      Заявка на консультацию          publish
-10      Заявка на тест-драйв            publish
-
-$ wp post meta list 10 --keys=_submission_status,_subject,_from,_from_email,_field_your-email,_field_your-message --format=table
+$ wp post meta list 27 --keys=_submission_status,_subject,_from_email,_field_your-email,_field_your-message --format=table
 post_id meta_key                meta_value
-10      _submission_status      mail_sent
-10      _subject                Заявка на тест-драйв
-10      _from                   EBIKE-21 E2E test-drive 20261110 <lead-e2e-test-drive@example.test>
-10      _from_email             lead-e2e-test-drive@example.test
-10      _field_your-email       lead-e2e-test-drive@example.test
-10      _field_your-message     EBIKE-21 E2E test-drive 20261110
+27      _submission_status      mail_sent
+27      _subject                Заявка на тест-драйв
+27      _from_email             lead-e2e-test-drive-1794279477-52776@example.test
+27      _field_your-email       lead-e2e-test-drive-1794279477-52776@example.test
+27      _field_your-message     EBIKE-21 E2E test-drive 1794279477-52776
 
-$ wp post meta list 12 --keys=_submission_status,_subject,_from,_from_email,_field_your-email,_field_your-message --format=table
+$ wp post meta list 29 --keys=_submission_status,_subject,_from_email,_field_your-email,_field_your-message --format=table
 post_id meta_key                meta_value
-12      _submission_status      mail_sent
-12      _subject                Заявка на консультацию
-12      _from                   EBIKE-21 E2E consultation 20261110 <lead-e2e-consultation@example.test>
-12      _from_email             lead-e2e-consultation@example.test
-12      _field_your-email       lead-e2e-consultation@example.test
-12      _field_your-message     EBIKE-21 E2E consultation 20261110
-
-$ wp post get 10 --field=post_content
-EBIKE-21 E2E test-drive 20261110
-+7 999 000-00-00
-lead-e2e-test-drive@example.test
-EBIKE-21 E2E test-drive 20261110
-Ривьера
-2030-01-15
-1
-127.0.0.1
-curl/7.88.1
-http://127.0.0.1:8100/index.php?rest_route=%2Fcontact-form-7%2Fv1%2Fcontact-forms%2F7%2Ffeedback
-November 10, 2026
-2:50 am
-Velotok E2E
-http://127.0.0.1:8100/work/cache/tmp/opencode/wp-local71
-admin@example.test
+29      _submission_status      mail_sent
+29      _subject                Заявка на консультацию
+29      _from_email             lead-e2e-consultation-1794279482-52776@example.test
+29      _field_your-email       lead-e2e-consultation-1794279482-52776@example.test
+29      _field_your-message     EBIKE-21 E2E consultation 1794279482-52776
 
 Письмо ушло на получателя из настройки формы:
-$ grep '^To:' /work/cache/tmp/opencode/outbox.eml | tail -n2
+$ grep '^To:' outbox.eml | tail -n 4
 To: shop@example.test
 To: shop@example.test
-
-Прогон добавленного E2E-скрипта (red-green)
--------------------------------------------
-`wp/tests/lead-forms-e2e.sh` рассчитан на docker compose. В этом окружении Docker
-отсутствует, поэтому вызов `docker compose ... run wpcli` заменён локальной
-обёрткой к тому же реальному WordPress (флаг LEAD_FORMS_E2E_ATTACH=1). Логика
-самого теста не менялась.
-
-RED — формы удалены, тест обязан упасть:
-$ wp post delete 7 8 --force
-$ LEAD_FORMS_E2E_ATTACH=1 ... bash wp/tests/lead-forms-e2e.sh
-FAIL: форма Contact Form 7 «test-drive» не создана
-exit: 1
-
-GREEN — формы восстановлены через lead-forms.php:
-$ wp eval-file wp/cli/lead-forms.php
-Создана форма «test-drive» (ID 18), получатель shop@example.test.
-Создана форма «consultation» (ID 19), получатель shop@example.test.
-
-$ LEAD_FORMS_E2E_ATTACH=1 ... bash wp/tests/lead-forms-e2e.sh
-POST /contact-form-7/v1/contact-forms/18/feedback (test-drive) -> status=mail_sent
-OK: форма «test-drive» отправлена, Flamingo Inbound Message 21 сохранён (lead-e2e-test-drive-1794279214-50539@example.test), получатель shop@example.test
-POST /contact-form-7/v1/contact-forms/19/feedback (consultation) -> status=mail_sent
-OK: форма «consultation» отправлена, Flamingo Inbound Message 23 сохранён (lead-e2e-consultation-1794279220-50539@example.test), получатель shop@example.test
-ID      post_title                      post_status
-23      Заявка на консультацию          publish
-21      Заявка на тест-драйв            publish
-17      Заявка на консультацию          publish
-15      Заявка на тест-драйв            publish
-12      Заявка на консультацию          publish
-10      Заявка на тест-драйв            publish
-OK: обе формы реально отправлены и сохранены во Flamingo
-exit: 0
+To: shop@example.test
+To: shop@example.test
 
 Автоматические проверки
 -----------------------
@@ -185,18 +117,17 @@ $ php wp/plugins/velotok-core/tests/lead-forms-contract-test.php
 Обновлена форма «test-drive» (ID 2), получатель shop@example.test.
 Создана форма «consultation» (ID 1), получатель shop@example.test.
 OK: контракт форм test-drive и consultation выполняется; реальная отправка и сохранение во Flamingo проверяются wp/tests/lead-forms-e2e.sh.
+exit code: 0
 
-$ bash scripts/ci/run-checks.sh . /work/cache/tmp/opencode/results.json
-...
+$ bash scripts/ci/run-checks.sh . results.json
 PASS: php-lint
 PASS: php-tests
 PASS: plugin-tests
 PASS: php-plugin-tests
 PASS: ci-repair-tests
-$ echo $?
-0
+exit code: 0
 
-$ cat /work/cache/tmp/opencode/results.json
+$ cat results.json
 {
   "php-lint": "success",
   "php-tests": "success",
@@ -205,19 +136,707 @@ $ cat /work/cache/tmp/opencode/results.json
   "ci-repair-tests": "success"
 }
 
-$ bash -n wp/tests/lead-forms-e2e.sh && bash -n wp/tests/smoke.sh && sh -n wp/cli/setup.sh
-shell syntax ok
+Ограничение окружения
+---------------------
+Docker в workspace недоступен, поэтому `docker compose` и `wp/tests/smoke.sh`
+здесь не запускались. E2E-сценарий `wp/tests/lead-forms-e2e.sh` прогнан на
+настоящем WordPress (см. выше), а дымовой тест вызывает его же на реальном
+compose-стенде. `setup.sh` и `docker-compose.yml` больше не скрывают ошибки
+установки/активации CF7 и Flamingo: при сбое настройка завершается с ошибкой,
+а не оставляет страницу с молча скрытой формой.
 
-E2E для docker compose
-----------------------
-Добавлен `wp/tests/lead-forms-e2e.sh`. Он поднимает compose, проверяет
-активность `contact-form-7` и `flamingo`, отправляет обе формы POST-запросом
-в REST API Contact Form 7, ждёт появления записи в `flamingo_inbound` и
-сверяет email/данные заявки. `wp/tests/smoke.sh` вызывает этот E2E после
-проверки главной страницы. Запуск на машине с Docker:
+================================================================
+Приложение: сохранённый отчёт базовой ветки main (EBIKE-20)
+==============================================================
 
-$ bash wp/tests/lead-forms-e2e.sh
+EBIKE-20 — локализация витрины (ru_RU)
+Локальные проверки в workspace: 2026-11-10T02:43:41Z
+Окружение: Linux 5.15.0-194-generic x86_64; PHP 8.2.35; Node v22.23.4; Docker недоступен в этом окружении.
 
-`setup.sh` и `docker-compose.yml` больше не глотают ошибки установки/активации
-Contact Form 7 и Flamingo: при сбое установка завершается с ошибкой, а не
-оставляет страницу с молча скрытой формой.
+Изменения: конфликты main разрешены, сохранены и установка языковых пакетов
+ru_RU (ядро + WooCommerce), и Contact Form 7/Flamingo из базы.
+
+================================================================
+1. Полный набор проверок CI (scripts/ci/run-checks.sh)
+
+$ bash scripts/ci/run-checks.sh . /tmp/velotok-results.json
+== php-lint
+PASS: php-lint
+== php-tests
+== wp/themes/velotok/tests/catalog-all-products-test.php
+OK: каталог выводит все товары, обязательное описание и дополнительные атрибуты.
+== wp/themes/velotok/tests/catalog-display-test.php
+OK: каталог электровелосипедов выводит все карточки с обязательными и произвольными атрибутами.
+== wp/themes/velotok/tests/catalog-filters-contract-test.php
+PASS: фильтры каталога строятся по контракту (TESTEB-20).
+== wp/themes/velotok/tests/catalog-filters-rendered-styles-test.php
+PASS: отрендеренные фильтры каталога получают стили темы на /shop/ и категориях (EBIKE-19).
+== wp/themes/velotok/tests/catalog-filters-styles-test.php
+PASS: фильтры каталога получают стили темы на десктопе и узких экранах (EBIKE-19).
+== wp/themes/velotok/tests/catalog-negative-price-test.php
+PASS: витрина отбрасывает отрицательную и нечисловую цену, сохраняя нулевую.
+== wp/themes/velotok/tests/catalog-pagination-preserves-filters-test.php
+PASS: пагинация каталога сохраняет фильтры и сортировку (TESTEB-60).
+== wp/themes/velotok/tests/catalog-product-card-test.php
+PASS: карточка товара на витрине показывает данные товара (TESTEB-18).
+== wp/themes/velotok/tests/catalog-product-state-model-test.php
+PASS: товар находится в одном из состояний модели (TESTEB-16).
+== wp/themes/velotok/tests/catalog-published-card-filter-test.php
+OK: витрина не выводит карточки неопубликованных и невалидных товаров в циклах и соседних товарах.
+== wp/themes/velotok/tests/catalog-published-products-test.php
+OK: витрина показывает только опубликованные валидные товары и пустое состояние.
+== wp/themes/velotok/tests/catalog-published-status-test.php
+OK: витрина фильтрует товары по состояниям и видимости каталога.
+== wp/themes/velotok/tests/catalog-render-test.php
+OK: каталог электровелосипедов выводит фото, название, описание, цену и произвольные атрибуты.
+== wp/themes/velotok/tests/catalog-search-filters-contract-test.php
+PASS: поиск и фильтры каталога учитывают атрибуты контракта (TESTEB-58).
+== wp/themes/velotok/tests/catalog-search-test.php
+PASS: поиск каталога находит товары по названию, описанию, модели, SKU и категории (TESTEB-19).
+== wp/themes/velotok/tests/catalog-sorting-test.php
+PASS: сортировка каталога поддерживает фиксированный набор значений (TESTEB-59).
+== wp/themes/velotok/tests/catalog-valid-products-test.php
+PASS: витрина показывает только валидные опубликованные товары (TESTEB-51).
+== wp/themes/velotok/tests/checkout-auth-required-test.php
+PASS: оформление заказа недоступно гостю и предлагает войти (TESTEB-24).
+== wp/themes/velotok/tests/checkout-classic-test.php
+PASS: checkout использует классический шорткод и шаблон темы вместо блока (EBIKE-22).
+== wp/themes/velotok/tests/checkout-empty-cart-test.php
+PASS: оформление заказа недоступно при пустой корзине (TESTEB-27).
+== wp/themes/velotok/tests/checkout-order-integration-test.php
+PASS: интеграция оформления заказа с WooCommerce Checkout проверена.
+== wp/themes/velotok/tests/localization-language-pack-test.php
+PASS: языковые пакеты ru_RU для ядра и WooCommerce устанавливаются (EBIKE-20).
+== wp/themes/velotok/tests/localization-ru-test.php
+PASS: витрина и служебные страницы WooCommerce локализованы на русский (EBIKE-20).
+== wp/themes/velotok/tests/model-card-test.php
+ok - нормализация товара передаёт описание в карточку
+ok - карточка содержит фото товара
+ok - карточка содержит название товара
+ok - карточка содержит описание товара
+ok - карточка содержит цену товара
+ok - если краткое описание пустое, используется полное
+ok - демо-карточка также содержит описание
+PASS: обязательные атрибуты карточки отображаются.
+== wp/themes/velotok/tests/picker-budget-test.php
+ok - все 48 комбинаций подбора укладываются в бюджет
+ok - границы бюджетов проверяются включительно
+ok - модель без цены не обходит фильтр бюджета
+ok - цена берётся из данных модели, а не из жёсткой таблицы
+PASS: подборщик фильтрует модели по бюджету во всех комбинациях.
+== wp/themes/velotok/tests/picker-index-budget-test.php
+ok - index.html: все 48 комбинаций укладываются в бюджет
+ok - index.html: границы бюджетов проверяются включительно
+ok - index.html: модель без цены не обходит фильтр бюджета
+ok - index.html: цены берутся из каталога товаров content/products.json
+PASS: подборщик на главной странице фильтрует модели по бюджету.
+== wp/themes/velotok/tests/picker-main-widget-test.php
+ok - виджет main.js: все 48 комбинаций показывают модель в рамках бюджета
+ok - виджет main.js: «до 80 000» не показывает Курьер и Хребет Trail
+ok - виджет main.js: «от 120 000» не показывает Стрит 7
+PASS: виджет подбора использует бюджет как фильтр и цены товаров.
+== wp/themes/velotok/tests/picker-models-test.php
+ok - в подборщик попадают все модели каталога
+ok - модели индексируются по slug товара
+ok - цена берётся из товара, а не из таблицы темы
+ok - цена для вывода форматируется из цены товара
+ok - ссылка ведёт на карточку товара
+ok - для подписи используется данные товара
+ok - без card_id ссылка собирается из slug
+ok - категория товара передаётся в подборщик
+ok - изменение цены товара сразу меняет данные подборщика
+ok - подборщик получает те же данные из каталога товаров
+ok - есть сообщение для бюджета без подходящих моделей
+ok - товары без корректной цены не попадают в подборщик
+PASS: подборщик получает модели и цены из товаров.
+== wp/themes/velotok/tests/theme-article-templates-test.php
+PASS: тема содержит шаблоны статей, рубрик и общую карточку записи (TESTEB-57).
+== wp/themes/velotok/tests/theme-brand-style-contract-test.php
+PASS: тема реализует контракт фирменного стиля из brand-style.json (TESTEB-55).
+== wp/themes/velotok/tests/theme-control-widths-test.php
+PASS: тема перестраивается по контрольным ширинам 1440, 1024, 768 и 360 px (TESTEB-56).
+== wp/themes/velotok/tests/theme-design-variants-test.php
+PASS: тема поддерживает варианты дизайна из манифеста (TESTEB-53).
+== wp/themes/velotok/tests/theme-invalid-price-message-test.php
+PASS: невалидная цена отклоняется с конкретным сообщением (TESTEB-62).
+== wp/themes/velotok/tests/theme-no-stub-plugins-test.php
+PASS: тема не зависит от плагинов-заглушек (TESTEB-54).
+== wp/themes/velotok/tests/theme-required-attributes-server-test.php
+PASS: обязательные атрибуты товара валидируются на сервере (TESTEB-61).
+== wp/themes/velotok/tests/theme-responsive-accessibility-test.php
+PASS: тема адаптивна и доступна с клавиатуры (TESTEB-52).
+== wp/themes/velotok/tests/woocommerce-templates-test.php
+PASS: тема переопределяет шаблоны WooCommerce и подключает их через woocommerce_template_path/woocommerce_locate_template (TESTEB-50).
+PASS: php-tests
+== plugin-tests
+== wp/plugins/velotok-core/tests/accounts-contract.test.js
+PASS: accounts contract and PHP behavior test passed
+== wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen.test.js
+PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
+== wp/plugins/velotok-core/tests/accounts-redgreen.test.js
+PASS: accounts contract test fails without email confirmation and passes with it
+== wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
+PASS: WordPress accounts integration is persistent and the test fails without email confirmation or customer persistence
+== wp/plugins/velotok-core/tests/checkout-order-contract.test.js
+PASS: оформление заказа через WooCommerce Checkout проверено.
+PASS: checkout order contract verified with PHP
+== wp/plugins/velotok-core/tests/checkout-order-redgreen.test.js
+PASS: checkout order contract test is red without checkout, authorization, empty-cart and duplicate guards, and green with them
+== wp/plugins/velotok-core/tests/delivery-cost-redgreen.test.js
+PASS: delivery cost test is red without the free-shipping threshold and green with it
+== wp/plugins/velotok-core/tests/delivery-eta-range-redgreen.test.js
+PASS: delivery ETA test is red without a stored range and green with it
+== wp/plugins/velotok-core/tests/delivery-order-tracking-redgreen.test.js
+PASS: delivery tracking test is red without a stored tracking number and green with it
+== wp/plugins/velotok-core/tests/delivery-pickup-points-failure-redgreen.test.js
+PASS: pickup point failure test is red without explicit failure handling and green with it
+== wp/plugins/velotok-core/tests/delivery-pickup-points-redgreen.test.js
+PASS: delivery pickup points test is red without the address radius and green with it
+== wp/plugins/velotok-core/tests/delivery-provider-configuration-redgreen.test.js
+PASS: provider configuration error test is red without the dedicated code and green with it
+== wp/plugins/velotok-core/tests/delivery-provider-parity-redgreen.test.js
+PASS: delivery provider parity test is red without equal providers and green with them
+== wp/plugins/velotok-core/tests/delivery-store-configuration-redgreen.test.js
+PASS: delivery store configuration test is red without reading the store configuration and green with it
+== wp/plugins/velotok-core/tests/delivery-test-mode-redgreen.test.js
+PASS: delivery test mode test is red without the provider flag and green with it
+== wp/plugins/velotok-core/tests/delivery-weight-redgreen.test.js
+PASS: delivery weight test is red without unambiguous order weight and green with it
+== wp/plugins/velotok-core/tests/delivery-woocommerce-integration.test.js
+PASS: WooCommerce delivery integration is red without shipping method registration and green with it
+== wp/plugins/velotok-core/tests/delivery-zones-contract.test.js
+OK: способы доставки из зон WooCommerce, тарифы, сроки и самовывоз на месте.
+PASS: delivery zones contract verified with PHP
+== wp/plugins/velotok-core/tests/delivery-zones-redgreen.test.js
+PASS: delivery zones contract test is red without the WooCommerce zones source and green with it
+== wp/plugins/velotok-core/tests/guest-cart-registration-contract.test.js
+OK: mocked-контракт гостевой корзины и регистрации на месте.
+PASS: guest cart registration stub contract verified with PHP
+== wp/plugins/velotok-core/tests/guest-cart-registration-redgreen.test.js
+PASS: guest cart contract test is red without the stub and green with the stub
+== wp/plugins/velotok-core/tests/payment-contract.test.js
+OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
+PASS: WooCommerce ЮKassa payment gateway verified with PHP
+== wp/plugins/velotok-core/tests/payment-gateway-contract.test.js
+OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
+PASS: WooCommerce ЮKassa payment gateway verified with PHP
+== wp/plugins/velotok-core/tests/product-attributes-contract.test.js
+OK: mocked-контракт дополнительных атрибутов товара на месте.
+OK: карточки каталога выводят атрибуты продавца и не зависят от плагина-заглушки.
+PASS: additional product attributes stub verified with PHP
+== wp/plugins/velotok-core/tests/spec-data-contract.test.js
+OK: mocked-контракт данных спецификации на месте.
+PASS: specification data stub contract verified with PHP
+PASS: plugin-tests
+== php-plugin-tests
+== wp/plugins/velotok-core/tests/accounts-contract-test.php
+PASS: контракт аккаунтов выполняется.
+== wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
+PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
+== wp/plugins/velotok-core/tests/accounts-email-confirmation-test.php
+PASS: регистрация требует подтверждения email (TESTEB-2).
+== wp/plugins/velotok-core/tests/accounts-email-confirmation-wp-test.php
+PASS: WordPress-регистрация требует подтверждения email (TESTEB-2).
+== wp/plugins/velotok-core/tests/accounts-existing-email-login-test.php
+PASS: существующий email ведёт ко входу без дубля (TESTEB-3).
+== wp/plugins/velotok-core/tests/accounts-existing-email-redgreen-test.php
+PASS: TESTEB-3 падает без обработки существующего email и проходит с ней.
+== wp/plugins/velotok-core/tests/accounts-logout-session-end-redgreen-test.php
+PASS: TESTEB-5 падает без завершения сессии при выходе и проходит с ним.
+== wp/plugins/velotok-core/tests/accounts-logout-session-end-test.php
+PASS: выход завершает сессию и закрывает личный кабинет (TESTEB-5).
+== wp/plugins/velotok-core/tests/accounts-registration-cart-checkout-redgreen-test.php
+PASS: TESTEB-4 падает без переноса корзины при регистрации и проходит с ним.
+== wp/plugins/velotok-core/tests/accounts-registration-cart-checkout-test.php
+PASS: регистрация завершается переносом корзины и переходом к оформлению (TESTEB-4).
+== wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
+PASS: регистрация требует подтверждения email независимо от переданных опций (TESTEB-2).
+== wp/plugins/velotok-core/tests/accounts-unconfirmed-account-access-redgreen-test.php
+PASS: TESTEB-6 падает без запрета доступа неподтверждённому пользователю и проходит с ним.
+== wp/plugins/velotok-core/tests/accounts-unconfirmed-account-access-test.php
+PASS: неподтверждённый пользователь не имеет доступа к личному кабинету (TESTEB-6).
+== wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
+PASS: WordPress-интеграция аккаунтов выполняется.
+== wp/plugins/velotok-core/tests/cart-checkout-auth-required-redgreen-test.php
+PASS: TESTEB-13 падает без требования авторизации для покупки и проходит с ним.
+== wp/plugins/velotok-core/tests/cart-checkout-auth-required-test.php
+PASS: покупка требует авторизации (TESTEB-13).
+== wp/plugins/velotok-core/tests/cart-empty-on-remove-last-item-redgreen-test.php
+PASS: TESTEB-14 падает без пустого состояния после удаления последней позиции и проходит с ним.
+== wp/plugins/velotok-core/tests/cart-empty-on-remove-last-item-test.php
+PASS: удаление последней позиции переводит корзину в пустое состояние (TESTEB-14).
+== wp/plugins/velotok-core/tests/cart-guest-persistence-sessions-redgreen-test.php
+PASS: TESTEB-9 падает без сохранения гостевой корзины между сессиями и проходит с ним.
+== wp/plugins/velotok-core/tests/cart-guest-persistence-sessions-test.php
+PASS: гостевая корзина сохраняется между сессиями (TESTEB-9).
+== wp/plugins/velotok-core/tests/cart-guest-transfer-login-redgreen-test.php
+PASS: TESTEB-8 падает без переноса гостевой корзины при входе и проходит с ним.
+== wp/plugins/velotok-core/tests/cart-guest-transfer-login-test.php
+PASS: гостевая корзина переносится при входе без дублей (TESTEB-8).
+== wp/plugins/velotok-core/tests/cart-quantity-limit-redgreen-test.php
+PASS: TESTEB-12 падает без ограничения количества на позицию и проходит с ним.
+== wp/plugins/velotok-core/tests/cart-quantity-limit-test.php
+PASS: количество на позицию ограничивается (TESTEB-12).
+== wp/plugins/velotok-core/tests/cart-totals-discounts-delivery-redgreen-test.php
+PASS: TESTEB-11 падает без учёта скидок и доставки в итогах корзины и проходит с ним.
+== wp/plugins/velotok-core/tests/cart-totals-discounts-delivery-test.php
+PASS: итоги корзины учитывают скидки и доставку WooCommerce (TESTEB-11).
+== wp/plugins/velotok-core/tests/cart-user-persistence-devices-redgreen-test.php
+PASS: TESTEB-10 падает без сохранения корзины пользователя между сессиями и устройствами и проходит с ним.
+== wp/plugins/velotok-core/tests/cart-user-persistence-devices-test.php
+PASS: корзина авторизованного пользователя сохраняется между сессиями и устройствами (TESTEB-10).
+== wp/plugins/velotok-core/tests/cart-woocommerce-integration-test.php
+PASS: корзина ведётся на WooCommerce и выполняет перенос гостевой корзины (TESTEB-7).
+== wp/plugins/velotok-core/tests/catalog-attributes-contract-test.php
+PASS: атрибуты товаров каталога валидируются по контракту (TESTEB-17).
+== wp/plugins/velotok-core/tests/catalog-filters-contract-test.php
+PASS: фильтры каталога строятся по контракту (TESTEB-20).
+== wp/plugins/velotok-core/tests/catalog-pagination-preserves-filters-test.php
+PASS: пагинация каталога сохраняет фильтры и сортировку (TESTEB-22).
+== wp/plugins/velotok-core/tests/catalog-product-card-test.php
+PASS: карточка товара показывает данные товара (TESTEB-18).
+== wp/plugins/velotok-core/tests/catalog-product-state-model-test.php
+PASS: товар каталога находится в одном из состояний модели (TESTEB-16).
+== wp/plugins/velotok-core/tests/catalog-search-test.php
+PASS: поиск каталога находит товары по названию, описанию, модели, SKU и категории (TESTEB-19).
+== wp/plugins/velotok-core/tests/catalog-sorting-test.php
+PASS: сортировка каталога поддерживает цену по возрастанию, убыванию и новинки (TESTEB-21).
+== wp/plugins/velotok-core/tests/checkout-auth-required-redgreen-test.php
+PASS: TESTEB-24 падает без требования авторизации и проходит с ним.
+== wp/plugins/velotok-core/tests/checkout-auth-required-test.php
+PASS: оформление заказа требует авторизации (TESTEB-24).
+== wp/plugins/velotok-core/tests/checkout-duplicate-order-redgreen-test.php
+PASS: TESTEB-26 падает без защиты от повторной отправки и проходит с ней.
+== wp/plugins/velotok-core/tests/checkout-duplicate-order-test.php
+PASS: повторная отправка формы не создаёт дубль заказа (TESTEB-26).
+== wp/plugins/velotok-core/tests/checkout-empty-cart-redgreen-test.php
+PASS: TESTEB-27 падает без запрета оформления при пустой корзине и проходит с ним.
+== wp/plugins/velotok-core/tests/checkout-empty-cart-test.php
+PASS: оформление заказа недоступно при пустой корзине (TESTEB-27).
+== wp/plugins/velotok-core/tests/checkout-order-contract-test.php
+PASS: оформление заказа через WooCommerce Checkout проверено.
+== wp/plugins/velotok-core/tests/checkout-order-persistence-redgreen-test.php
+PASS: TESTEB-25 падает без сохранения состава, доставки, оплаты и комментария и проходит с ним.
+== wp/plugins/velotok-core/tests/checkout-order-persistence-test.php
+PASS: заказ сохраняет состав, доставку, оплату и комментарий (TESTEB-25).
+== wp/plugins/velotok-core/tests/delivery-buyer-test-mode-banner-contract-test.php
+OK: баннер тестового режима доставки виден покупателю в корзине и в checkout.
+== wp/plugins/velotok-core/tests/delivery-cost-contract-test.php
+OK: стоимость доставки считается по тарифу и порогу бесплатной доставки.
+== wp/plugins/velotok-core/tests/delivery-eta-range-contract-test.php
+OK: срок получения отображается и хранится диапазоном.
+== wp/plugins/velotok-core/tests/delivery-order-selection-contract-test.php
+OK: выбор доставки фиксируется в заказе (TESTEB-37).
+== wp/plugins/velotok-core/tests/delivery-order-tracking-contract-test.php
+OK: трек-номер сохраняется в заказе и виден владельцу (TESTEB-38).
+== wp/plugins/velotok-core/tests/delivery-out-of-zone-ambiguous-test.php
+OK: адрес вне зон и неоднозначный адрес дают одинаковое поведение.
+== wp/plugins/velotok-core/tests/delivery-pickup-independent-of-zone-test.php
+OK: самовывоз доступен независимо от зоны доставки и не показывается за пределами России.
+== wp/plugins/velotok-core/tests/delivery-pickup-points-contract-test.php
+OK: список пунктов выдачи и самовывоза формируется по радиусу от адреса.
+== wp/plugins/velotok-core/tests/delivery-pickup-points-failure-contract-test.php
+OK: недоступность и сбой списка пунктов выдачи обрабатываются явно.
+== wp/plugins/velotok-core/tests/delivery-provider-configuration-contract-test.php
+OK: администратор видит ошибку конфигурации провайдера доставки (TESTEB-43).
+== wp/plugins/velotok-core/tests/delivery-provider-parity-contract-test.php
+OK: адаптеры СДЭК и Почты РФ поддерживаются равноправно.
+== wp/plugins/velotok-core/tests/delivery-store-configuration-contract-test.php
+OK: варианты доставки, сроки и пересчёт задаются конфигурацией магазина.
+== wp/plugins/velotok-core/tests/delivery-test-mode-contract-test.php
+OK: тестовый режим провайдера доставки явно сообщается и не подменяется рабочим тарифом.
+== wp/plugins/velotok-core/tests/delivery-weight-contract-test.php
+OK: вес заказа для тарифа рассчитывается однозначно.
+== wp/plugins/velotok-core/tests/delivery-woocommerce-integration-test.php
+OK: WooCommerce предлагает СДЭК и Почту РФ из зон с тарифом, сроком и видимой ошибкой.
+== wp/plugins/velotok-core/tests/delivery-zones-contract-test.php
+OK: способы доставки из зон WooCommerce, тарифы, сроки и самовывоз на месте.
+== wp/plugins/velotok-core/tests/guest-cart-registration-contract-test.php
+OK: mocked-контракт гостевой корзины и регистрации на месте.
+== wp/plugins/velotok-core/tests/lead-forms-contract-test.php
+Создана форма «test-drive» (ID 1), получатель shop@example.test.
+Обновлена форма «test-drive» (ID 2), получатель shop@example.test.
+Создана форма «consultation» (ID 1), получатель shop@example.test.
+OK: формы test-drive и consultation создаются, получатель задан, заявки сохраняются во Flamingo.
+== wp/plugins/velotok-core/tests/payment-contract-test.php
+OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
+== wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
+OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
+== wp/plugins/velotok-core/tests/payment-order-status-redgreen-test.php
+PASS: TESTEB-46 падает без отражения оплаты в статусе заказа и без refunded при полном возврате, и проходит с ними.
+== wp/plugins/velotok-core/tests/payment-order-status-test.php
+PASS: статусы заказа отражают оплату (83 проверок, TESTEB-46).
+== wp/plugins/velotok-core/tests/payment-refund-redgreen-test.php
+PASS: TESTEB-49 падает без перевода оплаты в refunded при полном возврате и проходит с ним.
+== wp/plugins/velotok-core/tests/payment-refund-test.php
+PASS: полный возврат переводит оплату в refunded (46 проверок, TESTEB-49).
+== wp/plugins/velotok-core/tests/payment-secrets-redgreen-test.php
+PASS: TESTEB-47 падает при зашитых в код секретах и проходит при чтении секретов из окружения или настроек.
+== wp/plugins/velotok-core/tests/payment-secrets-test.php
+PASS: секреты хранятся вне кода и читаются из окружения или настроек (29 проверок, TESTEB-47).
+== wp/plugins/velotok-core/tests/payment-status-model-redgreen-test.php
+PASS: TESTEB-48 падает без фиксированной модели статусов оплаты и проходит с ней.
+== wp/plugins/velotok-core/tests/payment-status-model-test.php
+PASS: статусы оплаты образуют фиксированную модель (169 проверок, TESTEB-48).
+== wp/plugins/velotok-core/tests/payment-webhook-signature-idempotency-redgreen-test.php
+PASS: TESTEB-45 падает без проверки подписи или идемпотентности webhook и проходит с ними.
+== wp/plugins/velotok-core/tests/payment-webhook-signature-idempotency-test.php
+PASS: webhook проверяет подпись и идемпотентен (41 проверок, TESTEB-45).
+== wp/plugins/velotok-core/tests/product-attributes-card-test.php
+OK: карточки каталога выводят атрибуты продавца и не зависят от плагина-заглушки.
+== wp/plugins/velotok-core/tests/product-attributes-contract-test.php
+OK: mocked-контракт дополнительных атрибутов товара на месте.
+== wp/plugins/velotok-core/tests/product-price-validation-message-test.php
+PASS: невалидная цена отклоняется с конкретным сообщением (TESTEB-62, core).
+== wp/plugins/velotok-core/tests/provisioning-checkout-layout-test.php
+PASS: провижининг переводит checkout на классический шорткод и шаблон темы (EBIKE-22).
+== wp/plugins/velotok-core/tests/provisioning-checkout-test.php
+PASS: после провижининга checkout создаёт заказ с оплатой и доставкой.
+== wp/plugins/velotok-core/tests/provisioning-contract-test.php
+OK: провижининг магазина создаёт зону, способы доставки, шлюзы и ru_RU идемпотентно.
+== wp/plugins/velotok-core/tests/spec-data-contract-test.php
+OK: mocked-контракт данных спецификации на месте.
+PASS: php-plugin-tests
+== ci-repair-tests
+== scripts/ci/tests/evidence.test.mjs
+PASS: green checks backed by a successful recovery run are ready
+PASS: synthetic green checks without a CI run are red
+PASS: failed/in-progress runs are red unless the current run is allowed
+PASS: a successful run from another workflow is not accepted as evidence
+PASS: an unmerged PR or failed/missing checks are red
+PASS: green checks without a ci/recover link are red
+PASS: a recovery run not linked from the commit status is red
+PASS: evidence resolves the exact recovery run linked from the checked commit
+PASS: each pull request keeps its own recovery workflow
+PASS: TESTEB-65 evidence for PR #68 uses the PR #68 recovery workflow
+PASS: the comment contains the run URL/id, checks and merge commit
+PASS: stale evidence is replaced instead of being duplicated
+PASS: the prepared comment is updated with real evidence, not left as a draft
+PASS: a missing comment is created with the verified evidence
+PASS: red evidence is not published
+== scripts/ci/tests/finalize-evidence.test.mjs
+PASS: the finalizer waits until the recovery run is completed
+PASS: an unfinished run is not treated as successful
+PASS: a failed recovery run does not publish evidence
+PASS: completed run evidence replaces the stale in-progress block
+PASS: the finalizer discovers the matching recovery run by trigger sha
+PASS: a finalizer run without a recovery run is red, not invented
+PASS: --trigger-sha discovery ignores the finalizer GITHUB_RUN_ID
+PASS: the finalizer follows the trigger SHA and publishes the recovery evidence
+== scripts/ci/tests/no-checks-recovery.test.mjs
+PASS: recovery runs on pull_request and only when the commit has no ci run
+PASS: a commit with no ci run is a no_checks incident
+PASS: an existing ci run (even queued or failed) is left to the regular workflow
+PASS: zero checks with no ci run requests recovery
+PASS: a queued ci run prevents a duplicate recovery run
+== scripts/ci/tests/pr78-recovery-evidence.test.mjs
+PASS: the TESTEB-68 incident snapshot (failed run, no merge) is red
+PASS: the real post-fix TESTEB-68 snapshot (run #42505520113, merge 330a631) is green
+PASS: ci/recover on the PR head links the exact successful recovery run
+PASS: the evidence block contains the actual run, merge commit and outcome
+== scripts/ci/tests/recover-pr.test.mjs
+PASS: checks are published on the exact target commit and the PR is merged
+PASS: recovery checks and merges the resolved current head after head drift
+PASS: recovery refuses to merge when the PR head moved
+PASS: failed checks are published and block the merge
+PASS: an already merged PR is not merged twice
+PASS: the recovery comment is idempotent
+PASS: existing check runs are updated in place
+PASS: recovery republishes unpatchable checks and completes the deferred merge
+PASS: success/skipped is green and failure/empty is red
+PASS: recovery verification is red until the PR is merged with green checks
+== scripts/ci/tests/repair-pr-checks.test.mjs
+PASS: missing workflow is committed onto the PR head branch
+PASS: an existing workflow is dispatched on the PR head branch
+PASS: repair plan always targets the PR head branch
+PASS: no checks is red, successful checks are green
+PASS: checks are polled until they turn green
+== scripts/ci/tests/resolve-pr-target.test.mjs
+PASS: a moved pull request head is the recovery target, not the stale incident SHA
+PASS: the current head is used even after the pull request was merged
+PASS: a pull request without a head SHA is rejected
+PASS: TESTEB-65 recovery follows the current PR #68 head, not the stale incident SHA
+== scripts/ci/tests/rollout-evidence.test.mjs
+PASS: rollout fixture is a recording of real GitHub API data
+PASS: the real ci run exposes every required job and standard check
+PASS: the recorded PR #65 head is green and ready for automerge
+PASS: recorded evidence for the rejected commit is rejected for another head
+PASS: recorded check runs without commit provenance are rejected
+PASS: CI documentation does not pin stale evidence and points at the per-head evidence
+== scripts/ci/tests/rollout.test.mjs
+PASS: an open, mergeable fix with a successful CI run on its real head is ready for automerge
+PASS: the same fix stays green once the tracker has merged it
+PASS: a merged fix cannot be proven by the old pull request head
+PASS: an unmergeable fix with conflicts against main is red
+PASS: a closed, unmerged fix is red
+PASS: a fix merged into the wrong base branch is red
+PASS: a fix that is not present in the pull request head is red
+PASS: a green run from a stale commit is rejected as evidence
+PASS: evidence recorded on the rejected commit cannot prove a later submitted head
+PASS: evidence for a new submission replaces the rejected recording instead of reusing it
+PASS: failed or incomplete CI runs are red
+PASS: a missing or failed CI job makes the rollout red
+PASS: a run from another workflow is not accepted as CI evidence
+PASS: the gate requires the standard check runs of the verified ci run
+PASS: synthetic green check runs are not accepted as CI evidence
+PASS: check runs from another check suite are rejected even when they link to the ci run
+PASS: standard check runs from another commit are rejected
+PASS: check runs without commit provenance are rejected
+PASS: a failed standard check run makes the rollout red
+PASS: the latest CI run is the one that is verified
+PASS: rollout evidence is collected from the repository, PR, workflow and run
+PASS: standard check runs are read from the real head commit
+PASS: without an explicit run id the latest CI run for the real head is verified
+PASS: a merged fix is verified against the merge commit on the base branch
+PASS: collecting evidence detects a workflow that is not in the fix
+PASS: the rollout evidence comment pins the real head and run
+PASS: verified rollout evidence is posted against the real head
+PASS: rollout evidence updates one idempotent comment
+PASS: a stale green run is not published as evidence for the head
+PASS: synthetic check runs are not published as rollout evidence
+== scripts/ci/tests/run-checks.test.mjs
+PASS: a healthy checkout is green
+PASS: a failing check is reported as failure
+PASS: broken PHP syntax is detected by php-lint
+PASS: failing plugin PHP contract tests are executed and reported
+== scripts/ci/tests/stale-checks.test.mjs
+PASS: an old in_progress duplicate does not block a completed success
+PASS: a newer pending duplicate still blocks the check
+PASS: recovery completes every pending duplicate check run
+PASS: unpatchable foreign check runs are republished as fresh completed checks
+PASS: recovery is requested for stale duplicates but not for green or failed checks
+== scripts/ci/tests/submitted-sha-evidence.test.mjs
+PASS: the submitted SHA has its own green ci run, standard check runs and a mergeable PR (criteria 2 and 3)
+PASS: evidence recorded on the submitted SHA is rejected for any later submission
+PASS: a run without commit provenance is rejected as evidence for the submitted SHA
+PASS: criterion 3 requires mergeable=true without conflicts
+PASS: the evidence comment always pins the submitted SHA to its own run
+PASS: documentation leaves the run link to the submission result instead of pinning a stale SHA
+== scripts/ci/tests/task-comment.test.mjs
+PASS: the task comment records the cause and the full post-fix evidence
+PASS: the recorded task comment contains the verified evidence
+PASS: the TESTEB-68 comment records the concrete cause, not a stub
+PASS: the TESTEB-68 task record contains the verified evidence
+== scripts/ci/tests/workflow-triggers.test.mjs
+PASS: a workflow without pull_request is detected as broken
+PASS: repository workflow triggers on pull_request without path filters
+PASS: a recovery workflow without write permissions and exact checkout is red
+PASS: PR #60 recovery resolves the current head and completes the merge
+PASS: PR #60 finalizer waits for completion and publishes final evidence
+PASS: recovery workflow targets PR #62 at the exact SHA and publishes verified evidence
+PASS: recovery follows the current PR #73 head without a fragile finalizer dispatch
+PASS: the push-triggered finalizer waits for completion and publishes final evidence
+PASS: PR #78 recovery resolves the current head and completes the merge
+PASS: PR #78 finalizer waits for completion and publishes final evidence
+PASS: PR #68 recovery resolves the current head and completes the merge
+PASS: PR #68 finalizer waits for completion and publishes final evidence
+PASS: the shared runner keeps the full check set
+PASS: rollout verification runs on PR #65, push to main and manually
+PASS: ci executes the plugin PHP acceptance tests
+PASS: ci keeps every job that the shared runner verifies
+PASS: ci-repair-tests
+exit code: 0
+
+Результаты по группам:
+
+================================================================
+2. Зависимости: PHP/Node-тесты самодостаточны, composer/npm install не
+   требуются (в проекте нет composer.json/package.json).
+
+================================================================
+3. Установка языковых пакетов ru_RU
+
+$ grep -nE "language .*install.*ru_RU|install_language_packs" wp/cli/setup.sh docker-compose.yml
+wp/cli/setup.sh:88:wp_cli language core install ru_RU --activate >/dev/null 2>&1 \
+wp/cli/setup.sh:122:if ( function_exists( "velotok_localization_install_language_packs" ) ) {
+wp/cli/setup.sh:123:	foreach ( velotok_localization_install_language_packs() as $command => $installed ) {
+wp/cli/setup.sh:145:	wp_cli language plugin install contact-form-7 ru_RU >/dev/null 2>&1 \
+wp/cli/setup.sh:147:	wp_cli language plugin install flamingo ru_RU >/dev/null 2>&1 \
+docker-compose.yml:89:        wp language core install ru_RU --activate --allow-root >/dev/null 2>&1 || true
+docker-compose.yml:93:        wp eval 'if ( function_exists( "velotok_localization_install_language_packs" ) ) { foreach ( velotok_localization_install_language_packs() as $command => $installed ) { echo ( $installed ? "OK: " : "WARNING: " ) . $command . PHP_EOL; } }' --allow-root || true
+docker-compose.yml:94:        wp language plugin install woocommerce ru_RU --allow-root >/dev/null 2>&1 || true
+docker-compose.yml:95:        wp language plugin install contact-form-7 ru_RU --allow-root >/dev/null 2>&1 || true
+docker-compose.yml:96:        wp language plugin install flamingo ru_RU --allow-root >/dev/null 2>&1 || true
+
+$ php wp/themes/velotok/tests/localization-language-pack-test.php
+PASS: языковые пакеты ru_RU для ядра и WooCommerce устанавливаются (EBIKE-20).
+exit code: 0
+
+$ php wp/themes/velotok/tests/localization-ru-test.php
+PASS: витрина и служебные страницы WooCommerce локализованы на русский (EBIKE-20).
+exit code: 0
+
+================================================================
+4. Red-green: тест языковых пакетов падает без реализации
+
+$ php <localization-language-pack-test.php с localization.php без функций установки пакетов>
+FAIL: 4 проверок языковых пакетов не прошли:
+ - Не определена функция языковых пакетов: velotok_localization_language_packs.
+ - Не определена функция языковых пакетов: velotok_localization_language_pack_commands.
+ - Не определена функция языковых пакетов: velotok_localization_install_language_packs.
+ - Не определена функция языковых пакетов: velotok_localization_language_packs_installed.
+exit code: 1 (ожидается ненулевой: без установки языковых пакетов тест красный)
+
+================================================================
+Итог: все доступные проверки прошли (php-lint, php-tests, plugin-tests,
+php-plugin-tests, ci-repair-tests), включая red-green тест установки
+языковых пакетов ru_RU. Docker в workspace недоступен, поэтому
+docker compose и wp/tests/smoke.sh здесь не запускались; установка
+пакетов в контейнере выполняется setup.sh/docker-compose.yml и
+проверяется localization-language-pack-test.php. При отсутствии сети
+WP-CLI выводит WARNING, а витрина продолжает использовать резервный
+русский словарь.
+
+================================================================
+Приложение: сохранённый отчёт базовой ветки main (не удалён при
+разрешении конфликта verify.log)
+
+EBIKE-18: подбор по бюджету и цены из товаров
+==============================================
+
+Дата проверки: 2026-11-10 UTC
+Окружение: PHP 8.2.35 (cli), Node v22.23.4
+
+Что исправлено
+--------------
+* main.js: pickModel() проверяет, что бюджет известен, и передаёт выбор в
+  picker.pickModel(). Бюджет — фильтр, а не ветка выбора; при неизвестном
+  бюджете модель не показывается.
+* picker.js: pickModel() отбрасывает модели, цена которых не попадает в
+  диапазон бюджета. matchesBudget() больше не считает NaN/Infinity
+  подходящей ценой, поэтому модель без цены не обходит фильтр.
+* enqueue.php: модели и цены по-прежнему берутся из velotok_get_home_models()
+  (товары WooCommerce или демо-каталог). Дополнительно пропускаются товары
+  без числовой/конечной неотрицательной цены, чтобы 0 или мусор не попадали
+  в подборщик.
+* index.html: подборщик загружает цены из общего каталога content/products.json;
+  разметка используется только как fallback до загрузки JSON.
+* Добавлен тест виджета main.js + picker.js на все 48 комбинаций и на
+  конкретные симптоми из задачи («до 80 000» и «от 120 000»).
+
+Red-green доказательство для NaN
+--------------------------------
+До исправления matchesBudget(NaN, "low") возвращал true, поэтому модель без
+цены проходила фильтр и тест мог пройти вхолостую. Временная копия picker.js
+со старым поведением падает на новом тесте:
+
+$ node /tmp/redgreen.js
+FAIL: старое поведение пропускает модель без цены через фильтр бюджета
+exit code: 1
+
+Проверки подборщика
+-------------------
+$ node wp/themes/velotok/tests/picker-budget.test.js
+ok - все 48 комбинаций подбора укладываются в бюджет
+ok - границы бюджетов проверяются включительно
+ok - модель без цены не обходит фильтр бюджета
+ok - цена берётся из данных модели, а не из жёсткой таблицы
+PASS: подборщик фильтрует модели по бюджету во всех комбинациях.
+exit code: 0
+
+$ node wp/themes/velotok/tests/picker-index-budget.test.js
+ok - index.html: все 48 комбинаций укладываются в бюджет
+ok - index.html: границы бюджетов проверяются включительно
+ok - index.html: модель без цены не обходит фильтр бюджета
+ok - index.html: цены берутся из каталога товаров content/products.json
+PASS: подборщик на главной странице фильтрует модели по бюджету.
+exit code: 0
+
+$ node wp/themes/velotok/tests/picker-main-widget.test.js
+ok - виджет main.js: все 48 комбинаций показывают модель в рамках бюджета
+ok - виджет main.js: «до 80 000» не показывает Курьер и Хребет Trail
+ok - виджет main.js: «от 120 000» не показывает Стрит 7
+PASS: виджет подбора использует бюджет как фильтр и цены товаров.
+exit code: 0
+
+$ php wp/themes/velotok/tests/picker-models-test.php
+ok - в подборщик попадают все модели каталога
+ok - модели индексируются по slug товара
+ok - цена берётся из товара, а не из таблицы темы
+ok - цена для вывода форматируется из цены товара
+ok - ссылка ведёт на карточку товара
+ok - для подписи используется данные товара
+ok - без card_id ссылка собирается из slug
+ok - категория товара передаётся в подборщик
+ok - изменение цены товара сразу меняет данные подборщика
+ok - подборщик получает те же данные из каталога товаров
+ok - есть сообщение для бюджета без подходящих моделей
+ok - товары без корректной цены не попадают в подборщик
+PASS: подборщик получает модели и цены из товаров.
+exit code: 0
+
+EBIKE-19: стили фильтров каталога (/shop/ и категории)
+----------------------------------------------------
+Исправлено: в wp/themes/velotok/assets/css/main.css добавлены/уточнены
+правила .catalog-filter* (сетка формы, сброс рамки fieldset и legend,
+поля поиска/диапазона, кнопка «Применить», ссылка «Сбросить», адаптив
+768/360px). Добавлен тест, который рендерит реальный шаблон
+woocommerce/archive-product.php, разбирает DOM и применяет к нему
+правила из main.css.
+
+$ php wp/themes/velotok/tests/catalog-filters-styles-test.php
+PASS: фильтры каталога получают стили темы на десктопе и узких экранах (EBIKE-19).
+exit code: 0
+
+$ php wp/themes/velotok/tests/catalog-filters-rendered-styles-test.php
+PASS: отрендеренные фильтры каталога получают стили темы на /shop/ и категориях (EBIKE-19).
+exit code: 0
+
+Red-green: если удалить блок стилей фильтров из main.css, падают оба
+теста: catalog-filters-styles-test.php (25 проверок) и
+catalog-filters-rendered-styles-test.php (20 проверок). С блоком — проходят.
+
+$ bash scripts/ci/run-checks.sh "$PWD"
+php-lint: success
+php-tests: success
+plugin-tests: success
+php-plugin-tests: success
+ci-repair-tests: success
+exit code: 0
+
+Скриншот в окружении не снимался: headless-браузер (chromium/playwright)
+не установлен. Вместо скриншота используется тест фактического рендера
+DOM + применённых CSS-правил на странице каталога.
+
+Полный прогон проверок репозитория
+----------------------------------
+$ bash scripts/ci/run-checks.sh .
+...
+== wp/themes/velotok/tests/picker-budget-test.php
+ok - все 48 комбинаций подбора укладываются в бюджет
+ok - границы бюджетов проверяются включительно
+ok - модель без цены не обходит фильтр бюджета
+ok - цена берётся из данных модели, а не из жёсткой таблицы
+PASS: подборщик фильтрует модели по бюджету во всех комбинациях.
+== wp/themes/velotok/tests/picker-index-budget-test.php
+ok - index.html: все 48 комбинаций укладываются в бюджет
+ok - index.html: границы бюджетов проверяются включительно
+ok - index.html: модель без цены не обходит фильтр бюджета
+ok - index.html: цены берутся из каталога товаров content/products.json
+PASS: подборщик на главной странице фильтрует модели по бюджету.
+== wp/themes/velotok/tests/picker-main-widget-test.php
+ok - виджет main.js: все 48 комбинаций показывают модель в рамках бюджета
+ok - виджет main.js: «до 80 000» не показывает Курьер и Хребет Trail
+ok - виджет main.js: «от 120 000» не показывает Стрит 7
+PASS: виджет подбора использует бюджет как фильтр и цены товаров.
+== wp/themes/velotok/tests/picker-models-test.php
+ok - в подборщик попадают все модели каталога
+ok - модели индексируются по slug товара
+ok - цена берётся из товара, а не из таблицы темы
+ok - цена для вывода форматируется из цены товара
+ok - ссылка ведёт на карточку товара
+ok - для подписи используется данные товара
+ok - без card_id ссылка собирается из slug
+ok - категория товара передаётся в подборщик
+ok - изменение цены товара сразу меняет данные подборщика
+ok - подборщик получает те же данные из каталога товаров
+ok - есть сообщение для бюджета без подходящих моделей
+ok - товары без корректной цены не попадают в подборщик
+PASS: подборщик получает модели и цены из товаров.
+...
+PASS: php-lint
+PASS: php-tests
+PASS: plugin-tests
+PASS: php-plugin-tests
+PASS: ci-repair-tests
+exit code: 0

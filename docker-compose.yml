@@ -103,6 +103,8 @@ services:
         wp language core install ru_RU --activate --allow-root >/dev/null 2>&1 || true
         wp site switch-language ru_RU --allow-root >/dev/null 2>&1 || true
         wp option update WPLANG ru_RU --allow-root >/dev/null 2>&1 || true
+        echo "Installing Russian language packs (core and WooCommerce):"
+        wp eval 'if ( function_exists( "velotok_localization_install_language_packs" ) ) { foreach ( velotok_localization_install_language_packs() as $command => $installed ) { echo ( $installed ? "OK: " : "WARNING: " ) . $command . PHP_EOL; } }' --allow-root || true
         wp language plugin install woocommerce ru_RU --allow-root >/dev/null 2>&1 || true
         wp language plugin install contact-form-7 ru_RU --allow-root >/dev/null 2>&1 || true
         wp language plugin install flamingo ru_RU --allow-root >/dev/null 2>&1 || true
@@ -127,8 +129,11 @@ services:
           wp option update woocommerce_price_thousand_sep ' ' --allow-root >/dev/null 2>&1 || true
           wp option update woocommerce_price_format '%2$s %1$s' --allow-root >/dev/null 2>&1 || true
           wp eval 'if ( function_exists( "velotok_localize_store" ) ) { velotok_localize_store(); }' --allow-root >/dev/null 2>&1 || true
+          wp eval 'if ( function_exists( "velotok_checkout_classic_migrate_page" ) ) { velotok_checkout_classic_migrate_page(); }' --allow-root >/dev/null 2>&1 || true
           echo "Seeding demo catalog:"
           wp eval-file /var/www/html/scripts/seed.php --allow-root || true
+          echo "Provisioning store:"
+          wp eval 'if ( function_exists( "velotok_core_provision_store" ) ) { $provisioned = velotok_core_provision_store(); echo "checkout_ready=" . ( ! empty( $provisioned["checkout_ready"] ) ? "yes" : "no" ) . PHP_EOL; } else { echo "provisioning module is not loaded" . PHP_EOL; }' --allow-root || true
         fi
         echo "Running specification data contract test:"
         wp eval-file wp-content/plugins/velotok-core/tests/spec-data-contract-test.php --allow-root
