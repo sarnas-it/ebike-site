@@ -116,6 +116,9 @@ velotok_lead_mail_assert( false !== strpos( $e2e_source, 'lead-forms-mail-check.
 velotok_lead_mail_assert( false !== strpos( $e2e_source, 'MAILPIT_URL' ), 'E2E должен проверять SMTP-ловушку Mailpit.' );
 velotok_lead_mail_assert( false !== strpos( $e2e_source, '/api/v1/search' ), 'E2E должен искать реально доставленное письмо в Mailpit.' );
 velotok_lead_mail_assert( false === strpos( $e2e_source, 'mail_failed' ), 'E2E не должен упоминать mail_failed как допустимый статус.' );
+velotok_lead_mail_assert( false !== strpos( $e2e_source, 'LEAD_FORMS_E2E_NO_DOCKER' ), 'E2E должен поддерживать внешний WordPress без Docker.' );
+velotok_lead_mail_assert( false !== strpos( $e2e_source, 'LEAD_FORMS_E2E_WP_CMD' ), 'E2E должен принимать команду WP-CLI внешнего WordPress.' );
+velotok_lead_mail_assert( false !== strpos( $e2e_source, 'USE_COMPOSE' ), 'E2E должен отделять compose-режим от запуска на готовом сайте.' );
 
 $compose_source = (string) file_get_contents( $compose );
 velotok_lead_mail_assert( false !== strpos( $compose_source, 'mailpit:' ), 'docker-compose должен запускать SMTP-ловушку Mailpit.' );
@@ -159,6 +162,10 @@ velotok_lead_mail_assert( 0 === $green_delivery['code'], 'GREEN: CLI долже�
 
 $red_delivery = velotok_lead_mail_run( $php . ' ' . $lib . ' delivery ' . escapeshellarg( $bad_delivery ) . ' shop@example.test EBIKE21-test-drive-123' );
 velotok_lead_mail_assert( 0 !== $red_delivery['code'], 'RED: CLI должен падать, если письмо ушло другому получателю.' );
+
+$e2e_no_target = velotok_lead_mail_run( 'env -u LEAD_FORMS_E2E_WP_CMD LEAD_FORMS_E2E_NO_DOCKER=1 bash ' . escapeshellarg( $e2e ) );
+velotok_lead_mail_assert( 0 !== $e2e_no_target['code'], 'RED: внешний режим без команды WP-CLI должен падать до отправки формы.' );
+velotok_lead_mail_assert( false !== strpos( $e2e_no_target['err'], 'LEAD_FORMS_E2E_WP_CMD' ), 'RED: E2E должен объяснять, что для режима без Docker нужна команда WP-CLI.' );
 
 array_map( 'unlink', glob( $tmp . '/*' ) ?: array() );
 @rmdir( $tmp );

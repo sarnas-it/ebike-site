@@ -93,12 +93,13 @@ Flamingo, создание форм `test-drive` и `consultation`, получа
 критерия «письмо действительно ушло»: он падает на статусе сбоя почты и на
 письме без нужного получателя или маркера, а зелёным становится только при
 `mail_sent` и совпадающем сообщении в Mailpit. Настоящую отправку проверяет
-`lead-forms-e2e.sh`: он поднимает сайт и SMTP-ловушку, отправляет обе формы
-POST-запросом в REST API Contact Form 7, требует `status=mail_sent`, находит
-каждое письмо через REST API Mailpit с получателем из формы и маркером заявки
-и только затем проверяет, что Flamingo сохранил её как Inbound Message со
-статусом `mail_sent`. Дымовой тест дополнительно проверяет эти элементы на
-реальной главной странице и запускает тот же E2E-сценарий.
+`lead-forms-e2e.sh`: он поднимает сайт и SMTP-ловушку (или подключается к уже
+готовому WordPress без Docker), отправляет обе формы POST-запросом в REST API
+Contact Form 7, требует `status=mail_sent`, находит каждое письмо через REST
+API Mailpit с получателем из формы и маркером заявки и только затем проверяет,
+что Flamingo сохранил её как Inbound Message со статусом `mail_sent`. Дымовой
+тест дополнительно проверяет эти элементы на реальной главной странице и
+запускает тот же E2E-сценарий.
 
 Версии Contact Form 7 (`6.1.7`) и Flamingo (`2.6.4`) закреплены в
 `setup.sh`/`docker-compose.yml`: более новые релизы CF7 требуют PHP 8.3, а
@@ -145,7 +146,11 @@ E2E-тест можно запустить отдельно: `bash wp/tests/lead
 `COMPOSE_PROJECT_NAME` и тот же `MAILPIT_PORT`; так его вызывает `smoke.sh`.
 Тест не принимает `mail_failed`: успешная заявка должна иметь `mail_sent`,
 письмо с маркером и получателем должно лежать в Mailpit, а Flamingo — сохранить
-Inbound Message со статусом `mail_sent`.
+Inbound Message со статусом `mail_sent`. На стенде без Docker тот же сценарий
+запускается с `LEAD_FORMS_E2E_NO_DOCKER=1` и
+`LEAD_FORMS_E2E_WP_CMD='wp --path=/srv/wordpress --allow-root'`: скрипт не
+вызывает compose, но проверяет реальный WordPress, Contact Form 7, Mailpit и
+Flamingo.
 
 ## Остановка и сброс
 

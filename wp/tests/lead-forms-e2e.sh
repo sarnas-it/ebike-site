@@ -2,9 +2,9 @@
 #
 # End-to-end проверка заявок EBIKE-21.
 #
-# Скрипт поднимает WordPress (по умолчанию отдельным compose-проектом),
-# реально отправляет формы test-drive и consultation через REST API Contact
-# Form 7 и требует одновременно:
+# Скрипт поднимает WordPress (по умолчанию отдельным compose-проектом) либо
+# подключается к уже работающему сайту, реально отправляет формы test-drive и
+# consultation через REST API Contact Form 7 и требует одновременно:
 #   1) status=mail_sent от Contact Form 7 (любой другой статус — провал, письмо
 #      не ушло);
 #   2) письмо с тем же маркером и получателем в SMTP-ловушке Mailpit;
@@ -18,6 +18,14 @@
 # второй проект:
 #   LEAD_FORMS_E2E_ATTACH=1 COMPOSE_PROJECT_NAME=velotok-smoke \
 #     WORDPRESS_PORT=8080 MAILPIT_PORT=8025 bash wp/tests/lead-forms-e2e.sh
+#
+# Для уже установленного WordPress без Docker (например, на CI-стенде или в
+# окружении без docker CLI) используйте внешнюю команду WP-CLI и отключите
+# compose. Скрипт проверит тот же реальный путь «форма → письмо → Flamingo»:
+#   LEAD_FORMS_E2E_NO_DOCKER=1 \
+#   LEAD_FORMS_E2E_WP_CMD='wp --path=/srv/wordpress --allow-root' \
+#   WORDPRESS_PORT=8080 MAILPIT_PORT=8025 \
+#   bash wp/tests/lead-forms-e2e.sh
 #
 set -euo pipefail
 
@@ -37,19 +45,42 @@ MAIL_DETAIL_FILE="$(mktemp)"
 ERROR_FILE="$(mktemp)"
 MAIL_CHECK="$ROOT_DIR/wp/cli/lead-forms-mail-check.php"
 
+# Compose is the default, but the same script must be able to prove the real
+# delivery path on an already installed WordPress where Docker is unavailable.
+USE_COMPOSE=1
+if [ "${LEAD_FORMS_E2E_NO_DOCKER:-0}" = "1" ] || [ -n "${LEAD_FORMS_E2E_WP_CMD:-}" ]; then
+	USE_COMPOSE=0
+fi
+
+if [ "$USE_COMPOSE" = "1" ]; then
+	WP_CLI_CMD=("${COMPOSE[@]}" run --rm -T wpcli)
+else
+	if [ -z "${LEAD_FORMS_E2E_WP_CMD:-}" ]; then
+		echo "FAIL: LEAD_FORMS_E2E_NO_DOCKER=1 требует LEAD_FORMS_E2E_WP_CMD (команда WP-CLI для внешнего сайта)" >&2
+		exit 1
+	fi
+	read -r -a WP_CLI_CMD <<<"${LEAD_FORMS_E2E_WP_CMD}"
+fi
+
 cleanup() {
 	rm -f "$RESPONSE_FILE" "$MAIL_FILE" "$MAIL_DETAIL_FILE" "$ERROR_FILE"
-	if [ "$ATTACH" != "1" ]; then
+	if [ "$USE_COMPOSE" = "1" ] && [ "$ATTACH" != "1" ]; then
 		"${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
 	fi
 }
 trap cleanup EXIT
 
 wp() {
-	"${COMPOSE[@]}" run --rm -T wpcli "$@"
+	"${WP_CLI_CMD[@]}" "$@"
 }
 
-if [ "$ATTACH" != "1" ]; then
+compose_logs() {
+	if [ "$USE_COMPOSE" = "1" ]; then
+		"${COMPOSE[@]}" logs "$@" >&2 || true
+	fi
+}
+
+if [ "$USE_COMPOSE" = "1" ] && [ "$ATTACH" != "1" ]; then
 	"${COMPOSE[@]}" up -d
 fi
 
@@ -58,7 +89,7 @@ until curl -fsS "${BASE_URL}/" -o /dev/null; do
 	attempt=$((attempt + 1))
 	if [ "$attempt" -ge 90 ]; then
 		echo "FAIL: сайт не ответил на ${BASE_URL}/" >&2
-		"${COMPOSE[@]}" logs --tail=120 >&2 || true
+		compose_logs --tail=120
 		exit 1
 	fi
 	sleep 2
@@ -66,7 +97,7 @@ done
 
 if ! curl -fsS "${MAILPIT_URL}/api/v1/messages?limit=1" -o /dev/null; then
 	echo "FAIL: SMTP-ловушка Mailpit недоступна на ${MAILPIT_URL}" >&2
-	"${COMPOSE[@]}" logs mailpit --tail=120 >&2 || true
+	compose_logs mailpit --tail=120
 	exit 1
 fi
 
