@@ -86,4 +86,28 @@ $strings = velotok_js_strings();
 velotok_picker_check( $updated === $strings['models'], 'подборщик получает те же данные из каталога товаров' );
 velotok_picker_check( isset( $strings['noModel'] ) && '' !== $strings['noModel'], 'есть сообщение для бюджета без подходящих моделей' );
 
+$GLOBALS['velotok_picker_source'] = array(
+	array(
+		'slug'     => 'no-price',
+		'name'     => 'Без цены',
+		'category' => 'city',
+	),
+	array(
+		'slug'     => 'bad-price',
+		'name'     => 'Нераспознанная цена',
+		'price'    => 'дорого',
+		'category' => 'city',
+	),
+	array(
+		'slug'     => 'negative-price',
+		'name'     => 'Отрицательная цена',
+		'price'    => -100,
+		'category' => 'city',
+	),
+);
+
+$invalid = velotok_picker_models();
+
+velotok_picker_check( array() === $invalid, 'товары без корректной цены не попадают в подборщик' );
+
 echo 'PASS: подборщик получает модели и цены из товаров.' . PHP_EOL;

@@ -77,6 +77,31 @@ if (!picker.matchesBudget(120000, "high") || picker.matchesBudget(119999, "high"
 
 console.log("ok - границы бюджетов проверяются включительно");
 
+if (picker.matchesBudget(NaN, "low") || picker.matchesBudget(Infinity, "mid") || picker.matchesBudget(undefined, "high")) {
+	process.stderr.write("FAIL: неизвестная цена не должна считаться подходящей ни под один бюджет\n");
+	process.exit(1);
+}
+
+if (!isNaN(picker.priceOf({ price: "Цена по запросу" }))) {
+	process.stderr.write("FAIL: нераспознанная цена должна оставаться NaN, а не превращаться в число\n");
+	process.exit(1);
+}
+
+budgets.forEach(function (budget) {
+	const invalidPick = picker.pickModel(
+		{ broken: { slug: "broken", name: "Без цены", price: "Цена по запросу", category: "city" } },
+		{ place: "city", need: "range", budget: budget }
+	);
+
+	if (invalidPick !== null) {
+		process.stderr.write("FAIL: модель без распознанной цены не должна попадать в подбор (" + budget + ")\n");
+		process.exit(1);
+	}
+});
+
+console.log("ok - модель без цены не обходит фильтр бюджета");
+
+
 const changed = Object.assign({}, models, {
 	riviera: Object.assign({}, models.riviera, {
 		price: "81 000 ₽",
