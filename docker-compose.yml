@@ -108,6 +108,7 @@ services:
           wp option update woocommerce_price_thousand_sep ' ' --allow-root >/dev/null 2>&1 || true
           wp option update woocommerce_price_format '%2$s %1$s' --allow-root >/dev/null 2>&1 || true
           wp eval 'if ( function_exists( "velotok_localize_store" ) ) { velotok_localize_store(); }' --allow-root >/dev/null 2>&1 || true
+          wp eval 'if ( function_exists( "velotok_checkout_classic_migrate_page" ) ) { velotok_checkout_classic_migrate_page(); }' --allow-root >/dev/null 2>&1 || true
           echo "Seeding demo catalog:"
           wp eval-file /var/www/html/scripts/seed.php --allow-root || true
           echo "Provisioning store:"

@@ -58,6 +58,231 @@ function velotok_locate_woocommerce_template( $template, $template_name, $templa
 add_filter( 'woocommerce_locate_template', 'velotok_locate_woocommerce_template', 10, 3 );
 
 /**
+ * Шорткод классического оформления заказа.
+ *
+ * Блочный checkout (`wp:woocommerce/checkout`) рендерится JavaScript и не
+ * использует шаблон темы. Классический шорткод выводит форму через
+ * `woocommerce/checkout/form-checkout.php`, поэтому тему можно стилизовать,
+ * а разметку — проверять тестами.
+ *
+ * @return string
+ */
+function velotok_checkout_classic_shortcode() {
+	return '[woocommerce_checkout]';
+}
+
+/**
+ * Псевдоним шорткода для кода настройки и тестов.
+ *
+ * @return string
+ */
+function velotok_checkout_shortcode() {
+	return velotok_checkout_classic_shortcode();
+}
+
+/**
+ * Содержимое страницы оформления заказа для классического checkout.
+ *
+ * @return string
+ */
+function velotok_checkout_classic_page_content() {
+	return velotok_checkout_classic_shortcode();
+}
+
+/**
+ * Псевдоним содержимого страницы оформления заказа.
+ *
+ * @return string
+ */
+function velotok_checkout_page_content() {
+	return velotok_checkout_classic_page_content();
+}
+
+/**
+ * Есть ли в содержимом блочный checkout WooCommerce.
+ *
+ * @param mixed $content Содержимое записи.
+ * @return bool
+ */
+function velotok_checkout_has_block( $content ) {
+	if ( ! is_string( $content ) || '' === trim( $content ) ) {
+		return false;
+	}
+
+	if ( false !== strpos( $content, 'wp:woocommerce/checkout' ) ) {
+		return true;
+	}
+
+	if ( false !== strpos( $content, 'woocommerce/checkout' ) ) {
+		return true;
+	}
+
+	return function_exists( 'has_block' ) && has_block( 'woocommerce/checkout', $content );
+}
+
+/**
+ * Заменяет блочный checkout классическим шорткодом.
+ *
+ * Сохраняет остальное содержимое страницы, если блок был частью более
+ * крупной разметки, и подставляет шорткод целиком, если после замены блок
+ * всё ещё остался.
+ *
+ * @param mixed $content Содержимое записи.
+ * @return mixed
+ */
+function velotok_checkout_classic_replace_blocks( $content ) {
+	if ( ! velotok_checkout_has_block( $content ) ) {
+		return $content;
+	}
+
+	$shortcode = velotok_checkout_classic_shortcode();
+
+	$replaced = preg_replace(
+		'/<!--\s*wp:woocommerce\/checkout(?:\s+\{[^}]*\})?\s*\/-->/',
+		$shortcode,
+		(string) $content
+	);
+
+	if ( is_string( $replaced ) ) {
+		$content = $replaced;
+	}
+
+	$replaced = preg_replace(
+		'/<!--\s*wp:woocommerce\/checkout(?:\s+\{[^}]*\})?\s*-->.*?<!--\s*\/wp:woocommerce\/checkout\s*-->/s',
+		$shortcode,
+		(string) $content
+	);
+
+	if ( is_string( $replaced ) ) {
+		$content = $replaced;
+	}
+
+	if ( velotok_checkout_has_block( $content ) ) {
+		return $shortcode;
+	}
+
+	return $content;
+}
+
+/**
+ * При создании служебных страниц WooCommerce задаёт классический checkout.
+ *
+ * @param mixed $pages Описание создаваемых страниц.
+ * @return mixed
+ */
+function velotok_checkout_classic_create_pages( $pages ) {
+	if ( ! is_array( $pages ) || ! isset( $pages['checkout'] ) || ! is_array( $pages['checkout'] ) ) {
+		return $pages;
+	}
+
+	$pages['checkout']['content'] = velotok_checkout_classic_page_content();
+
+	return $pages;
+}
+add_filter( 'woocommerce_create_pages', 'velotok_checkout_classic_create_pages' );
+
+/**
+ * Переводит существующую страницу оформления заказа на шорткод.
+ *
+ * Функция идемпотентна: страница с блочным checkout или пустым содержимым
+ * получает `[woocommerce_checkout]`, а страница с другим содержимым не
+ * меняется. Возвращает true, только если запись была обновлена.
+ *
+ * @param int $page_id ID страницы; 0 — взять из настроек WooCommerce.
+ * @return bool
+ */
+function velotok_checkout_classic_migrate_page( $page_id = 0 ) {
+	if ( ! function_exists( 'get_option' ) ) {
+		return false;
+	}
+
+	$page_id = (int) $page_id;
+
+	if ( $page_id <= 0 ) {
+		$page_id = (int) get_option( 'woocommerce_checkout_page_id' );
+	}
+
+	if ( $page_id <= 0 || ! function_exists( 'get_post' ) || ! function_exists( 'wp_update_post' ) ) {
+		return false;
+	}
+
+	$page = get_post( $page_id );
+
+	if ( ! is_object( $page ) || empty( $page->ID ) ) {
+		return false;
+	}
+
+	$content  = isset( $page->post_content ) ? (string) $page->post_content : '';
+	$is_empty = '' === trim( $content );
+	$is_block = velotok_checkout_has_block( $content );
+
+	if ( ! $is_empty && ! $is_block ) {
+		return false;
+	}
+
+	$new_content = $is_empty
+		? velotok_checkout_classic_page_content()
+		: velotok_checkout_classic_replace_blocks( $content );
+
+	if ( $new_content === $content ) {
+		return false;
+	}
+
+	$result = wp_update_post(
+		array(
+			'ID'           => $page_id,
+			'post_content' => $new_content,
+		),
+		true
+	);
+
+	if ( function_exists( 'is_wp_error' ) && is_wp_error( $result ) ) {
+		return false;
+	}
+
+	return ! empty( $result );
+}
+
+/**
+ * Псевдоним миграции checkout на классический шорткод.
+ *
+ * @param int $page_id ID страницы.
+ * @return bool
+ */
+function velotok_use_classic_checkout( $page_id = 0 ) {
+	return velotok_checkout_classic_migrate_page( $page_id );
+}
+
+/**
+ * Идемпотентно переводит оформление заказа на классический шорткод.
+ *
+ * @return void
+ */
+function velotok_checkout_classic_maybe_migrate() {
+	velotok_checkout_classic_migrate_page();
+}
+add_action( 'init', 'velotok_checkout_classic_maybe_migrate', 20 );
+
+/**
+ * Подменяет блочный checkout шорткодом до рендера блоков.
+ *
+ * Фильтр срабатывает раньше `do_blocks` и `do_shortcode`, поэтому страница
+ * всегда выводит форму из шаблона темы, даже если содержимое в базе ещё не
+ * мигрировано.
+ *
+ * @param mixed $content Содержимое записи.
+ * @return mixed
+ */
+function velotok_checkout_classic_the_content( $content ) {
+	if ( function_exists( 'is_checkout' ) && ! is_checkout() ) {
+		return $content;
+	}
+
+	return velotok_checkout_classic_replace_blocks( $content );
+}
+add_filter( 'the_content', 'velotok_checkout_classic_the_content', 1 );
+
+/**
  * Отключает стандартные стили WooCommerce: оформление задаёт тема.
  *
  * @return array
