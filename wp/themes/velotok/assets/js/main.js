@@ -90,6 +90,12 @@
 			return null;
 		}
 
+		// Бюджет — это фильтр, а не ветка выбора: без известного бюджета
+		// не показываем модель, чтобы не нарушить ценовую границу.
+		if (!picker.BUDGETS || !Object.prototype.hasOwnProperty.call(picker.BUDGETS, answers.budget)) {
+			return null;
+		}
+
 		return picker.pickModel(models, answers);
 	}
 

@@ -1140,6 +1140,7 @@ body.is-locked{overflow:hidden}
     mid: { min: 80000, max: 120000 },
     high: { min: 120000, max: null }
   };
+  var PRODUCT_DATA_URL = "content/products.json";
   var answers = {};
   var resultEl = document.getElementById("quiz-result");
   var resetBtn = document.getElementById("quiz-reset");
@@ -1155,6 +1156,35 @@ body.is-locked{overflow:hidden}
       .replace(",", ".");
     if(text === ""){ return NaN; }
     return Number(text);
+  }
+
+  function modelsFromProducts(products, baseModels){
+    var result = {};
+    var base = baseModels || {};
+    var byName = {};
+    if(!Array.isArray(products)){ return result; }
+    Object.keys(base).forEach(function(key){
+      byName[base[key].name] = key;
+    });
+    products.forEach(function(product){
+      if(!product || typeof product !== "object"){ return; }
+      var price = toNumber(product.price);
+      var slug = String(product.slug || "").trim();
+      if(slug === "" || !isFinite(price) || price < 0){ return; }
+      var key = Object.prototype.hasOwnProperty.call(base, slug) ? slug : byName[product.name];
+      if(!key){ key = slug; }
+      var existing = base[key] || {};
+      result[key] = {
+        slug: key,
+        name: product.name ? String(product.name) : (existing.name || ""),
+        price: money(price),
+        price_value: price,
+        href: existing.href || ("#model-" + key),
+        note: product.tagline || product.short_description || existing.note || "",
+        category: product.category ? String(product.category) : (existing.category || "")
+      };
+    });
+    return result;
   }
 
   function readModels(){
@@ -1190,7 +1220,7 @@ body.is-locked{overflow:hidden}
 
   function matchesBudget(price, budget){
     var rule = BUDGETS[budget];
-    if(!rule || !isFinite(price)){ return true; }
+    if(!rule || !isFinite(price)){ return false; }
     if(rule.min !== null && price < rule.min){ return false; }
     if(rule.max !== null && price > rule.max){ return false; }
     return true;
@@ -1316,6 +1346,20 @@ body.is-locked{overflow:hidden}
     document.querySelectorAll(".chip").forEach(function(chip){ chip.setAttribute("aria-pressed", "false"); });
     renderResult();
   });
+
+  function loadProductModels(){
+    if(typeof fetch !== "function"){ return; }
+    fetch(PRODUCT_DATA_URL, { cache: "no-store", credentials: "same-origin" })
+      .then(function(response){ return response && response.ok ? response.json() : null; })
+      .then(function(products){
+        var loaded = modelsFromProducts(products, models);
+        if(Object.keys(loaded).length === 0){ return; }
+        models = loaded;
+        if(answers.place && answers.need && answers.budget){ renderResult(); }
+      })
+      .catch(function(){});
+  }
+  loadProductModels();
 
   var form = document.getElementById("lead-form");
   var success = document.getElementById("form-success");

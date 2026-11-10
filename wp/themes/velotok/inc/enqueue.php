@@ -52,7 +52,16 @@ function velotok_picker_models() {
 			$slug = 'model-' . $index;
 		}
 
-		$price   = isset( $model['price'] ) ? (float) $model['price'] : 0;
+		if ( ! isset( $model['price'] ) || ! is_numeric( $model['price'] ) ) {
+			continue;
+		}
+
+		$price = (float) $model['price'];
+
+		if ( ! is_finite( $price ) || $price < 0 ) {
+			continue;
+		}
+
 		$card_id = isset( $model['card_id'] ) ? trim( (string) $model['card_id'] ) : '';
 
 		if ( '' === $card_id ) {
