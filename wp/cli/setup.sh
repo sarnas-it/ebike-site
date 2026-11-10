@@ -117,18 +117,44 @@ if wp_cli plugin is-installed velotok-core; then
 	fi
 fi
 
+log "Installing Contact Form 7 and Flamingo"
+for plugin in contact-form-7 flamingo; do
+	if ! wp_cli plugin is-installed "$plugin"; then
+		if ! wp_cli plugin install "$plugin" --activate; then
+			log "WARNING: $plugin could not be installed (offline environment?)"
+		fi
+	else
+		wp_cli plugin activate "$plugin" >/dev/null 2>&1 || true
+	fi
+done
+
+if wp_cli plugin is-active contact-form-7 >/dev/null 2>&1; then
+	log "Installing Contact Form 7 and Flamingo Russian translations"
+	wp_cli language plugin install contact-form-7 ru_RU >/dev/null 2>&1 \
+		|| log "WARNING: Contact Form 7 ru_RU translation could not be installed (offline environment?)"
+	wp_cli language plugin install flamingo ru_RU >/dev/null 2>&1 \
+		|| log "WARNING: Flamingo ru_RU translation could not be installed (offline environment?)"
+
+	log "Configuring lead forms"
+	wp_cli eval-file "/opt/velotok/cli/lead-forms.php" \
+		|| log "WARNING: lead forms setup failed"
+else
+	log "WARNING: Contact Form 7 is not active; lead forms were not created"
+fi
+
 if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	log "Configuring WooCommerce"
 	log "Installing WooCommerce Russian translations"
 	wp_cli language plugin install woocommerce ru_RU >/dev/null 2>&1 \
 		|| log "WARNING: WooCommerce ru_RU translation could not be installed (offline environment?)"
 	wp_cli eval 'if ( class_exists( "WC_Install" ) ) { WC_Install::create_pages(); }' >/dev/null 2>&1 || true
+	wp_cli eval 'if ( function_exists( "velotok_checkout_classic_migrate_page" ) ) { velotok_checkout_classic_migrate_page(); }' >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_currency "RUB" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_currency_symbol "₽" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_price_num_decimals "0" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_price_decimal_sep "," >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_price_thousand_sep " " >/dev/null 2>&1 || true
-	wp_cli option update woocommerce_price_format '%1$s %2$s' >/dev/null 2>&1 || true
+	wp_cli option update woocommerce_price_format '%2$s %1$s' >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_enable_guest_checkout "yes" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_cod_settings '{"enabled":"yes","title":"Оплата при получении","description":"Оплата наличными или картой при получении заказа.","instructions":"Менеджер свяжется для подтверждения заказа и доставки."}' --format=json >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_default_country "RU:MOW" >/dev/null 2>&1 || true
@@ -140,9 +166,13 @@ if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	wp_cli eval-file "/opt/velotok/cli/seed.php" \
 		|| log "WARNING: demo catalog seed failed"
 
-	log "Configuring WooCommerce delivery zones"
+	log "Provisioning store: payment gateways, delivery zones and language pack"
+	wp_cli eval-file "/opt/velotok/cli/provision.php" \
+		|| log "WARNING: store provisioning failed"
+
+	log "Ensuring WooCommerce delivery zones (legacy fallback)"
 	wp_cli eval-file "/opt/velotok/cli/delivery-zones.php" \
-		|| log "WARNING: delivery zones setup failed"
+		|| log "WARNING: delivery zones fallback setup failed"
 fi
 
 create_page() {

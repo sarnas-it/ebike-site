@@ -53,8 +53,10 @@
 	function matchesBudget(price, budget) {
 		var rule = BUDGETS[budget];
 
+		// Неизвестный бюджет или цену нельзя трактовать как «подходит»:
+		// иначе модель без цены обходит фильтр и тест проходит вхолостую.
 		if (!rule || !isFinite(price)) {
-			return true;
+			return false;
 		}
 
 		if (rule.min !== null && price < rule.min) {
