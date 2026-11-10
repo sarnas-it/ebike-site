@@ -148,6 +148,7 @@ if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	wp_cli language plugin install woocommerce ru_RU >/dev/null 2>&1 \
 		|| log "WARNING: WooCommerce ru_RU translation could not be installed (offline environment?)"
 	wp_cli eval 'if ( class_exists( "WC_Install" ) ) { WC_Install::create_pages(); }' >/dev/null 2>&1 || true
+	wp_cli eval 'if ( function_exists( "velotok_checkout_classic_migrate_page" ) ) { velotok_checkout_classic_migrate_page(); }' >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_currency "RUB" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_currency_symbol "₽" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_price_num_decimals "0" >/dev/null 2>&1 || true

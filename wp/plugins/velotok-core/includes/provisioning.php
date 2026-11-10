@@ -90,6 +90,160 @@ if ( ! function_exists( 'velotok_core_provisioning_normalize_locations' ) ) {
 	}
 }
 
+if ( ! function_exists( 'velotok_core_provisioning_checkout_shortcode' ) ) {
+	/**
+	 * Shortcode of the classic WooCommerce checkout used by the theme.
+	 *
+	 * The block checkout renders with JavaScript and ignores the theme template,
+	 * so provisioning keeps the checkout page on the classic shortcode.
+	 *
+	 * @return string
+	 */
+	function velotok_core_provisioning_checkout_shortcode() {
+		return '[woocommerce_checkout]';
+	}
+}
+
+if ( ! function_exists( 'velotok_core_provisioning_checkout_has_block' ) ) {
+	/**
+	 * Whether content contains the WooCommerce checkout block.
+	 *
+	 * @param mixed $content Post content.
+	 * @return bool
+	 */
+	function velotok_core_provisioning_checkout_has_block( $content ) {
+		if ( ! is_string( $content ) || '' === trim( $content ) ) {
+			return false;
+		}
+
+		if ( false !== strpos( $content, 'wp:woocommerce/checkout' ) ) {
+			return true;
+		}
+
+		if ( false !== strpos( $content, 'woocommerce/checkout' ) ) {
+			return true;
+		}
+
+		return function_exists( 'has_block' ) && has_block( 'woocommerce/checkout', $content );
+	}
+}
+
+if ( ! function_exists( 'velotok_core_provisioning_checkout_replace_blocks' ) ) {
+	/**
+	 * Replace the checkout block with the classic shortcode.
+	 *
+	 * @param mixed $content Post content.
+	 * @return mixed
+	 */
+	function velotok_core_provisioning_checkout_replace_blocks( $content ) {
+		if ( ! velotok_core_provisioning_checkout_has_block( $content ) ) {
+			return $content;
+		}
+
+		$shortcode = velotok_core_provisioning_checkout_shortcode();
+
+		$replaced = preg_replace(
+			'/<!--\s*wp:woocommerce\/checkout(?:\s+\{[^}]*\})?\s*\/-->/',
+			$shortcode,
+			(string) $content
+		);
+
+		if ( is_string( $replaced ) ) {
+			$content = $replaced;
+		}
+
+		$replaced = preg_replace(
+			'/<!--\s*wp:woocommerce\/checkout(?:\s+\{[^}]*\})?\s*-->.*?<!--\s*\/wp:woocommerce\/checkout\s*-->/s',
+			$shortcode,
+			(string) $content
+		);
+
+		if ( is_string( $replaced ) ) {
+			$content = $replaced;
+		}
+
+		if ( velotok_core_provisioning_checkout_has_block( $content ) ) {
+			return $shortcode;
+		}
+
+		return $content;
+	}
+}
+
+if ( ! function_exists( 'velotok_core_provisioning_apply_checkout_layout' ) ) {
+	/**
+	 * Keep the checkout page on the classic shortcode.
+	 *
+	 * Existing block checkout pages or empty checkout pages are migrated
+	 * idempotently. Pages with custom content are left untouched.
+	 *
+	 * @param array $result Result accumulator (by reference).
+	 * @return void
+	 */
+	function velotok_core_provisioning_apply_checkout_layout( &$result ) {
+		$result['checkout_layout'] = array(
+			'mode'      => 'classic',
+			'shortcode' => velotok_core_provisioning_checkout_shortcode(),
+			'template'  => 'woocommerce/checkout/form-checkout.php',
+			'page_id'   => 0,
+			'applied'   => false,
+			'skipped'   => true,
+		);
+
+		if ( ! function_exists( 'get_option' ) || ! function_exists( 'get_post' ) || ! function_exists( 'wp_update_post' ) ) {
+			$result['warnings'][] = 'WordPress post API is not available; the checkout page was not switched to the classic shortcode.';
+			return;
+		}
+
+		$page_id = (int) get_option( 'woocommerce_checkout_page_id', 0 );
+		$result['checkout_layout']['page_id'] = $page_id;
+
+		if ( $page_id <= 0 ) {
+			return;
+		}
+
+		$page = get_post( $page_id );
+
+		if ( ! is_object( $page ) || empty( $page->ID ) ) {
+			$result['warnings'][] = 'The WooCommerce checkout page could not be loaded; the classic shortcode was not applied.';
+			return;
+		}
+
+		$content  = isset( $page->post_content ) ? (string) $page->post_content : '';
+		$is_empty = '' === trim( $content );
+		$is_block = velotok_core_provisioning_checkout_has_block( $content );
+
+		$result['checkout_layout']['skipped'] = false;
+
+		if ( ! $is_empty && ! $is_block ) {
+			return;
+		}
+
+		$new_content = $is_empty
+			? velotok_core_provisioning_checkout_shortcode()
+			: velotok_core_provisioning_checkout_replace_blocks( $content );
+
+		if ( $new_content === $content ) {
+			return;
+		}
+
+		$updated = wp_update_post(
+			array(
+				'ID'           => $page_id,
+				'post_content' => $new_content,
+			),
+			true
+		);
+
+		if ( function_exists( 'is_wp_error' ) && is_wp_error( $updated ) ) {
+			$result['warnings'][] = 'The WooCommerce checkout page could not be updated to the classic shortcode.';
+			return;
+		}
+
+		$result['checkout_layout']['applied'] = ! empty( $updated );
+	}
+}
+
 if ( ! function_exists( 'velotok_core_provisioning_contract' ) ) {
 	/**
 	 * Declare the store configuration that provisioning must guarantee.
@@ -195,6 +349,9 @@ if ( ! function_exists( 'velotok_core_provisioning_contract' ) ) {
 				'creates_order'             => true,
 				'requires_payment_gateway'  => true,
 				'requires_shipping_method'  => true,
+				'layout'                    => 'classic',
+				'shortcode'                 => velotok_core_provisioning_checkout_shortcode(),
+				'template'                  => 'woocommerce/checkout/form-checkout.php',
 			),
 		);
 
@@ -473,6 +630,7 @@ if ( ! function_exists( 'velotok_core_provision_store' ) ) {
 		}
 
 		velotok_core_provisioning_apply_language( $contract['locale'], $result, $args );
+		velotok_core_provisioning_apply_checkout_layout( $result );
 
 		$has_gateway = false;
 
