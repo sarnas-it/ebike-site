@@ -19,8 +19,12 @@ docker compose up -d
 Сервис `setup` идемпотентно устанавливает WordPress, активирует тему `velotok` и
 плагин `velotok-core`, устанавливает WooCommerce, создаёт служебные страницы и
 заполняет каталог демо-товарами из `wp/data/products.json`. Скрипт также
-включает локаль `ru_RU`, ставит русские пакеты ядра и WooCommerce, переводит
-служебные страницы и задаёт русские форматы цен (`119 900 ₽`) и дат (`дд.мм.гггг`).
+включает локаль `ru_RU`, явно ставит языковые пакеты ядра и WooCommerce
+(`wp language core install ru_RU --activate` и
+`wp language plugin install woocommerce ru_RU`, либо через
+`velotok_localization_install_language_packs()`), проверяет наличие
+`ru_RU.mo`/`woocommerce-ru_RU.mo`, переводит служебные страницы и задаёт
+русские форматы цен (`119 900 ₽`) и дат (`дд.мм.гггг`).
 Если сети нет и WooCommerce установить не удалось, сайт всё равно открывается:
 тема показывает встроенный каталог-заглушку.
 
@@ -35,6 +39,7 @@ php wp/themes/velotok/tests/catalog-display-test.php
 php wp/themes/velotok/tests/catalog-all-products-test.php
 php wp/themes/velotok/tests/catalog-published-products-test.php
 php wp/themes/velotok/tests/localization-ru-test.php
+php wp/themes/velotok/tests/localization-language-pack-test.php
 php wp/plugins/velotok-core/tests/product-attributes-contract-test.php
 php wp/plugins/velotok-core/tests/product-attributes-card-test.php
 php wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
@@ -110,7 +115,8 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/themes/velotok/tests/catalog-all-products-test.php` — тест полноты каталога и описания;
 * `wp/themes/velotok/tests/catalog-published-products-test.php` — тест опубликованных валидных товаров и пустого каталога;
 * `wp/themes/velotok/tests/localization-ru-test.php` — тест русской локали, переводов WooCommerce и форматов цен/дат;
-* `wp/themes/velotok/inc/localization.php` — русская локаль, переводы служебных страниц и форматы цен/дат;
+* `wp/themes/velotok/tests/localization-language-pack-test.php` — red-green тест установки языковых пакетов ядра и WooCommerce ru_RU;
+* `wp/themes/velotok/inc/localization.php` — установка пакетов ru_RU, русская локаль, переводы служебных страниц и форматы цен/дат;
 * `wp/plugins/velotok-core/tests/product-attributes-contract-test.php` — тест контракта дополнительных атрибутов;
 * `wp/plugins/velotok-core/tests/product-attributes-card-test.php` — тест вывода дополнительных атрибутов в карточке;
 * `wp/tests/smoke.sh` — дымовой тест локального запуска.

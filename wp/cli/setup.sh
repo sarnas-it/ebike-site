@@ -117,11 +117,20 @@ if wp_cli plugin is-installed velotok-core; then
 	fi
 fi
 
+log "Installing Russian language packs (core and WooCommerce)"
+wp_cli eval '
+if ( function_exists( "velotok_localization_install_language_packs" ) ) {
+	foreach ( velotok_localization_install_language_packs() as $command => $installed ) {
+		WP_CLI::log( ( $installed ? "OK: " : "WARNING: " ) . $command );
+	}
+	foreach ( velotok_localization_language_packs_installed() as $pack => $present ) {
+		WP_CLI::log( ( $present ? "OK: " : "WARNING: " ) . "ru_RU files for " . $pack . ( $present ? " are installed" : " are missing" ) );
+	}
+}
+' || log "WARNING: Russian language packs could not be installed (offline environment?)"
+
 if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	log "Configuring WooCommerce"
-	log "Installing WooCommerce Russian translations"
-	wp_cli language plugin install woocommerce ru_RU >/dev/null 2>&1 \
-		|| log "WARNING: WooCommerce ru_RU translation could not be installed (offline environment?)"
 	wp_cli eval 'if ( class_exists( "WC_Install" ) ) { WC_Install::create_pages(); }' >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_currency "RUB" >/dev/null 2>&1 || true
 	wp_cli option update woocommerce_currency_symbol "₽" >/dev/null 2>&1 || true

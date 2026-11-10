@@ -84,7 +84,8 @@ services:
         wp language core install ru_RU --activate --allow-root >/dev/null 2>&1 || true
         wp site switch-language ru_RU --allow-root >/dev/null 2>&1 || true
         wp option update WPLANG ru_RU --allow-root >/dev/null 2>&1 || true
-        wp language plugin install woocommerce ru_RU --allow-root >/dev/null 2>&1 || true
+        echo "Installing Russian language packs (core and WooCommerce):"
+        wp eval 'if ( function_exists( "velotok_localization_install_language_packs" ) ) { foreach ( velotok_localization_install_language_packs() as $command => $installed ) { echo ( $installed ? "OK: " : "WARNING: " ) . $command . PHP_EOL; } }' --allow-root || true
         wp option update timezone_string 'Europe/Moscow' --allow-root >/dev/null 2>&1 || true
         wp option update date_format 'd.m.Y' --allow-root >/dev/null 2>&1 || true
         wp option update time_format 'H:i' --allow-root >/dev/null 2>&1 || true
