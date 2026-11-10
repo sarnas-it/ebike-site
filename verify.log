@@ -1,95 +1,223 @@
-TESTEB-63: CI не дал результат (no_checks): TESTEB-1 — sarnas-it/ebike-site#62
-----------------------------------------------------------------
+EBIKE-21 — Contact Form 7 + Flamingo: реальная отправка заявок
+==============================================================
 
-Причина no_checks
------------------
-Застрявший коммит PR #62 `578e87b5a8587d6078aade92d26bd449448dd1d3` не
-содержал `.github/workflows` в своём дереве, а `main` на момент открытия и
-последнего push PR был пустым (`40134b5`) и тоже не содержал workflow.
-Для события `pull_request` GitHub ищет workflow в дереве PR (head + base),
-поэтому запускать было нечего: `no checks reported for the pull request`.
-GitHub не запускает workflow ретроспективно.
-
-Починка: `.github/workflows/ci.yml` теперь запускается на каждом
-`pull_request` (без `paths`-фильтра), на `push` в `main` и по
-`workflow_dispatch`. Гейт `.github/workflows/verify-ci-rollout.yml` на самом
-PR #65 привязывает доказательство к `TARGET_SHA` из
-`github.event.pull_request.head.sha` и публикует ссылку на штатный прогон
-`ci`, его job, стандартные check runs и состояние `mergeable` PR #65.
-
-Доказательство для текущей сдачи
---------------------------------
-В репозитории намеренно не фиксируется ссылка на конкретный прогон: коммит с
-такой ссылкой сам меняет проверяемый SHA и превращает доказательство в
-устаревшее. Для каждой сдачи прогон `ci` запускается на её собственном коммите,
-а ссылка на прогон указывается в результате сдачи (result), а не файлом в
-репозитории.
-
-Актуальное доказательство формирует workflow `verify-ci-rollout`: на событии
-`pull_request` он берёт `TARGET_SHA` из `github.event.pull_request.head.sha`,
-сравнивает с ним `head_sha` прогона `ci` и каждого штатного check run и только
-при совпадении обновляет комментарий `<!-- testeb-63-rollout -->` на PR #65.
-Запись на другом SHA не может подтвердить новый коммит. Пока GitHub
-пересчитывает mergeability, `mergeable` может временно вернуть `null`; workflow
-повторяет запрос, пока не получит определённое значение.
-
-Red-green тест привязки доказательства к сдаваемому SHA:
-`scripts/ci/tests/submitted-sha-evidence.test.mjs`. Он проверяет, что прогон без
-`head_sha` и прогон/check runs на другом коммите не принимаются.
-
-Локальные проверки
+Окружение проверки
 ------------------
-$ for f in wp/plugins/velotok-core/tests/*-test.php wp/themes/velotok/tests/*-test.php; do php "$f" || exit 1; done
-exit code: 0
+Docker CLI/демон в этом workspace недоступен:
 
-PASS: контракт аккаунтов выполняется.
-PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
-PASS: регистрация требует подтверждения email (TESTEB-2).
-PASS: WordPress-регистрация требует подтверждения email (TESTEB-2).
-PASS: существующий email ведёт ко входу без дубля (TESTEB-3).
-PASS: TESTEB-3 падает без обработки существующего email и проходит с ней.
-PASS: TESTEB-5 падает без завершения сессии при выходе и проходит с ним.
-PASS: выход завершает сессию и закрывает личный кабинет (TESTEB-5).
-PASS: TESTEB-4 падает без переноса корзины при регистрации и проходит с ним.
-PASS: регистрация завершается переносом корзины и переходом к оформлению (TESTEB-4).
-PASS: регистрация требует подтверждения email независимо от переданных опций (TESTEB-2).
-PASS: TESTEB-6 падает без запрета доступа неподтверждённому пользователю и проходит с ним.
-PASS: неподтверждённый пользователь не имеет доступа к личному кабинету (TESTEB-6).
-PASS: WordPress-интеграция аккаунтов выполняется.
-PASS: оформление заказа через WooCommerce Checkout проверено.
-OK: стоимость доставки считается по тарифу и порогу бесплатной доставки.
-OK: срок получения отображается и хранится диапазоном.
-OK: вес заказа для тарифа рассчитывается однозначно.
-OK: WooCommerce предлагает СДЭК и Почту РФ из зон с тарифом, сроком и видимой ошибкой.
-OK: способы доставки из зон WooCommerce, тарифы, сроки и самовывоз на месте.
-OK: mocked-контракт гостевой корзины и регистрации на месте.
-OK: mocked-контракт данных спецификации на месте.
-OK: каталог выводит все товары, обязательное описание и дополнительные атрибуты.
-OK: каталог электровелосипедов выводит все карточки с обязательными и произвольными атрибутами.
-OK: каталог электровелосипедов выводит фото, название, описание, цену и произвольные атрибуты.
-PASS: интеграция оформления заказа с WooCommerce Checkout проверена.
-ok - нормализация товара передаёт описание в карточку
-ok - карточка содержит фото товара
-ok - карточка содержит название товара
-ok - карточка содержит описание товара
-ok - карточка содержит цену товара
-ok - если краткое описание пустое, используется полное
-ok - демо-карточка также содержит описание
-PASS: обязательные атрибуты карточки отображаются.
+$ docker --version
+bash: docker: command not found
 
-$ for t in scripts/ci/tests/*.test.mjs; do node "$t" || exit 1; done
-exit code: 0
-(все наборы scripts/ci/tests прошли, включая новый
-scripts/ci/tests/submitted-sha-evidence.test.mjs)
+Поэтому `docker compose` здесь запустить нельзя. Чтобы критерий «форма
+отправляется и заявка сохраняется» был подтверждён фактически, тот же код
+темы/плагина проверен на реальном WordPress без моков WordPress, CF7 и
+Flamingo:
 
-$ node scripts/ci/tests/submitted-sha-evidence.test.mjs
-PASS: the submitted SHA has its own green ci run, standard check runs and a mergeable PR (criteria 2 and 3)
-PASS: evidence recorded on the submitted SHA is rejected for any later submission
-PASS: a run without commit provenance is rejected as evidence for the submitted SHA
-PASS: criterion 3 requires mergeable=true without conflicts
-PASS: the evidence comment always pins the submitted SHA to its own run
-PASS: documentation leaves the run link to the submission result instead of pinning a stale SHA
-exit code: 0
+- WordPress 7.1.4;
+- PHP 8.2.35;
+- Contact Form 7 6.1.7 (эта версия закреплена в setup.sh/docker-compose.yml);
+- Flamingo 2.6.4 (тоже закреплён);
+- SQLite drop-in только для локального стенда (в docker compose остаётся MariaDB);
+- `sendmail_path` указывает на тестовый MTA-стаб, который складывает письма в
+  outbox. Форма, REST API Contact Form 7 и Flamingo при этом настоящие.
 
-PHP-файлы продуктовых пакетов в этой правке не менялись: изменены только
-документация, verify.log и тесты/фикстура CI-инструментов.
+Команды `wp ...` ниже выполнялись локальной обёрткой WP-CLI на этом временном
+стенде; путь к стенду в командах опущен.
+
+Стенд собран из настоящих дистрибутивов:
+
+$ wp core download --version=7.1.4
+$ wp plugin install contact-form-7 --version=6.1.7
+$ wp plugin install flamingo --version=2.6.4
+# SQLite drop-in подключён только как замена MariaDB в локальном стенде;
+# WordPress, Contact Form 7 и Flamingo не подменялись.
+
+
+Плагины и версии
+----------------
+$ wp plugin list --fields=name,status,version --format=table
+name                            status          version
+akismet                         inactive        5.7.2
+contact-form-7                  active          6.1.7
+flamingo                        active          2.6.4
+hello                           inactive        1.7.2
+sqlite-database-integration     active          3.1.3
+db.php                          dropin
+
+$ wp core version
+7.1.4
+
+Формы и получатель
+------------------
+$ wp eval-file wp/cli/lead-forms.php
+Создана форма «test-drive» (ID 7), получатель shop@example.test.
+Создана форма «consultation» (ID 8), получатель shop@example.test.
+
+Повторный запуск (идемпотентность):
+Обновлена форма «test-drive» (ID 7), получатель shop@example.test.
+Обновлена форма «consultation» (ID 8), получатель shop@example.test.
+
+$ wp post list --post_type=wpcf7_contact_form --fields=ID,post_title,post_status --format=table
+ID      post_title      post_status
+7       test-drive      publish
+8       consultation    publish
+4       Contact form 1  publish
+
+$ wp post meta get 7 _mail --format=json   # извлечён recipient
+shop@example.test
+$ wp post meta get 8 _mail --format=json   # извлечён recipient
+shop@example.test
+
+Реальная отправка через REST API Contact Form 7
+-----------------------------------------------
+Inbound Messages до отправки:
+$ wp post list --post_type=flamingo_inbound --format=count
+0
+
+Форма test-drive:
+$ curl -sS -X POST 'http://127.0.0.1:8100/index.php?rest_route=/contact-form-7/v1/contact-forms/7/feedback' \
+    -F '_wpcf7=7' -F '_wpcf7_version=6.1.7' -F '_wpcf7_locale=ru_RU' \
+    -F '_wpcf7_unit_tag=wpcf7-f7-p1-o1' -F '_wpcf7_container_post=0' \
+    -F 'your-name=EBIKE-21 E2E test-drive 20261110' \
+    -F 'your-phone=+7 999 000-00-00' \
+    -F 'your-email=lead-e2e-test-drive@example.test' \
+    -F 'your-message=EBIKE-21 E2E test-drive 20261110' \
+    -F 'bike-model=Ривьера' -F 'test-drive-date=2030-01-15'
+{"contact_form_id":7,"status":"mail_sent","message":"Спасибо! Заявка отправлена, мы свяжемся с вами в течение рабочего дня.","posted_data_hash":"547d0482e093aa9583bbd0913078e007","into":"#wpcf7-f7-p1-o1","invalid_fields":[]}
+
+Форма consultation:
+$ curl -sS -X POST 'http://127.0.0.1:8100/index.php?rest_route=/contact-form-7/v1/contact-forms/8/feedback' \
+    -F '_wpcf7=8' -F '_wpcf7_version=6.1.7' -F '_wpcf7_locale=ru_RU' \
+    -F '_wpcf7_unit_tag=wpcf7-f8-p1-o1' -F '_wpcf7_container_post=0' \
+    -F 'your-name=EBIKE-21 E2E consultation 20261110' \
+    -F 'your-phone=+7 999 000-00-00' \
+    -F 'your-email=lead-e2e-consultation@example.test' \
+    -F 'your-message=EBIKE-21 E2E consultation 20261110'
+{"contact_form_id":8,"status":"mail_sent","message":"Спасибо! Заявка отправлена, мы свяжемся с вами в течение рабочего дня.","posted_data_hash":"c2dfcc4dd7cc1e97c121a126cf00baba","into":"#wpcf7-f8-p1-o1","invalid_fields":[]}
+
+Проверка сохранения во Flamingo
+-------------------------------
+$ wp post list --post_type=flamingo_inbound --format=count
+2
+
+$ wp post list --post_type=flamingo_inbound --fields=ID,post_title,post_status --format=table
+ID      post_title                      post_status
+12      Заявка на консультацию          publish
+10      Заявка на тест-драйв            publish
+
+$ wp post meta list 10 --keys=_submission_status,_subject,_from,_from_email,_field_your-email,_field_your-message --format=table
+post_id meta_key                meta_value
+10      _submission_status      mail_sent
+10      _subject                Заявка на тест-драйв
+10      _from                   EBIKE-21 E2E test-drive 20261110 <lead-e2e-test-drive@example.test>
+10      _from_email             lead-e2e-test-drive@example.test
+10      _field_your-email       lead-e2e-test-drive@example.test
+10      _field_your-message     EBIKE-21 E2E test-drive 20261110
+
+$ wp post meta list 12 --keys=_submission_status,_subject,_from,_from_email,_field_your-email,_field_your-message --format=table
+post_id meta_key                meta_value
+12      _submission_status      mail_sent
+12      _subject                Заявка на консультацию
+12      _from                   EBIKE-21 E2E consultation 20261110 <lead-e2e-consultation@example.test>
+12      _from_email             lead-e2e-consultation@example.test
+12      _field_your-email       lead-e2e-consultation@example.test
+12      _field_your-message     EBIKE-21 E2E consultation 20261110
+
+$ wp post get 10 --field=post_content
+EBIKE-21 E2E test-drive 20261110
++7 999 000-00-00
+lead-e2e-test-drive@example.test
+EBIKE-21 E2E test-drive 20261110
+Ривьера
+2030-01-15
+1
+127.0.0.1
+curl/7.88.1
+http://127.0.0.1:8100/index.php?rest_route=%2Fcontact-form-7%2Fv1%2Fcontact-forms%2F7%2Ffeedback
+November 10, 2026
+2:50 am
+Velotok E2E
+http://127.0.0.1:8100/work/cache/tmp/opencode/wp-local71
+admin@example.test
+
+Письмо ушло на получателя из настройки формы:
+$ grep '^To:' /work/cache/tmp/opencode/outbox.eml | tail -n2
+To: shop@example.test
+To: shop@example.test
+
+Прогон добавленного E2E-скрипта (red-green)
+-------------------------------------------
+`wp/tests/lead-forms-e2e.sh` рассчитан на docker compose. В этом окружении Docker
+отсутствует, поэтому вызов `docker compose ... run wpcli` заменён локальной
+обёрткой к тому же реальному WordPress (флаг LEAD_FORMS_E2E_ATTACH=1). Логика
+самого теста не менялась.
+
+RED — формы удалены, тест обязан упасть:
+$ wp post delete 7 8 --force
+$ LEAD_FORMS_E2E_ATTACH=1 ... bash wp/tests/lead-forms-e2e.sh
+FAIL: форма Contact Form 7 «test-drive» не создана
+exit: 1
+
+GREEN — формы восстановлены через lead-forms.php:
+$ wp eval-file wp/cli/lead-forms.php
+Создана форма «test-drive» (ID 18), получатель shop@example.test.
+Создана форма «consultation» (ID 19), получатель shop@example.test.
+
+$ LEAD_FORMS_E2E_ATTACH=1 ... bash wp/tests/lead-forms-e2e.sh
+POST /contact-form-7/v1/contact-forms/18/feedback (test-drive) -> status=mail_sent
+OK: форма «test-drive» отправлена, Flamingo Inbound Message 21 сохранён (lead-e2e-test-drive-1794279214-50539@example.test), получатель shop@example.test
+POST /contact-form-7/v1/contact-forms/19/feedback (consultation) -> status=mail_sent
+OK: форма «consultation» отправлена, Flamingo Inbound Message 23 сохранён (lead-e2e-consultation-1794279220-50539@example.test), получатель shop@example.test
+ID      post_title                      post_status
+23      Заявка на консультацию          publish
+21      Заявка на тест-драйв            publish
+17      Заявка на консультацию          publish
+15      Заявка на тест-драйв            publish
+12      Заявка на консультацию          publish
+10      Заявка на тест-драйв            publish
+OK: обе формы реально отправлены и сохранены во Flamingo
+exit: 0
+
+Автоматические проверки
+-----------------------
+$ php wp/plugins/velotok-core/tests/lead-forms-contract-test.php
+Создана форма «test-drive» (ID 1), получатель shop@example.test.
+Обновлена форма «test-drive» (ID 2), получатель shop@example.test.
+Создана форма «consultation» (ID 1), получатель shop@example.test.
+OK: контракт форм test-drive и consultation выполняется; реальная отправка и сохранение во Flamingo проверяются wp/tests/lead-forms-e2e.sh.
+
+$ bash scripts/ci/run-checks.sh . /work/cache/tmp/opencode/results.json
+...
+PASS: php-lint
+PASS: php-tests
+PASS: plugin-tests
+PASS: php-plugin-tests
+PASS: ci-repair-tests
+$ echo $?
+0
+
+$ cat /work/cache/tmp/opencode/results.json
+{
+  "php-lint": "success",
+  "php-tests": "success",
+  "plugin-tests": "success",
+  "php-plugin-tests": "success",
+  "ci-repair-tests": "success"
+}
+
+$ bash -n wp/tests/lead-forms-e2e.sh && bash -n wp/tests/smoke.sh && sh -n wp/cli/setup.sh
+shell syntax ok
+
+E2E для docker compose
+----------------------
+Добавлен `wp/tests/lead-forms-e2e.sh`. Он поднимает compose, проверяет
+активность `contact-form-7` и `flamingo`, отправляет обе формы POST-запросом
+в REST API Contact Form 7, ждёт появления записи в `flamingo_inbound` и
+сверяет email/данные заявки. `wp/tests/smoke.sh` вызывает этот E2E после
+проверки главной страницы. Запуск на машине с Docker:
+
+$ bash wp/tests/lead-forms-e2e.sh
+
+`setup.sh` и `docker-compose.yml` больше не глотают ошибки установки/активации
+Contact Form 7 и Flamingo: при сбое установка завершается с ошибкой, а не
+оставляет страницу с молча скрытой формой.

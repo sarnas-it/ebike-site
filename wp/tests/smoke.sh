@@ -85,6 +85,13 @@ if ! grep -q 'wpcf7-form' "$PAGE_FILE"; then
 	exit 1
 fi
 
+# Реальная отправка: POST в REST API Contact Form 7 + проверка Inbound
+# Messages Flamingo. Без работающих форм и сохранения заявок тест падает.
+LEAD_FORMS_E2E_ATTACH=1 \
+	COMPOSE_PROJECT_NAME="$PROJECT" \
+	WORDPRESS_PORT="$PORT" \
+	bash "$ROOT_DIR/wp/tests/lead-forms-e2e.sh"
+
 if "${COMPOSE[@]}" run --rm -T wpcli plugin is-active woocommerce >/dev/null 2>&1; then
 	products="$("${COMPOSE[@]}" run --rm -T wpcli post list --post_type=product --post_status=publish --format=count | tr -dc '0-9')"
 	if [ "${products:-0}" -lt 1 ]; then

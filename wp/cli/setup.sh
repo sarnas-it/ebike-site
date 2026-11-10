@@ -14,6 +14,8 @@ DB_NAME="${WORDPRESS_DB_NAME:-wordpress}"
 DB_USER="${WORDPRESS_DB_USER:-wordpress}"
 DB_PASSWORD="${WORDPRESS_DB_PASSWORD:-wordpress}"
 DB_HOST="${WORDPRESS_DB_HOST:-db:3306}"
+CONTACT_FORM_7_VERSION="${CONTACT_FORM_7_VERSION:-6.1.7}"
+FLAMINGO_VERSION="${FLAMINGO_VERSION:-2.6.4}"
 
 log() {
 	printf '[velotok-setup] %s\n' "$*"
@@ -118,29 +120,55 @@ if wp_cli plugin is-installed velotok-core; then
 fi
 
 log "Installing Contact Form 7 and Flamingo"
+lead_plugins_ready=1
 for plugin in contact-form-7 flamingo; do
-	if ! wp_cli plugin is-installed "$plugin"; then
-		if ! wp_cli plugin install "$plugin" --activate; then
-			log "WARNING: $plugin could not be installed (offline environment?)"
+	case "$plugin" in
+		contact-form-7) version="$CONTACT_FORM_7_VERSION" ;;
+		flamingo) version="$FLAMINGO_VERSION" ;;
+		*) version="" ;;
+	esac
+
+	if ! wp_cli plugin is-installed "$plugin" >/dev/null 2>&1; then
+		if ! wp_cli plugin install "$plugin" --version="$version"; then
+			log "ERROR: $plugin could not be installed"
+			lead_plugins_ready=0
 		fi
-	else
-		wp_cli plugin activate "$plugin" >/dev/null 2>&1 || true
+	fi
+
+	if [ "$lead_plugins_ready" -eq 1 ] && ! wp_cli plugin activate "$plugin" >/dev/null 2>&1; then
+		log "ERROR: $plugin could not be activated"
+		lead_plugins_ready=0
+	fi
+
+	if [ "$lead_plugins_ready" -eq 1 ] && ! wp_cli plugin is-active "$plugin" >/dev/null 2>&1; then
+		log "ERROR: $plugin is not active"
+		lead_plugins_ready=0
 	fi
 done
 
-if wp_cli plugin is-active contact-form-7 >/dev/null 2>&1; then
-	log "Installing Contact Form 7 and Flamingo Russian translations"
-	wp_cli language plugin install contact-form-7 ru_RU >/dev/null 2>&1 \
-		|| log "WARNING: Contact Form 7 ru_RU translation could not be installed (offline environment?)"
-	wp_cli language plugin install flamingo ru_RU >/dev/null 2>&1 \
-		|| log "WARNING: Flamingo ru_RU translation could not be installed (offline environment?)"
-
-	log "Configuring lead forms"
-	wp_cli eval-file "/opt/velotok/cli/lead-forms.php" \
-		|| log "WARNING: lead forms setup failed"
-else
-	log "WARNING: Contact Form 7 is not active; lead forms were not created"
+if [ "$lead_plugins_ready" -ne 1 ]; then
+	log "ERROR: Contact Form 7 and Flamingo are required for the lead forms"
+	exit 1
 fi
+
+log "Installing Contact Form 7 and Flamingo Russian translations"
+wp_cli language plugin install contact-form-7 ru_RU >/dev/null 2>&1 \
+	|| log "WARNING: Contact Form 7 ru_RU translation could not be installed (offline environment?)"
+wp_cli language plugin install flamingo ru_RU >/dev/null 2>&1 \
+	|| log "WARNING: Flamingo ru_RU translation could not be installed (offline environment?)"
+
+log "Configuring lead forms"
+if ! wp_cli eval-file "/opt/velotok/cli/lead-forms.php"; then
+	log "ERROR: lead forms setup failed"
+	exit 1
+fi
+
+for form in test-drive consultation; do
+	if ! wp_cli post list --post_type=wpcf7_contact_form --name="$form" --field=ID | grep -q '[0-9]'; then
+		log "ERROR: Contact Form 7 form «$form» was not created"
+		exit 1
+	fi
+done
 
 if wp_cli plugin is-active woocommerce >/dev/null 2>&1; then
 	log "Configuring WooCommerce"

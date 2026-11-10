@@ -47,6 +47,7 @@ php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
 node wp/plugins/velotok-core/tests/accounts-contract.test.js
 node wp/plugins/velotok-core/tests/accounts-redgreen.test.js
 node wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
+bash wp/tests/lead-forms-e2e.sh
 bash wp/tests/smoke.sh
 ```
 
@@ -66,10 +67,19 @@ WooCommerce → список моделей → шаблон каталога �
 `payment-gateway-contract-test.php` проверяет шлюз ЮKassa для WooCommerce:
 создание платежа, подпись и идемпотентность webhook, статусы заказа и полный
 возврат в `refunded`; секреты читаются только из окружения или настроек.
-`lead-forms-contract-test.php` проверяет установку Contact Form 7 и Flamingo,
-создание форм `test-drive` и `consultation`, получателя писем и идемпотентность
-их настройки. Дымовой тест дополнительно проверяет эти элементы на реальной
-главной странице.
+`lead-forms-contract-test.php` проверяет контракт настройки Contact Form 7 и
+Flamingo, создание форм `test-drive` и `consultation`, получателя писем и
+идемпотентность. Настоящую отправку проверяет `lead-forms-e2e.sh`: он поднимает
+сайт, отправляет обе формы POST-запросом в REST API Contact Form 7 и требует,
+чтобы Flamingo сохранил каждую заявку как Inbound Message с данными формы.
+Дымовой тест дополнительно проверяет эти элементы на реальной главной странице
+и запускает тот же E2E-сценарий.
+
+Версии Contact Form 7 (`6.1.7`) и Flamingo (`2.6.4`) закреплены в
+`setup.sh`/`docker-compose.yml`: более новые релизы CF7 требуют PHP 8.3, а
+локальный образ работает на PHP 8.2. Если для заявок не удалось установить или
+активировать плагины либо создать формы, настройка завершается с ошибкой, а не
+продолжает работу с неработающей формой.
 
 Тест аккаунтов `accounts-contract-test.php` проверяет регистрацию по email и
 паролю, обязательное подтверждение email, вход существующего пользователя без
@@ -95,8 +105,13 @@ Inbound Messages». Получателя можно переопределить
 В контейнере `wordpress` уже есть WP-CLI (обёртка сама добавляет `--allow-root`).
 
 Дымовой тест поднимает отдельный compose-проект, ждёт ответ главной страницы,
-проверяет активные тему и плагин, наличие товаров, формы заявок, затем удаляет
+проверяет активные тему и плагин, наличие товаров, формы заявок, реально
+отправляет заявки и проверяет Inbound Messages Flamingo, затем удаляет
 контейнеры и тома тестового проекта.
+
+E2E-тест можно запустить отдельно: `bash wp/tests/lead-forms-e2e.sh`. Если сайт
+уже поднят, используйте `LEAD_FORMS_E2E_ATTACH=1` и тот же
+`COMPOSE_PROJECT_NAME`; так его вызывает `smoke.sh`.
 
 ## Остановка и сброс
 
@@ -126,4 +141,5 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/themes/velotok/inc/localization.php` — русская локаль, переводы служебных страниц и форматы цен/дат;
 * `wp/plugins/velotok-core/tests/product-attributes-contract-test.php` — тест контракта дополнительных атрибутов;
 * `wp/plugins/velotok-core/tests/product-attributes-card-test.php` — тест вывода дополнительных атрибутов в карточке;
-* `wp/tests/smoke.sh` — дымовой тест локального запуска.
+* `wp/tests/lead-forms-e2e.sh` — реальная отправка форм и проверка Inbound Messages Flamingo;
+* `wp/tests/smoke.sh` — дымовой тест локального запуска и E2E-проверка заявок.

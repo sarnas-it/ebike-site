@@ -81,9 +81,23 @@ services:
           sleep 3
         done
         wp plugin install woocommerce --activate --allow-root >/dev/null 2>&1 || true
-        wp plugin install contact-form-7 --activate --allow-root >/dev/null 2>&1 || true
-        wp plugin install flamingo --activate --allow-root >/dev/null 2>&1 || true
-        wp plugin activate contact-form-7 flamingo --allow-root >/dev/null 2>&1 || true
+        # Lead forms are a product requirement: unlike WooCommerce, Contact Form 7
+        # and Flamingo must not be skipped silently. Versions are pinned because
+        # newer CF7 releases require PHP 8.3 while this image runs PHP 8.2.
+        for plugin in contact-form-7 flamingo; do
+          if ! wp plugin is-installed "$plugin" --allow-root >/dev/null 2>&1; then
+            case "$plugin" in
+              contact-form-7) version=6.1.7 ;;
+              flamingo) version=2.6.4 ;;
+            esac
+            wp plugin install "$plugin" --version="$version" --allow-root \
+              || { echo "ERROR: not installed: $plugin" >&2; exit 1; }
+          fi
+          wp plugin activate "$plugin" --allow-root \
+            || { echo "ERROR: not activated: $plugin" >&2; exit 1; }
+          wp plugin is-active "$plugin" --allow-root \
+            || { echo "ERROR: inactive plugin: $plugin" >&2; exit 1; }
+        done
         wp plugin activate velotok-core --allow-root >/dev/null 2>&1 || true
         wp theme activate velotok --allow-root >/dev/null 2>&1 || true
         wp language core install ru_RU --activate --allow-root >/dev/null 2>&1 || true
@@ -92,10 +106,15 @@ services:
         wp language plugin install woocommerce ru_RU --allow-root >/dev/null 2>&1 || true
         wp language plugin install contact-form-7 ru_RU --allow-root >/dev/null 2>&1 || true
         wp language plugin install flamingo ru_RU --allow-root >/dev/null 2>&1 || true
-        if wp plugin is-active contact-form-7 --allow-root >/dev/null 2>&1; then
-          echo "Configuring lead forms:"
-          wp eval-file /opt/velotok/cli/lead-forms.php --allow-root || true
-        fi
+        echo "Configuring lead forms:"
+        wp eval-file /opt/velotok/cli/lead-forms.php --allow-root \
+          || { echo "ERROR: lead forms setup failed" >&2; exit 1; }
+        for form in test-drive consultation; do
+          if ! wp post list --post_type=wpcf7_contact_form --name="$form" --field=ID --allow-root | grep -q '[0-9]'; then
+            echo "ERROR: Contact Form 7 form not created: $form" >&2
+            exit 1
+          fi
+        done
         wp option update timezone_string 'Europe/Moscow' --allow-root >/dev/null 2>&1 || true
         wp option update date_format 'd.m.Y' --allow-root >/dev/null 2>&1 || true
         wp option update time_format 'H:i' --allow-root >/dev/null 2>&1 || true
