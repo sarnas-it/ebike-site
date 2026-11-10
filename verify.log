@@ -93,3 +93,35 @@ exit code: 0
 
 PHP-файлы продуктовых пакетов в этой правке не менялись: изменены только
 документация, verify.log и тесты/фикстура CI-инструментов.
+
+EBIKE-19: стили фильтров каталога (/shop/ и категории)
+----------------------------------------------------
+Исправлено: в wp/themes/velotok/assets/css/main.css добавлены/уточнены
+правила .catalog-filter* (сетка формы, сброс рамки fieldset и legend,
+поля поиска/диапазона, кнопка «Применить», ссылка «Сбросить», адаптив
+768/360px). Добавлен тест, который рендерит реальный шаблон
+woocommerce/archive-product.php, разбирает DOM и применяет к нему
+правила из main.css.
+
+$ php wp/themes/velotok/tests/catalog-filters-styles-test.php
+PASS: фильтры каталога получают стили темы на десктопе и узких экранах (EBIKE-19).
+exit code: 0
+
+$ php wp/themes/velotok/tests/catalog-filters-rendered-styles-test.php
+PASS: отрендеренные фильтры каталога получают стили темы на /shop/ и категориях (EBIKE-19).
+exit code: 0
+
+Red-green: при удалении блока стилей фильтров из main.css тест
+catalog-filters-rendered-styles-test.php падает (20 проверок), с блоком — проходит.
+
+$ bash scripts/ci/run-checks.sh "$PWD"
+php-lint: success
+php-tests: success
+plugin-tests: success
+php-plugin-tests: success
+ci-repair-tests: success
+exit code: 0
+
+Скриншот в окружении не снимался: headless-браузер (chromium/playwright)
+не установлен. Вместо скриншота используется тест фактического рендера
+DOM + применённых CSS-правил на странице каталога.
