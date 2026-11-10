@@ -61,6 +61,30 @@ if ! "${COMPOSE[@]}" run --rm -T wpcli plugin list --status=active --field=name 
 	exit 1
 fi
 
+for plugin in contact-form-7 flamingo; do
+	if ! "${COMPOSE[@]}" run --rm -T wpcli plugin is-active "$plugin" >/dev/null 2>&1; then
+		echo "FAIL: плагин $plugin не активирован" >&2
+		exit 1
+	fi
+done
+
+for form in test-drive consultation; do
+	if ! "${COMPOSE[@]}" run --rm -T wpcli post list --post_type=wpcf7_contact_form --name="$form" --field=ID | grep -q '[0-9]'; then
+		echo "FAIL: форма Contact Form 7 «$form» не создана" >&2
+		exit 1
+	fi
+done
+
+if ! curl -fsS "http://localhost:${PORT}/" -o "$PAGE_FILE"; then
+	echo "FAIL: главная страница перестала отвечать после настройки форм" >&2
+	exit 1
+fi
+
+if ! grep -q 'wpcf7-form' "$PAGE_FILE"; then
+	echo "FAIL: на главной странице не отрендерена форма заявки Contact Form 7" >&2
+	exit 1
+fi
+
 if "${COMPOSE[@]}" run --rm -T wpcli plugin is-active woocommerce >/dev/null 2>&1; then
 	products="$("${COMPOSE[@]}" run --rm -T wpcli post list --post_type=product --post_status=publish --format=count | tr -dc '0-9')"
 	if [ "${products:-0}" -lt 1 ]; then
