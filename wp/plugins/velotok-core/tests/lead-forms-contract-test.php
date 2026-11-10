@@ -143,15 +143,22 @@ $root             = dirname( __DIR__, 4 );
 $setup_script     = $root . '/wp/cli/setup.sh';
 $lead_forms_script = $root . '/wp/cli/lead-forms.php';
 $template         = $root . '/wp/themes/velotok/template-parts/lead-form.php';
+$e2e_script       = $root . '/wp/tests/lead-forms-e2e.sh';
 
 velotok_lead_assert( is_readable( $setup_script ), 'Не найден скрипт настройки wp/cli/setup.sh.' );
 velotok_lead_assert( is_readable( $lead_forms_script ), 'Не найден скрипт форм wp/cli/lead-forms.php.' );
 velotok_lead_assert( is_readable( $template ), 'Не найден шаблон блока заявки.' );
+velotok_lead_assert( is_readable( $e2e_script ), 'Не найден E2E-тест реальной отправки wp/tests/lead-forms-e2e.sh.' );
+
+$e2e_source = (string) file_get_contents( $e2e_script );
+velotok_lead_assert( false !== strpos( $e2e_source, '/feedback' ), 'E2E-тест не отправляет форму через REST API Contact Form 7.' );
+velotok_lead_assert( false !== strpos( $e2e_source, 'flamingo_inbound' ), 'E2E-тест не проверяет Inbound Messages Flamingo.' );
 
 $setup = (string) file_get_contents( $setup_script );
 velotok_lead_assert( false !== strpos( $setup, 'contact-form-7' ), 'Настройка не устанавливает Contact Form 7.' );
 velotok_lead_assert( false !== strpos( $setup, 'flamingo' ), 'Настройка не устанавливает Flamingo.' );
 velotok_lead_assert( false !== strpos( $setup, 'lead-forms.php' ), 'Настройка не создаёт формы заявок.' );
+velotok_lead_assert( false === strpos( $setup, 'Contact Form 7 is not active; lead forms were not created' ), 'Настройка не должна молча пропускать создание форм.' );
 
 $template_source = (string) file_get_contents( $template );
 velotok_lead_assert( false !== strpos( $template_source, '[contact-form-7 title="test-drive"]' ), 'Шаблон не выводит форму test-drive.' );
@@ -199,4 +206,4 @@ if ( $failures ) {
 	exit( 1 );
 }
 
-echo 'OK: формы test-drive и consultation создаются, получатель задан, заявки сохраняются во Flamingo.' . PHP_EOL;
+echo 'OK: контракт форм test-drive и consultation выполняется; реальная отправка и сохранение во Flamingo проверяются wp/tests/lead-forms-e2e.sh.' . PHP_EOL;
