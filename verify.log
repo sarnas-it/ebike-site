@@ -1,227 +1,25 @@
 EBIKE-20 — локализация витрины (ru_RU)
-Локальные проверки в workspace: 2026-11-10T02:39:49Z
+Локальные проверки в workspace: 2026-11-10T02:43:41Z
 Окружение: Linux 5.15.0-194-generic x86_64; PHP 8.2.35; Node v22.23.4; Docker недоступен в этом окружении.
 
-================================================================
-1. Синтаксис PHP (php -l по всем файлам)
-
-$ find . -name "*.php" -not -path "./.git/*" -print0 | xargs -0 -n1 php -l
-No syntax errors detected in ./wp/cli/seed.php
-No syntax errors detected in ./wp/cli/delivery-zones.php
-No syntax errors detected in ./wp/themes/velotok/front-page.php
-No syntax errors detected in ./wp/themes/velotok/page.php
-No syntax errors detected in ./wp/themes/velotok/tag.php
-No syntax errors detected in ./wp/themes/velotok/archive.php
-No syntax errors detected in ./wp/themes/velotok/search.php
-No syntax errors detected in ./wp/themes/velotok/404.php
-No syntax errors detected in ./wp/themes/velotok/category.php
-No syntax errors detected in ./wp/themes/velotok/inc/product-validation.php
-No syntax errors detected in ./wp/themes/velotok/inc/security.php
-No syntax errors detected in ./wp/themes/velotok/inc/localization.php
-No syntax errors detected in ./wp/themes/velotok/inc/brand-style.php
-No syntax errors detected in ./wp/themes/velotok/inc/catalog-filters.php
-No syntax errors detected in ./wp/themes/velotok/inc/setup.php
-No syntax errors detected in ./wp/themes/velotok/inc/woocommerce.php
-No syntax errors detected in ./wp/themes/velotok/inc/customizer.php
-No syntax errors detected in ./wp/themes/velotok/inc/design-variants.php
-No syntax errors detected in ./wp/themes/velotok/inc/enqueue.php
-No syntax errors detected in ./wp/themes/velotok/header.php
-No syntax errors detected in ./wp/themes/velotok/single.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/categories.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/hero.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/header-bar.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/footer-content.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/lead-form.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/model-card.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/advantages.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/models.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/reviews.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/content-post-card.php
-No syntax errors detected in ./wp/themes/velotok/template-parts/picker.php
-No syntax errors detected in ./wp/themes/velotok/index.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-search-filters-contract-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/localization-ru-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/theme-responsive-accessibility-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/theme-brand-style-contract-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-product-card-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/picker-budget-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/theme-required-attributes-server-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/picker-index-budget-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-negative-price-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-all-products-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/localization-language-pack-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-published-status-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/checkout-empty-cart-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-published-products-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-filters-contract-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/theme-control-widths-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-filters-styles-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/theme-design-variants-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/woocommerce-templates-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/checkout-auth-required-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-valid-products-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/picker-models-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-render-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-product-state-model-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-sorting-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-search-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/theme-invalid-price-message-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/theme-no-stub-plugins-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/theme-article-templates-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/checkout-order-integration-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-display-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-pagination-preserves-filters-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/model-card-test.php
-No syntax errors detected in ./wp/themes/velotok/tests/catalog-published-card-filter-test.php
-No syntax errors detected in ./wp/themes/velotok/functions.php
-No syntax errors detected in ./wp/themes/velotok/comments.php
-No syntax errors detected in ./wp/themes/velotok/author.php
-No syntax errors detected in ./wp/themes/velotok/footer.php
-No syntax errors detected in ./wp/themes/velotok/woocommerce/single-product.php
-No syntax errors detected in ./wp/themes/velotok/woocommerce/checkout/thankyou.php
-No syntax errors detected in ./wp/themes/velotok/woocommerce/checkout/form-checkout.php
-No syntax errors detected in ./wp/themes/velotok/woocommerce/content-product.php
-No syntax errors detected in ./wp/themes/velotok/woocommerce/cart/cart.php
-No syntax errors detected in ./wp/themes/velotok/woocommerce/archive-product.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/product-validation.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/class-pvs-admin.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/delivery-options.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/accounts-wordpress.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/meta.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/cart-woocommerce.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/product-attributes.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/payment-gateway.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/checkout-payment-delivery.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/yookassa.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/woocommerce-payment-gateway.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/payment-integration.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/cart.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/delivery-zones.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/class-pvs-contract.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/delivery-woocommerce.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/class-pvs-scanner.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/yookassa-gateway.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/checkout-order.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/guest-cart-registration.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/order-delivery.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/accounts.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/delivery-shipping-methods.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/spec-data.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/payment.php
-No syntax errors detected in ./wp/plugins/velotok-core/includes/catalog.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-order-persistence-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-empty-cart-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-webhook-signature-idempotency-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-registration-cart-checkout-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-logout-session-end-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-provider-parity-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-pickup-points-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-out-of-zone-ambiguous-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-user-persistence-devices-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-existing-email-login-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-status-model-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-registration-confirmation-required-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-order-status-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-guest-transfer-login-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-weight-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/catalog-product-card-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/product-price-validation-message-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-checkout-auth-required-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-guest-persistence-sessions-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-secrets-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-quantity-limit-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-woocommerce-integration-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-email-confirmation-wp-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-buyer-test-mode-banner-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-existing-email-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-email-confirmation-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-woocommerce-integration-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-user-persistence-devices-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-logout-session-end-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-unconfirmed-account-access-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-pickup-independent-of-zone-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-empty-cart-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-webhook-signature-idempotency-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-empty-on-remove-last-item-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-order-status-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-order-selection-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-order-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-refund-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-duplicate-order-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/catalog-filters-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-order-persistence-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-cost-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/catalog-attributes-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-order-tracking-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-auth-required-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-status-model-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-totals-discounts-delivery-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-guest-persistence-sessions-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/catalog-product-state-model-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/catalog-sorting-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/catalog-search-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-refund-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/guest-cart-registration-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-store-configuration-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-checkout-auth-required-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/payment-secrets-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-eta-range-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-unconfirmed-account-access-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-zones-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-test-mode-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-auth-required-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/product-attributes-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-guest-transfer-login-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-empty-on-remove-last-item-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/product-attributes-card-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-provider-configuration-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/delivery-pickup-points-failure-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/catalog-pagination-preserves-filters-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-registration-cart-checkout-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/spec-data-contract-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/helpers/accounts-wordpress-harness.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/checkout-duplicate-order-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-totals-discounts-delivery-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/tests/cart-quantity-limit-redgreen-test.php
-No syntax errors detected in ./wp/plugins/velotok-core/velotok-core.php
-No syntax errors detected in ./wp/plugins/velotok-core/uninstall.php
-No syntax errors detected in ./scripts/seed.php
-
-exit code: 0
+Изменения: конфликты main разрешены, сохранены и установка языковых пакетов
+ru_RU (ядро + WooCommerce), и Contact Form 7/Flamingo из базы.
 
 ================================================================
-2. Синтаксис shell-скрипта настройки
+1. Полный набор проверок CI (scripts/ci/run-checks.sh)
 
-$ bash -n wp/cli/setup.sh
-exit code: 0
-
-================================================================
-3. Сформированные WP-CLI команды установки языковых пакетов ru_RU
-
-$ php -r 'define("ABSPATH", __DIR__); function add_filter(){}; require "wp/themes/velotok/inc/localization.php"; print_r( velotok_localization_language_pack_commands() );'
-Array
-(
-    [0] => language core install ru_RU --activate
-    [1] => language plugin install woocommerce ru_RU
-)
-
-exit code: 0
-
-================================================================
-4. Тесты темы (включая localization-ru-test.php и localization-language-pack-test.php)
-
-$ for test in wp/themes/velotok/tests/*-test.php; do echo "== $test"; php "$test" || exit 1; done
+$ bash scripts/ci/run-checks.sh . /tmp/velotok-results.json
+== php-lint
+PASS: php-lint
+== php-tests
 == wp/themes/velotok/tests/catalog-all-products-test.php
 OK: каталог выводит все товары, обязательное описание и дополнительные атрибуты.
 == wp/themes/velotok/tests/catalog-display-test.php
 OK: каталог электровелосипедов выводит все карточки с обязательными и произвольными атрибутами.
 == wp/themes/velotok/tests/catalog-filters-contract-test.php
 PASS: фильтры каталога строятся по контракту (TESTEB-20).
+== wp/themes/velotok/tests/catalog-filters-rendered-styles-test.php
+PASS: отрендеренные фильтры каталога получают стили темы на /shop/ и категориях (EBIKE-19).
 == wp/themes/velotok/tests/catalog-filters-styles-test.php
 PASS: фильтры каталога получают стили темы на десктопе и узких экранах (EBIKE-19).
 == wp/themes/velotok/tests/catalog-negative-price-test.php
@@ -250,6 +48,8 @@ PASS: сортировка каталога поддерживает фикси�
 PASS: витрина показывает только валидные опубликованные товары (TESTEB-51).
 == wp/themes/velotok/tests/checkout-auth-required-test.php
 PASS: оформление заказа недоступно гостю и предлагает войти (TESTEB-24).
+== wp/themes/velotok/tests/checkout-classic-test.php
+PASS: checkout использует классический шорткод и шаблон темы вместо блока (EBIKE-22).
 == wp/themes/velotok/tests/checkout-empty-cart-test.php
 PASS: оформление заказа недоступно при пустой корзине (TESTEB-27).
 == wp/themes/velotok/tests/checkout-order-integration-test.php
@@ -270,12 +70,20 @@ PASS: обязательные атрибуты карточки отображ�
 == wp/themes/velotok/tests/picker-budget-test.php
 ok - все 48 комбинаций подбора укладываются в бюджет
 ok - границы бюджетов проверяются включительно
+ok - модель без цены не обходит фильтр бюджета
 ok - цена берётся из данных модели, а не из жёсткой таблицы
 PASS: подборщик фильтрует модели по бюджету во всех комбинациях.
 == wp/themes/velotok/tests/picker-index-budget-test.php
 ok - index.html: все 48 комбинаций укладываются в бюджет
 ok - index.html: границы бюджетов проверяются включительно
+ok - index.html: модель без цены не обходит фильтр бюджета
+ok - index.html: цены берутся из каталога товаров content/products.json
 PASS: подборщик на главной странице фильтрует модели по бюджету.
+== wp/themes/velotok/tests/picker-main-widget-test.php
+ok - виджет main.js: все 48 комбинаций показывают модель в рамках бюджета
+ok - виджет main.js: «до 80 000» не показывает Курьер и Хребет Trail
+ok - виджет main.js: «от 120 000» не показывает Стрит 7
+PASS: виджет подбора использует бюджет как фильтр и цены товаров.
 == wp/themes/velotok/tests/picker-models-test.php
 ok - в подборщик попадают все модели каталога
 ok - модели индексируются по slug товара
@@ -288,6 +96,7 @@ ok - категория товара передаётся в подборщик
 ok - изменение цены товара сразу меняет данные подборщика
 ok - подборщик получает те же данные из каталога товаров
 ok - есть сообщение для бюджета без подходящих моделей
+ok - товары без корректной цены не попадают в подборщик
 PASS: подборщик получает модели и цены из товаров.
 == wp/themes/velotok/tests/theme-article-templates-test.php
 PASS: тема содержит шаблоны статей, рубрик и общую карточку записи (TESTEB-57).
@@ -307,13 +116,68 @@ PASS: обязательные атрибуты товара валидирую�
 PASS: тема адаптивна и доступна с клавиатуры (TESTEB-52).
 == wp/themes/velotok/tests/woocommerce-templates-test.php
 PASS: тема переопределяет шаблоны WooCommerce и подключает их через woocommerce_template_path/woocommerce_locate_template (TESTEB-50).
-
-exit code: 0
-
-================================================================
-5. PHP-тесты плагина velotok-core
-
-$ for test in wp/plugins/velotok-core/tests/*-test.php; do echo "== $test"; php "$test" || exit 1; done
+PASS: php-tests
+== plugin-tests
+== wp/plugins/velotok-core/tests/accounts-contract.test.js
+PASS: accounts contract and PHP behavior test passed
+== wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen.test.js
+PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
+== wp/plugins/velotok-core/tests/accounts-redgreen.test.js
+PASS: accounts contract test fails without email confirmation and passes with it
+== wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
+PASS: WordPress accounts integration is persistent and the test fails without email confirmation or customer persistence
+== wp/plugins/velotok-core/tests/checkout-order-contract.test.js
+PASS: оформление заказа через WooCommerce Checkout проверено.
+PASS: checkout order contract verified with PHP
+== wp/plugins/velotok-core/tests/checkout-order-redgreen.test.js
+PASS: checkout order contract test is red without checkout, authorization, empty-cart and duplicate guards, and green with them
+== wp/plugins/velotok-core/tests/delivery-cost-redgreen.test.js
+PASS: delivery cost test is red without the free-shipping threshold and green with it
+== wp/plugins/velotok-core/tests/delivery-eta-range-redgreen.test.js
+PASS: delivery ETA test is red without a stored range and green with it
+== wp/plugins/velotok-core/tests/delivery-order-tracking-redgreen.test.js
+PASS: delivery tracking test is red without a stored tracking number and green with it
+== wp/plugins/velotok-core/tests/delivery-pickup-points-failure-redgreen.test.js
+PASS: pickup point failure test is red without explicit failure handling and green with it
+== wp/plugins/velotok-core/tests/delivery-pickup-points-redgreen.test.js
+PASS: delivery pickup points test is red without the address radius and green with it
+== wp/plugins/velotok-core/tests/delivery-provider-configuration-redgreen.test.js
+PASS: provider configuration error test is red without the dedicated code and green with it
+== wp/plugins/velotok-core/tests/delivery-provider-parity-redgreen.test.js
+PASS: delivery provider parity test is red without equal providers and green with them
+== wp/plugins/velotok-core/tests/delivery-store-configuration-redgreen.test.js
+PASS: delivery store configuration test is red without reading the store configuration and green with it
+== wp/plugins/velotok-core/tests/delivery-test-mode-redgreen.test.js
+PASS: delivery test mode test is red without the provider flag and green with it
+== wp/plugins/velotok-core/tests/delivery-weight-redgreen.test.js
+PASS: delivery weight test is red without unambiguous order weight and green with it
+== wp/plugins/velotok-core/tests/delivery-woocommerce-integration.test.js
+PASS: WooCommerce delivery integration is red without shipping method registration and green with it
+== wp/plugins/velotok-core/tests/delivery-zones-contract.test.js
+OK: способы доставки из зон WooCommerce, тарифы, сроки и самовывоз на месте.
+PASS: delivery zones contract verified with PHP
+== wp/plugins/velotok-core/tests/delivery-zones-redgreen.test.js
+PASS: delivery zones contract test is red without the WooCommerce zones source and green with it
+== wp/plugins/velotok-core/tests/guest-cart-registration-contract.test.js
+OK: mocked-контракт гостевой корзины и регистрации на месте.
+PASS: guest cart registration stub contract verified with PHP
+== wp/plugins/velotok-core/tests/guest-cart-registration-redgreen.test.js
+PASS: guest cart contract test is red without the stub and green with the stub
+== wp/plugins/velotok-core/tests/payment-contract.test.js
+OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
+PASS: WooCommerce ЮKassa payment gateway verified with PHP
+== wp/plugins/velotok-core/tests/payment-gateway-contract.test.js
+OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
+PASS: WooCommerce ЮKassa payment gateway verified with PHP
+== wp/plugins/velotok-core/tests/product-attributes-contract.test.js
+OK: mocked-контракт дополнительных атрибутов товара на месте.
+OK: карточки каталога выводят атрибуты продавца и не зависят от плагина-заглушки.
+PASS: additional product attributes stub verified with PHP
+== wp/plugins/velotok-core/tests/spec-data-contract.test.js
+OK: mocked-контракт данных спецификации на месте.
+PASS: specification data stub contract verified with PHP
+PASS: plugin-tests
+== php-plugin-tests
 == wp/plugins/velotok-core/tests/accounts-contract-test.php
 PASS: контракт аккаунтов выполняется.
 == wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen-test.php
@@ -438,6 +302,11 @@ OK: WooCommerce предлагает СДЭК и Почту РФ из зон с 
 OK: способы доставки из зон WooCommerce, тарифы, сроки и самовывоз на месте.
 == wp/plugins/velotok-core/tests/guest-cart-registration-contract-test.php
 OK: mocked-контракт гостевой корзины и регистрации на месте.
+== wp/plugins/velotok-core/tests/lead-forms-contract-test.php
+Создана форма «test-drive» (ID 1), получатель shop@example.test.
+Обновлена форма «test-drive» (ID 2), получатель shop@example.test.
+Создана форма «consultation» (ID 1), получатель shop@example.test.
+OK: формы test-drive и consultation создаются, получатель задан, заявки сохраняются во Flamingo.
 == wp/plugins/velotok-core/tests/payment-contract-test.php
 OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
 == wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
@@ -468,80 +337,16 @@ OK: карточки каталога выводят атрибуты прода
 OK: mocked-контракт дополнительных атрибутов товара на месте.
 == wp/plugins/velotok-core/tests/product-price-validation-message-test.php
 PASS: невалидная цена отклоняется с конкретным сообщением (TESTEB-62, core).
+== wp/plugins/velotok-core/tests/provisioning-checkout-layout-test.php
+PASS: провижининг переводит checkout на классический шорткод и шаблон темы (EBIKE-22).
+== wp/plugins/velotok-core/tests/provisioning-checkout-test.php
+PASS: после провижининга checkout создаёт заказ с оплатой и доставкой.
+== wp/plugins/velotok-core/tests/provisioning-contract-test.php
+OK: провижининг магазина создаёт зону, способы доставки, шлюзы и ru_RU идемпотентно.
 == wp/plugins/velotok-core/tests/spec-data-contract-test.php
 OK: mocked-контракт данных спецификации на месте.
-
-exit code: 0
-
-================================================================
-6. JS-контракты плагина velotok-core
-
-$ for test in wp/plugins/velotok-core/tests/*.test.js; do echo "== $test"; node "$test" || exit 1; done
-== wp/plugins/velotok-core/tests/accounts-contract.test.js
-PASS: accounts contract and PHP behavior test passed
-== wp/plugins/velotok-core/tests/accounts-email-confirmation-redgreen.test.js
-PASS: TESTEB-2 падает без обязательного подтверждения email и проходит с ним.
-== wp/plugins/velotok-core/tests/accounts-redgreen.test.js
-PASS: accounts contract test fails without email confirmation and passes with it
-== wp/plugins/velotok-core/tests/accounts-wordpress-integration.test.js
-PASS: WordPress accounts integration is persistent and the test fails without email confirmation or customer persistence
-== wp/plugins/velotok-core/tests/checkout-order-contract.test.js
-PASS: оформление заказа через WooCommerce Checkout проверено.
-PASS: checkout order contract verified with PHP
-== wp/plugins/velotok-core/tests/checkout-order-redgreen.test.js
-PASS: checkout order contract test is red without checkout, authorization, empty-cart and duplicate guards, and green with them
-== wp/plugins/velotok-core/tests/delivery-cost-redgreen.test.js
-PASS: delivery cost test is red without the free-shipping threshold and green with it
-== wp/plugins/velotok-core/tests/delivery-eta-range-redgreen.test.js
-PASS: delivery ETA test is red without a stored range and green with it
-== wp/plugins/velotok-core/tests/delivery-order-tracking-redgreen.test.js
-PASS: delivery tracking test is red without a stored tracking number and green with it
-== wp/plugins/velotok-core/tests/delivery-pickup-points-failure-redgreen.test.js
-PASS: pickup point failure test is red without explicit failure handling and green with it
-== wp/plugins/velotok-core/tests/delivery-pickup-points-redgreen.test.js
-PASS: delivery pickup points test is red without the address radius and green with it
-== wp/plugins/velotok-core/tests/delivery-provider-configuration-redgreen.test.js
-PASS: provider configuration error test is red without the dedicated code and green with it
-== wp/plugins/velotok-core/tests/delivery-provider-parity-redgreen.test.js
-PASS: delivery provider parity test is red without equal providers and green with them
-== wp/plugins/velotok-core/tests/delivery-store-configuration-redgreen.test.js
-PASS: delivery store configuration test is red without reading the store configuration and green with it
-== wp/plugins/velotok-core/tests/delivery-test-mode-redgreen.test.js
-PASS: delivery test mode test is red without the provider flag and green with it
-== wp/plugins/velotok-core/tests/delivery-weight-redgreen.test.js
-PASS: delivery weight test is red without unambiguous order weight and green with it
-== wp/plugins/velotok-core/tests/delivery-woocommerce-integration.test.js
-PASS: WooCommerce delivery integration is red without shipping method registration and green with it
-== wp/plugins/velotok-core/tests/delivery-zones-contract.test.js
-OK: способы доставки из зон WooCommerce, тарифы, сроки и самовывоз на месте.
-PASS: delivery zones contract verified with PHP
-== wp/plugins/velotok-core/tests/delivery-zones-redgreen.test.js
-PASS: delivery zones contract test is red without the WooCommerce zones source and green with it
-== wp/plugins/velotok-core/tests/guest-cart-registration-contract.test.js
-OK: mocked-контракт гостевой корзины и регистрации на месте.
-PASS: guest cart registration stub contract verified with PHP
-== wp/plugins/velotok-core/tests/guest-cart-registration-redgreen.test.js
-PASS: guest cart contract test is red without the stub and green with the stub
-== wp/plugins/velotok-core/tests/payment-contract.test.js
-OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
-PASS: WooCommerce ЮKassa payment gateway verified with PHP
-== wp/plugins/velotok-core/tests/payment-gateway-contract.test.js
-OK: контракт платёжного шлюза WooCommerce и ЮKassa проверен (58 проверок).
-PASS: WooCommerce ЮKassa payment gateway verified with PHP
-== wp/plugins/velotok-core/tests/product-attributes-contract.test.js
-OK: mocked-контракт дополнительных атрибутов товара на месте.
-OK: карточки каталога выводят атрибуты продавца и не зависят от плагина-заглушки.
-PASS: additional product attributes stub verified with PHP
-== wp/plugins/velotok-core/tests/spec-data-contract.test.js
-OK: mocked-контракт данных спецификации на месте.
-PASS: specification data stub contract verified with PHP
-
-exit code: 0
-
-================================================================
-7. Тесты CI-инструментов
-
-$ for test in scripts/ci/tests/*.test.mjs; do echo "== $test"; node "$test" || exit 1; done
+PASS: php-plugin-tests
+== ci-repair-tests
 == scripts/ci/tests/evidence.test.mjs
 PASS: green checks backed by a successful recovery run are ready
 PASS: synthetic green checks without a CI run are red
@@ -678,13 +483,49 @@ PASS: the shared runner keeps the full check set
 PASS: rollout verification runs on PR #65, push to main and manually
 PASS: ci executes the plugin PHP acceptance tests
 PASS: ci keeps every job that the shared runner verifies
+PASS: ci-repair-tests
+exit code: 0
 
+Результаты по группам:
+{
+  "php-lint": "success",
+  "php-tests": "success",
+  "plugin-tests": "success",
+  "php-plugin-tests": "success",
+  "ci-repair-tests": "success"
+}
+
+================================================================
+2. Зависимости: PHP/Node-тесты самодостаточны, composer/npm install не
+   требуются (в проекте нет composer.json/package.json).
+
+================================================================
+3. Установка языковых пакетов ru_RU
+
+$ grep -nE "language .*install.*ru_RU|install_language_packs" wp/cli/setup.sh docker-compose.yml
+wp/cli/setup.sh:88:wp_cli language core install ru_RU --activate >/dev/null 2>&1 \
+wp/cli/setup.sh:122:if ( function_exists( "velotok_localization_install_language_packs" ) ) {
+wp/cli/setup.sh:123:	foreach ( velotok_localization_install_language_packs() as $command => $installed ) {
+wp/cli/setup.sh:145:	wp_cli language plugin install contact-form-7 ru_RU >/dev/null 2>&1 \
+wp/cli/setup.sh:147:	wp_cli language plugin install flamingo ru_RU >/dev/null 2>&1 \
+docker-compose.yml:89:        wp language core install ru_RU --activate --allow-root >/dev/null 2>&1 || true
+docker-compose.yml:93:        wp eval 'if ( function_exists( "velotok_localization_install_language_packs" ) ) { foreach ( velotok_localization_install_language_packs() as $command => $installed ) { echo ( $installed ? "OK: " : "WARNING: " ) . $command . PHP_EOL; } }' --allow-root || true
+docker-compose.yml:94:        wp language plugin install woocommerce ru_RU --allow-root >/dev/null 2>&1 || true
+docker-compose.yml:95:        wp language plugin install contact-form-7 ru_RU --allow-root >/dev/null 2>&1 || true
+docker-compose.yml:96:        wp language plugin install flamingo ru_RU --allow-root >/dev/null 2>&1 || true
+
+$ php wp/themes/velotok/tests/localization-language-pack-test.php
+PASS: языковые пакеты ru_RU для ядра и WooCommerce устанавливаются (EBIKE-20).
+exit code: 0
+
+$ php wp/themes/velotok/tests/localization-ru-test.php
+PASS: витрина и служебные страницы WooCommerce локализованы на русский (EBIKE-20).
 exit code: 0
 
 ================================================================
-8. Red-green: тест падает, если языковые пакеты не устанавливаются
+4. Red-green: тест языковых пакетов падает без реализации
 
-$ php <копия localization-language-pack-test.php с localization.php без новых функций>
+$ php <localization-language-pack-test.php с localization.php без функций установки пакетов>
 FAIL: 4 проверок языковых пакетов не прошли:
  - Не определена функция языковых пакетов: velotok_localization_language_packs.
  - Не определена функция языковых пакетов: velotok_localization_language_pack_commands.
@@ -693,9 +534,165 @@ FAIL: 4 проверок языковых пакетов не прошли:
 exit code: 1 (ожидается ненулевой: без установки языковых пакетов тест красный)
 
 ================================================================
-Итог: все доступные проверки прошли.
-Ограничение окружения: Docker в workspace недоступен, поэтому docker compose
-и wp/tests/smoke.sh здесь не запускались. Установка языковых пакетов в
-контейнере покрыта setup.sh/docker-compose.yml и проверяется тестом
-localization-language-pack-test.php; при отсутствии сети WP-CLI сообщит
-WARNING, а витрина продолжит использовать резервный русский словарь.
+Итог: все доступные проверки прошли (php-lint, php-tests, plugin-tests,
+php-plugin-tests, ci-repair-tests), включая red-green тест установки
+языковых пакетов ru_RU. Docker в workspace недоступен, поэтому
+docker compose и wp/tests/smoke.sh здесь не запускались; установка
+пакетов в контейнере выполняется setup.sh/docker-compose.yml и
+проверяется localization-language-pack-test.php. При отсутствии сети
+WP-CLI выводит WARNING, а витрина продолжает использовать резервный
+русский словарь.
+
+================================================================
+Приложение: сохранённый отчёт базовой ветки main (не удалён при
+разрешении конфликта verify.log)
+
+EBIKE-18: подбор по бюджету и цены из товаров
+==============================================
+
+Дата проверки: 2026-11-10 UTC
+Окружение: PHP 8.2.35 (cli), Node v22.23.4
+
+Что исправлено
+--------------
+* main.js: pickModel() проверяет, что бюджет известен, и передаёт выбор в
+  picker.pickModel(). Бюджет — фильтр, а не ветка выбора; при неизвестном
+  бюджете модель не показывается.
+* picker.js: pickModel() отбрасывает модели, цена которых не попадает в
+  диапазон бюджета. matchesBudget() больше не считает NaN/Infinity
+  подходящей ценой, поэтому модель без цены не обходит фильтр.
+* enqueue.php: модели и цены по-прежнему берутся из velotok_get_home_models()
+  (товары WooCommerce или демо-каталог). Дополнительно пропускаются товары
+  без числовой/конечной неотрицательной цены, чтобы 0 или мусор не попадали
+  в подборщик.
+* index.html: подборщик загружает цены из общего каталога content/products.json;
+  разметка используется только как fallback до загрузки JSON.
+* Добавлен тест виджета main.js + picker.js на все 48 комбинаций и на
+  конкретные симптоми из задачи («до 80 000» и «от 120 000»).
+
+Red-green доказательство для NaN
+--------------------------------
+До исправления matchesBudget(NaN, "low") возвращал true, поэтому модель без
+цены проходила фильтр и тест мог пройти вхолостую. Временная копия picker.js
+со старым поведением падает на новом тесте:
+
+$ node /tmp/redgreen.js
+FAIL: старое поведение пропускает модель без цены через фильтр бюджета
+exit code: 1
+
+Проверки подборщика
+-------------------
+$ node wp/themes/velotok/tests/picker-budget.test.js
+ok - все 48 комбинаций подбора укладываются в бюджет
+ok - границы бюджетов проверяются включительно
+ok - модель без цены не обходит фильтр бюджета
+ok - цена берётся из данных модели, а не из жёсткой таблицы
+PASS: подборщик фильтрует модели по бюджету во всех комбинациях.
+exit code: 0
+
+$ node wp/themes/velotok/tests/picker-index-budget.test.js
+ok - index.html: все 48 комбинаций укладываются в бюджет
+ok - index.html: границы бюджетов проверяются включительно
+ok - index.html: модель без цены не обходит фильтр бюджета
+ok - index.html: цены берутся из каталога товаров content/products.json
+PASS: подборщик на главной странице фильтрует модели по бюджету.
+exit code: 0
+
+$ node wp/themes/velotok/tests/picker-main-widget.test.js
+ok - виджет main.js: все 48 комбинаций показывают модель в рамках бюджета
+ok - виджет main.js: «до 80 000» не показывает Курьер и Хребет Trail
+ok - виджет main.js: «от 120 000» не показывает Стрит 7
+PASS: виджет подбора использует бюджет как фильтр и цены товаров.
+exit code: 0
+
+$ php wp/themes/velotok/tests/picker-models-test.php
+ok - в подборщик попадают все модели каталога
+ok - модели индексируются по slug товара
+ok - цена берётся из товара, а не из таблицы темы
+ok - цена для вывода форматируется из цены товара
+ok - ссылка ведёт на карточку товара
+ok - для подписи используется данные товара
+ok - без card_id ссылка собирается из slug
+ok - категория товара передаётся в подборщик
+ok - изменение цены товара сразу меняет данные подборщика
+ok - подборщик получает те же данные из каталога товаров
+ok - есть сообщение для бюджета без подходящих моделей
+ok - товары без корректной цены не попадают в подборщик
+PASS: подборщик получает модели и цены из товаров.
+exit code: 0
+
+EBIKE-19: стили фильтров каталога (/shop/ и категории)
+----------------------------------------------------
+Исправлено: в wp/themes/velotok/assets/css/main.css добавлены/уточнены
+правила .catalog-filter* (сетка формы, сброс рамки fieldset и legend,
+поля поиска/диапазона, кнопка «Применить», ссылка «Сбросить», адаптив
+768/360px). Добавлен тест, который рендерит реальный шаблон
+woocommerce/archive-product.php, разбирает DOM и применяет к нему
+правила из main.css.
+
+$ php wp/themes/velotok/tests/catalog-filters-styles-test.php
+PASS: фильтры каталога получают стили темы на десктопе и узких экранах (EBIKE-19).
+exit code: 0
+
+$ php wp/themes/velotok/tests/catalog-filters-rendered-styles-test.php
+PASS: отрендеренные фильтры каталога получают стили темы на /shop/ и категориях (EBIKE-19).
+exit code: 0
+
+Red-green: если удалить блок стилей фильтров из main.css, падают оба
+теста: catalog-filters-styles-test.php (25 проверок) и
+catalog-filters-rendered-styles-test.php (20 проверок). С блоком — проходят.
+
+$ bash scripts/ci/run-checks.sh "$PWD"
+php-lint: success
+php-tests: success
+plugin-tests: success
+php-plugin-tests: success
+ci-repair-tests: success
+exit code: 0
+
+Скриншот в окружении не снимался: headless-браузер (chromium/playwright)
+не установлен. Вместо скриншота используется тест фактического рендера
+DOM + применённых CSS-правил на странице каталога.
+
+Полный прогон проверок репозитория
+----------------------------------
+$ bash scripts/ci/run-checks.sh .
+...
+== wp/themes/velotok/tests/picker-budget-test.php
+ok - все 48 комбинаций подбора укладываются в бюджет
+ok - границы бюджетов проверяются включительно
+ok - модель без цены не обходит фильтр бюджета
+ok - цена берётся из данных модели, а не из жёсткой таблицы
+PASS: подборщик фильтрует модели по бюджету во всех комбинациях.
+== wp/themes/velotok/tests/picker-index-budget-test.php
+ok - index.html: все 48 комбинаций укладываются в бюджет
+ok - index.html: границы бюджетов проверяются включительно
+ok - index.html: модель без цены не обходит фильтр бюджета
+ok - index.html: цены берутся из каталога товаров content/products.json
+PASS: подборщик на главной странице фильтрует модели по бюджету.
+== wp/themes/velotok/tests/picker-main-widget-test.php
+ok - виджет main.js: все 48 комбинаций показывают модель в рамках бюджета
+ok - виджет main.js: «до 80 000» не показывает Курьер и Хребет Trail
+ok - виджет main.js: «от 120 000» не показывает Стрит 7
+PASS: виджет подбора использует бюджет как фильтр и цены товаров.
+== wp/themes/velotok/tests/picker-models-test.php
+ok - в подборщик попадают все модели каталога
+ok - модели индексируются по slug товара
+ok - цена берётся из товара, а не из таблицы темы
+ok - цена для вывода форматируется из цены товара
+ok - ссылка ведёт на карточку товара
+ok - для подписи используется данные товара
+ok - без card_id ссылка собирается из slug
+ok - категория товара передаётся в подборщик
+ok - изменение цены товара сразу меняет данные подборщика
+ok - подборщик получает те же данные из каталога товаров
+ok - есть сообщение для бюджета без подходящих моделей
+ok - товары без корректной цены не попадают в подборщик
+PASS: подборщик получает модели и цены из товаров.
+...
+PASS: php-lint
+PASS: php-tests
+PASS: plugin-tests
+PASS: php-plugin-tests
+PASS: ci-repair-tests
+exit code: 0

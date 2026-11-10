@@ -192,6 +192,23 @@ velotok_l10n_pack_assert(
 	'docker-compose.yml должен вызывать установку языковых пакетов ru_RU.'
 );
 
+/*
+ * 7. The installation is not only a locale filter: the setup scripts contain
+ *    the explicit WP-CLI commands that download the ru_RU pack files.
+ */
+velotok_l10n_pack_assert(
+	false !== strpos( $setup_script, 'language core install ru_RU' ),
+	'wp/cli/setup.sh должен явно ставить языковой пакет ядра ru_RU.'
+);
+velotok_l10n_pack_assert(
+	false !== strpos( $compose, 'language core install ru_RU' ),
+	'docker-compose.yml должен явно ставить языковой пакет ядра ru_RU.'
+);
+velotok_l10n_pack_assert(
+	false !== strpos( $compose, 'language plugin install woocommerce ru_RU' ),
+	'docker-compose.yml должен явно ставить языковой пакет WooCommerce ru_RU.'
+);
+
 velotok_l10n_pack_cleanup( $lang_dir );
 
 if ( $failures ) {
