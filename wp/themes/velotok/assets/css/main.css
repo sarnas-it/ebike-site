@@ -465,6 +465,20 @@ body.is-locked{overflow:hidden}
   text-transform:uppercase;
   color:var(--muted);
 }
+.catalog-filter-form fieldset{
+  min-inline-size:0;
+}
+.catalog-filter-form legend{
+  max-width:100%;
+  overflow-wrap:anywhere;
+}
+.catalog-filter-form input[type="number"]{
+  -moz-appearance:textfield;
+}
+.catalog-filter-form input[type="number"]::-webkit-outer-spin-button,
+.catalog-filter-form input[type="number"]::-webkit-inner-spin-button{
+  margin:0;
+}
 .catalog-filter-actions{
   grid-column:1/-1;
   display:flex;
@@ -516,6 +530,11 @@ body.is-locked{overflow:hidden}
   border-color:var(--ink);
   background:var(--lime-soft);
   color:var(--ink);
+}
+.catalog-filter-form .catalog-filter-actions .button:focus-visible,
+.catalog-filter-form .catalog-filter-actions .text-link:focus-visible{
+  outline:2px solid var(--ink);
+  outline-offset:3px;
 }
 @media (max-width:768px){
   .catalog-filter-form{

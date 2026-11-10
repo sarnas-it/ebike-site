@@ -72,6 +72,39 @@ ok - товары без корректной цены не попадают в 
 PASS: подборщик получает модели и цены из товаров.
 exit code: 0
 
+EBIKE-19: стили фильтров каталога (/shop/ и категории)
+----------------------------------------------------
+Исправлено: в wp/themes/velotok/assets/css/main.css добавлены/уточнены
+правила .catalog-filter* (сетка формы, сброс рамки fieldset и legend,
+поля поиска/диапазона, кнопка «Применить», ссылка «Сбросить», адаптив
+768/360px). Добавлен тест, который рендерит реальный шаблон
+woocommerce/archive-product.php, разбирает DOM и применяет к нему
+правила из main.css.
+
+$ php wp/themes/velotok/tests/catalog-filters-styles-test.php
+PASS: фильтры каталога получают стили темы на десктопе и узких экранах (EBIKE-19).
+exit code: 0
+
+$ php wp/themes/velotok/tests/catalog-filters-rendered-styles-test.php
+PASS: отрендеренные фильтры каталога получают стили темы на /shop/ и категориях (EBIKE-19).
+exit code: 0
+
+Red-green: если удалить блок стилей фильтров из main.css, падают оба
+теста: catalog-filters-styles-test.php (25 проверок) и
+catalog-filters-rendered-styles-test.php (20 проверок). С блоком — проходят.
+
+$ bash scripts/ci/run-checks.sh "$PWD"
+php-lint: success
+php-tests: success
+plugin-tests: success
+php-plugin-tests: success
+ci-repair-tests: success
+exit code: 0
+
+Скриншот в окружении не снимался: headless-браузер (chromium/playwright)
+не установлен. Вместо скриншота используется тест фактического рендера
+DOM + применённых CSS-правил на странице каталога.
+
 Полный прогон проверок репозитория
 ----------------------------------
 $ bash scripts/ci/run-checks.sh .

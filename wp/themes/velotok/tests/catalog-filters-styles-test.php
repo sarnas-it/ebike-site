@@ -67,6 +67,7 @@ function velotok_filter_style_compact( $css ) {
 
 $main_css = velotok_filter_style_read( 'assets/css/main.css' );
 $archive  = velotok_filter_style_read( 'woocommerce/archive-product.php' );
+$enqueue  = velotok_filter_style_read( 'inc/enqueue.php' );
 
 $marker = '/* Фильтры каталога (EBIKE-19) */';
 $start  = strpos( $main_css, $marker );
@@ -171,6 +172,31 @@ velotok_filter_style_assert(
 velotok_filter_style_assert(
 	substr_count( $filters_css, '{' ) === substr_count( $filters_css, '}' ),
 	'В блоке стилей фильтров несбалансированные фигурные скобки.'
+);
+
+/*
+ * 6. The stylesheet reaches the shop/category pages and the archive renders
+ *    every styled control, so /shop/ and product categories are not raw.
+ */
+velotok_filter_style_assert(
+	false !== strpos( $enqueue, 'assets/css/main.css' ),
+	'Тема не подключает assets/css/main.css на витрине.'
+);
+velotok_filter_style_assert(
+	(bool) preg_match( '/wp_enqueue_style\(\s*[\'"]velotok-main[\'"]/', $enqueue ),
+	'Стили фильтров не подключаются через wp_enqueue_style().'
+);
+velotok_filter_style_assert(
+	false !== strpos( $archive, '<fieldset class="catalog-filter-range"' ),
+	'В архиве каталога нет размеченного range-фильтра.'
+);
+velotok_filter_style_assert(
+	false !== strpos( $archive, '<div class="catalog-filter-actions">' ),
+	'В архиве каталога нет блока действий фильтров.'
+);
+velotok_filter_style_assert(
+	false !== strpos( $archive, 'class="text-link"' ) && false !== strpos( $archive, 'class="button"' ),
+	'В архиве каталога нет стилизованных кнопки и ссылки сброса.'
 );
 
 if ( $failures ) {
