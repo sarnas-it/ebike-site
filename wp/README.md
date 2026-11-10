@@ -16,10 +16,14 @@ docker compose up -d
 * логин по умолчанию — `admin`, пароль — `velotok-local` (меняется переменными
   `WORDPRESS_ADMIN_USER`, `WORDPRESS_ADMIN_PASSWORD`, `WORDPRESS_ADMIN_EMAIL`).
 
-Сервис `setup` идемпотентно устанавливает WordPress, активирует тему `velotok` и
+Сервис `wpcli` идемпотентно устанавливает WordPress, активирует тему `velotok` и
 плагин `velotok-core`, устанавливает WooCommerce, Contact Form 7 и Flamingo,
 создаёт формы заявок `test-drive` и `consultation`, создаёт служебные страницы и
-заполняет каталог демо-товарами из `wp/data/products.json`. Провижининг
+заполняет каталог демо-товарами из `wp/data/products.json`. Письма заявок
+принимает локальная SMTP-ловушка Mailpit (`http://localhost:8025`): плагин
+`wp/mu-plugins/velotok-mailcatcher.php` включает SMTP для контейнера WordPress,
+поэтому Contact Form 7 возвращает `mail_sent`, а E2E-тест проверяет реально
+доставленное письмо через REST API Mailpit. Провижининг
 создаёт зону доставки «Россия» со СДЭК, Почтой РФ и самовывозом из шоурума,
 включает оплату при получении (и ЮKassa при заданных реквизитах), поэтому
 checkout сразу может создавать заказы. Оформление заказа работает на
@@ -54,6 +58,7 @@ php wp/plugins/velotok-core/tests/product-attributes-card-test.php
 php wp/plugins/velotok-core/tests/payment-gateway-contract-test.php
 node wp/plugins/velotok-core/tests/payment-gateway-contract.test.js
 php wp/plugins/velotok-core/tests/lead-forms-contract-test.php
+php wp/plugins/velotok-core/tests/lead-forms-mail-delivery-redgreen-test.php
 php wp/plugins/velotok-core/tests/accounts-contract-test.php
 php wp/plugins/velotok-core/tests/accounts-wordpress-integration-test.php
 node wp/plugins/velotok-core/tests/accounts-contract.test.js
@@ -84,11 +89,17 @@ WooCommerce → список моделей → шаблон каталога �
 возврат в `refunded`; секреты читаются только из окружения или настроек.
 `lead-forms-contract-test.php` проверяет контракт настройки Contact Form 7 и
 Flamingo, создание форм `test-drive` и `consultation`, получателя писем и
-идемпотентность. Настоящую отправку проверяет `lead-forms-e2e.sh`: он поднимает
-сайт, отправляет обе формы POST-запросом в REST API Contact Form 7 и требует,
-чтобы Flamingo сохранил каждую заявку как Inbound Message с данными формы.
-Дымовой тест дополнительно проверяет эти элементы на реальной главной странице
-и запускает тот же E2E-сценарий.
+идемпотентность. `lead-forms-mail-delivery-redgreen-test.php` — red-green тест
+критерия «письмо действительно ушло»: он падает на статусе сбоя почты и на
+письме без нужного получателя или маркера, а зелёным становится только при
+`mail_sent` и совпадающем сообщении в Mailpit. Настоящую отправку проверяет
+`lead-forms-e2e.sh`: он поднимает сайт и SMTP-ловушку (или подключается к уже
+готовому WordPress без Docker), отправляет обе формы POST-запросом в REST API
+Contact Form 7, требует `status=mail_sent`, находит каждое письмо через REST
+API Mailpit с получателем из формы и маркером заявки и только затем проверяет,
+что Flamingo сохранил её как Inbound Message со статусом `mail_sent`. Дымовой
+тест дополнительно проверяет эти элементы на реальной главной странице и
+запускает тот же E2E-сценарий.
 
 Версии Contact Form 7 (`6.1.7`) и Flamingo (`2.6.4`) закреплены в
 `setup.sh`/`docker-compose.yml`: более новые релизы CF7 требуют PHP 8.3, а
@@ -131,8 +142,15 @@ Inbound Messages». Получателя можно переопределить
 контейнеры и тома тестового проекта.
 
 E2E-тест можно запустить отдельно: `bash wp/tests/lead-forms-e2e.sh`. Если сайт
-уже поднят, используйте `LEAD_FORMS_E2E_ATTACH=1` и тот же
-`COMPOSE_PROJECT_NAME`; так его вызывает `smoke.sh`.
+уже поднят, используйте `LEAD_FORMS_E2E_ATTACH=1`, тот же
+`COMPOSE_PROJECT_NAME` и тот же `MAILPIT_PORT`; так его вызывает `smoke.sh`.
+Тест не принимает `mail_failed`: успешная заявка должна иметь `mail_sent`,
+письмо с маркером и получателем должно лежать в Mailpit, а Flamingo — сохранить
+Inbound Message со статусом `mail_sent`. На стенде без Docker тот же сценарий
+запускается с `LEAD_FORMS_E2E_NO_DOCKER=1` и
+`LEAD_FORMS_E2E_WP_CMD='wp --path=/srv/wordpress --allow-root'`: скрипт не
+вызывает compose, но проверяет реальный WordPress, Contact Form 7, Mailpit и
+Flamingo.
 
 ## Остановка и сброс
 
@@ -169,5 +187,8 @@ docker compose down -v    # остановить и удалить базу, ф�
 * `wp/themes/velotok/inc/localization.php` — установка пакетов ru_RU, русская локаль, переводы служебных страниц и форматы цен/дат;
 * `wp/plugins/velotok-core/tests/product-attributes-contract-test.php` — тест контракта дополнительных атрибутов;
 * `wp/plugins/velotok-core/tests/product-attributes-card-test.php` — тест вывода дополнительных атрибутов в карточке;
-* `wp/tests/lead-forms-e2e.sh` — реальная отправка форм и проверка Inbound Messages Flamingo;
+* `wp/cli/lead-forms-mail-check.php` — общий чекер `mail_sent` и доставки письма в Mailpit;
+* `wp/mu-plugins/velotok-mailcatcher.php` — SMTP-мост WordPress → Mailpit;
+* `wp/tests/lead-forms-e2e.sh` — реальная отправка форм, доставка в Mailpit и проверка Inbound Messages Flamingo;
+* `wp/plugins/velotok-core/tests/lead-forms-mail-delivery-redgreen-test.php` — red-green тест доставки письма;
 * `wp/tests/smoke.sh` — дымовой тест локального запуска и E2E-проверка заявок.
