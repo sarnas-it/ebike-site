@@ -16,11 +16,23 @@ services:
       timeout: 5s
       retries: 30
 
+  # Local SMTP catcher for lead forms. Contact Form 7 reports mail_sent only
+  # when wp_mail() actually handed the message to an MTA; Mailpit accepts it over
+  # SMTP and exposes it to the E2E test via its REST API.
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
+
   wordpress:
     image: wordpress:php8.2-apache
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     ports:
       - "8080:80"
     environment:
@@ -29,6 +41,12 @@ services:
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress}
       WORDPRESS_DEBUG: "1"
+      # wp/mu-plugins/velotok-mailcatcher.php switches PHPMailer to SMTP only
+      # when VELOTOK_SMTP_HOST is set. The E2E test then verifies the delivered
+      # message in Mailpit instead of trusting CF7's mail_failed status.
+      VELOTOK_SMTP_HOST: mailpit
+      VELOTOK_SMTP_PORT: "1025"
+      VELOTOK_SMTP_FROM: admin@example.test
       # WP_DEBUG сам по себе печатает замечания PHP на страницу (WP_DEBUG_DISPLAY
       # по умолчанию true). Локальный стенд должен показывать продукт, а не
       # дамп ошибок: замечания уходят в wp-content/debug.log, на страницу — нет.
@@ -39,6 +57,7 @@ services:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
       - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
+      - ./wp/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
       - ./wp/cli:/opt/velotok/cli:ro
       - ./scripts:/var/www/html/scripts:ro
       - ./content:/var/www/html/content:ro
@@ -63,6 +82,7 @@ services:
       - wordpress_data:/var/www/html
       - ./wp/plugins/velotok-core:/var/www/html/wp-content/plugins/velotok-core:ro
       - ./wp/themes/velotok:/var/www/html/wp-content/themes/velotok:ro
+      - ./wp/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
       - ./wp/cli:/opt/velotok/cli:ro
       - ./scripts:/var/www/html/scripts:ro
       - ./content:/var/www/html/content:ro

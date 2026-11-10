@@ -10,6 +10,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 PORT="${WORDPRESS_PORT:-8080}"
+MAILPIT_PORT="${MAILPIT_PORT:-8025}"
 PROJECT="${COMPOSE_PROJECT_NAME:-velotok-smoke}"
 COMPOSE=(docker compose -p "$PROJECT")
 PAGE_FILE="$(mktemp)"
@@ -90,6 +91,7 @@ fi
 LEAD_FORMS_E2E_ATTACH=1 \
 	COMPOSE_PROJECT_NAME="$PROJECT" \
 	WORDPRESS_PORT="$PORT" \
+	MAILPIT_PORT="$MAILPIT_PORT" \
 	bash "$ROOT_DIR/wp/tests/lead-forms-e2e.sh"
 
 if "${COMPOSE[@]}" run --rm -T wpcli plugin is-active woocommerce >/dev/null 2>&1; then

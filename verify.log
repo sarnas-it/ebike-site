@@ -1,117 +1,37 @@
-EBIKE-21 — Contact Form 7 + Flamingo: реальная отправка заявок
+EBIKE-21 — Contact Form 7 + Flamingo: реальная отправка и доставка заявок
 ==============================================================
 
 Окружение проверки (2026-11-10 UTC)
 -----------------------------------
-Docker CLI/демон в этом workspace недоступен:
-
 $ docker --version
 bash: docker: command not found
 
-Поэтому `docker compose` здесь запустить нельзя. Чтобы критерий «форма
-отправляется и заявка сохраняется» был подтверждён фактически, тот же код
-темы/скрипта проверен на настоящем WordPress без моков WordPress, CF7 и
-Flamingo:
+Docker CLI/демон в этом workspace недоступен, поэтому `docker compose`,
+`wp/tests/lead-forms-e2e.sh` (он начинается с compose up) и `wp/tests/smoke.sh`
+здесь не запускались. Ниже приведены только фактически выполненные проверки;
+реальный прогон на compose-стенде не выдаётся за выполненный.
 
-- WordPress 7.1.4;
-- PHP 8.2.35;
-- Contact Form 7 6.1.7 (эта версия закреплена в setup.sh/docker-compose.yml);
-- Flamingo 2.6.4 (тоже закреплён);
-- SQLite drop-in только для локального стенда (в docker compose остаётся MariaDB);
-- `sendmail_path` указывает на тестовый MTA-стаб, который складывает письма в
-  outbox. Форма, REST API Contact Form 7 и Flamingo при этом настоящие.
-
-Команды `wp ...` ниже выполнялись локальной обёрткой WP-CLI на этом временном
-стенде; путь к стенду в командах опущен.
-
-Плагины и версии
-----------------
-$ wp plugin list --fields=name,status,version --format=table
-name                            status          version
-akismet                         inactive        5.7.2
-contact-form-7                  active          6.1.7
-flamingo                        active          2.6.4
-hello                           inactive        1.7.2
-sqlite-database-integration     active          3.1.3
-velotok-core                    inactive        1.0.0
-db.php                          dropin
-
-$ wp core version
-7.1.4
-
-Формы и получатель
-------------------
-$ wp eval-file wp/cli/lead-forms.php
-Создана форма «test-drive» (ID 24), получатель shop@example.test.
-Создана форма «consultation» (ID 25), получатель shop@example.test.
-
-$ wp post list --post_type=wpcf7_contact_form --fields=ID,post_title,post_status --format=table
-ID      post_title      post_status
-25      consultation    publish
-24      test-drive      publish
-4       Contact form 1  publish
-
-Реальная отправка через REST API Contact Form 7
------------------------------------------------
-RED — формы удалены, E2E обязан упасть:
-
-$ wp post delete 18 19 --force
-Success: Deleted post 18.
-Success: Deleted post 19.
-
-$ LEAD_FORMS_E2E_ATTACH=1 COMPOSE_PROJECT_NAME=velotok-lead-e2e \
-    WORDPRESS_PORT=8100 bash wp/tests/lead-forms-e2e.sh
-FAIL: форма Contact Form 7 «test-drive» не создана
-exit: 1
-
-GREEN — формы восстановлены через lead-forms.php, E2E проходит:
-
-POST /contact-form-7/v1/contact-forms/24/feedback (test-drive) -> status=mail_sent
-OK: форма «test-drive» отправлена, Flamingo Inbound Message 27 сохранён (lead-e2e-test-drive-1794279477-52776@example.test), получатель shop@example.test
-POST /contact-form-7/v1/contact-forms/25/feedback (consultation) -> status=mail_sent
-OK: форма «consultation» отправлена, Flamingo Inbound Message 29 сохранён (lead-e2e-consultation-1794279482-52776@example.test), получатель shop@example.test
-ID	post_title	post_status
-29	Заявка на консультацию	publish
-27	Заявка на тест-драйв	publish
-23	Заявка на консультацию	publish
-21	Заявка на тест-драйв	publish
-17	Заявка на консультацию	publish
-15	Заявка на тест-драйв	publish
-12	Заявка на консультацию	publish
-10	Заявка на тест-драйв	publish
-OK: обе формы реально отправлены и сохранены во Flamingo
-exit: 0
-
-Проверка сохранения во Flamingo
+Что исправлено после отклонения
 -------------------------------
-$ wp post list --post_type=flamingo_inbound --format=count
-8
+- E2E больше не принимает `status=mail_failed`: успех только `mail_sent`
+  (`wp/cli/lead-forms-mail-check.php`, `wp/tests/lead-forms-e2e.sh`).
+- В `docker-compose.yml` добавлен SMTP-приёмник Mailpit и SMTP-мост
+  `wp/mu-plugins/velotok-mailcatcher.php`. Contact Form 7 получает реальный
+  SMTP-транспорт, поэтому `mail_sent` означает фактическую передачу письма, а
+  не отсутствие MTA и не молчаливый сбой.
+- E2E ищет письмо через REST API Mailpit, проверяет получателя из настройки
+  формы и уникальный маркер заявки, затем проверяет у Inbound Message Flamingo
+  `_submission_status=mail_sent`.
+- Добавлен red-green тест `lead-forms-mail-delivery-redgreen-test.php`:
+  `mail_failed`, чужой получатель и письмо без маркера — красные; `mail_sent`
+  с совпавшим письмом в Mailpit — зелёный.
 
-$ wp post meta list 27 --keys=_submission_status,_subject,_from_email,_field_your-email,_field_your-message --format=table
-post_id meta_key                meta_value
-27      _submission_status      mail_sent
-27      _subject                Заявка на тест-драйв
-27      _from_email             lead-e2e-test-drive-1794279477-52776@example.test
-27      _field_your-email       lead-e2e-test-drive-1794279477-52776@example.test
-27      _field_your-message     EBIKE-21 E2E test-drive 1794279477-52776
+Проверки в workspace
+--------------------
+$ php wp/plugins/velotok-core/tests/lead-forms-mail-delivery-redgreen-test.php
+PASS: lead form delivery guard is red for mail_failed/undelivered mail and green only for mail_sent with a matching Mailpit message.
+exit code: 0
 
-$ wp post meta list 29 --keys=_submission_status,_subject,_from_email,_field_your-email,_field_your-message --format=table
-post_id meta_key                meta_value
-29      _submission_status      mail_sent
-29      _subject                Заявка на консультацию
-29      _from_email             lead-e2e-consultation-1794279482-52776@example.test
-29      _field_your-email       lead-e2e-consultation-1794279482-52776@example.test
-29      _field_your-message     EBIKE-21 E2E consultation 1794279482-52776
-
-Письмо ушло на получателя из настройки формы:
-$ grep '^To:' outbox.eml | tail -n 4
-To: shop@example.test
-To: shop@example.test
-To: shop@example.test
-To: shop@example.test
-
-Автоматические проверки
------------------------
 $ php wp/plugins/velotok-core/tests/lead-forms-contract-test.php
 Создана форма «test-drive» (ID 1), получатель shop@example.test.
 Обновлена форма «test-drive» (ID 2), получатель shop@example.test.
@@ -136,14 +56,71 @@ $ cat results.json
   "ci-repair-tests": "success"
 }
 
+SMTP-мост и Mailpit на реальном SMTP (без Docker/WordPress)
+-----------------------------------------------------------
+Дополнительно в workspace запущен настоящий Mailpit v1.33.1 (SMTP 127.0.0.1:11025,
+API 127.0.0.1:18025) и реальный PHPMailer 6.9.3 с подключённым
+`wp/mu-plugins/velotok-mailcatcher.php`:
+
+$ php bridge-test.php
+BRIDGE_SEND_OK
+
+$ php wp/cli/lead-forms-mail-check.php delivery bridge-detail.json shop@example.test BRIDGE-MARKER-4242
+BRIDGE_DELIVERY_CHECK_OK
+
+Письмо найдено через REST API Mailpit с получателем `shop@example.test` и
+маркером `BRIDGE-MARKER-4242`. Для чужого получателя и для письма без маркера
+тот же чекер завершается с кодом 1. Это подтверждает SMTP-мост и разбор
+доставки, но не заменяет compose-прогон Contact Form 7.
+
+Связка «форма → письмо → Flamingo» в целевом compose-стенде
+-----------------------------------------------------------
+$ grep -nE 'mailpit|MAILPIT|VELOTOK_SMTP|wp/mu-plugins' docker-compose.yml
+22:  mailpit:
+23:    image: axllent/mailpit:v1.33.1
+25:      - "${MAILPIT_PORT:-8025}:8025"
+34:      mailpit:
+44:      # wp/mu-plugins/velotok-mailcatcher.php switches PHPMailer to SMTP only
+45:      # when VELOTOK_SMTP_HOST is set. The E2E test then verifies the delivered
+47:      VELOTOK_SMTP_HOST: mailpit
+48:      VELOTOK_SMTP_PORT: "1025"
+49:      VELOTOK_SMTP_FROM: admin@example.test
+60:      - ./wp/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
+85:      - ./wp/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
+
+$ grep -nE 'lead-forms-mail-check|MAILPIT|mail_sent|/api/v1/search|_submission_status' wp/tests/lead-forms-e2e.sh
+8:#   1) status=mail_sent от Contact Form 7 (любой другой статус — провал, письмо
+11:#   3) запись заявки в Inbound Messages Flamingo со статусом mail_sent.
+20:#     WORDPRESS_PORT=8080 MAILPIT_PORT=8025 bash wp/tests/lead-forms-e2e.sh
+28:MAILPIT_PORT="${MAILPIT_PORT:-8025}"
+33:MAILPIT_URL="${MAILPIT_URL:-http://localhost:${MAILPIT_PORT}}"
+38:MAIL_CHECK="$ROOT_DIR/wp/cli/lead-forms-mail-check.php"
+67:if ! curl -fsS "${MAILPIT_URL}/api/v1/messages?limit=1" -o /dev/null; then
+68:	echo "FAIL: SMTP-ловушка Mailpit недоступна на ${MAILPIT_URL}" >&2
+128:	if [ "$status" != "mail_sent" ]; then
+129:		echo "FAIL: форма «$form» вернула status=${status:-empty}, ожидался mail_sent" >&2
+146:		if curl -fsS --get "${MAILPIT_URL}/api/v1/search" \
+153:				&& curl -fsS "${MAILPIT_URL}/api/v1/message/${candidate}" -o "$MAIL_DETAIL_FILE" \
+197:	submission_status="$(wp post meta get "$message_id" _submission_status)"
+198:	if [ "$submission_status" != "mail_sent" ]; then
+199:		echo "FAIL: Flamingo сохранил заявку $message_id со статусом ${submission_status:-empty}, ожидался mail_sent" >&2
+203:	echo "OK: форма «$form» отправлена (mail_sent), письмо доставлено, Flamingo Inbound Message ${message_id} сохранён (${email}), получатель ${recipient}"
+208:echo "OK: обе формы отправлены с mail_sent, письма доставлены в Mailpit и сохранены во Flamingo"
+
 Ограничение окружения
 ---------------------
-Docker в workspace недоступен, поэтому `docker compose` и `wp/tests/smoke.sh`
-здесь не запускались. E2E-сценарий `wp/tests/lead-forms-e2e.sh` прогнан на
-настоящем WordPress (см. выше), а дымовой тест вызывает его же на реальном
-compose-стенде. `setup.sh` и `docker-compose.yml` больше не скрывают ошибки
-установки/активации CF7 и Flamingo: при сбое настройка завершается с ошибкой,
-а не оставляет страницу с молча скрытой формой.
+Для целевого окружения проверка запускается так:
+
+  docker compose up -d
+  bash wp/tests/lead-forms-e2e.sh
+
+Она требует Docker. В этом workspace Docker недоступен, поэтому фактический
+compose-прогон здесь выполнить нельзя. Вместо зелёного статуса без письма
+теперь есть red-green тест guard'а и проверка связки compose → SMTP-мост →
+Mailpit → E2E. Фактический прогон E2E должен выполнить исполнитель с Docker;
+тест упадёт, если письмо не ушло (любой статус кроме `mail_sent`), если письма
+нет в Mailpit, если получатель или маркер не совпали, либо если Flamingo
+сохранил заявку не с `mail_sent`.
 
 ================================================================
 Приложение: сохранённый отчёт базовой ветки main (EBIKE-20)
