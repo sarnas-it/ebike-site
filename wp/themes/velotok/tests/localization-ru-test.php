@@ -150,6 +150,8 @@ $required_functions = array(
 	'velotok_localization_locale',
 	'velotok_localization_price_format',
 	'velotok_localization_page_titles',
+	'velotok_localization_language_packs',
+	'velotok_localization_install_language_packs',
 	'velotok_localize_store',
 );
 

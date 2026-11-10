@@ -346,15 +346,138 @@ function velotok_localization_filter_title( $title, $post_id = 0 ) {
 }
 
 /**
+ * Языковые пакеты, без которых витрина остаётся на en_US.
+ *
+ * Ядро WordPress отвечает за даты, меню и общие строки, WooCommerce — за
+ * Shop/Cart/Checkout/My account, Add to cart, SKU, Category и Description.
+ *
+ * @return array<int,array{type:string,slug:string,language:string,activate:bool}>
+ */
+function velotok_localization_language_packs() {
+	return array(
+		array(
+			'type'     => 'core',
+			'slug'     => 'ru_RU',
+			'language' => 'ru_RU',
+			'activate' => true,
+		),
+		array(
+			'type'     => 'plugin',
+			'slug'     => 'woocommerce',
+			'language' => 'ru_RU',
+			'activate' => false,
+		),
+	);
+}
+
+/**
+ * WP-CLI команды установки обязательных языковых пакетов.
+ *
+ * @return string[]
+ */
+function velotok_localization_language_pack_commands() {
+	$commands = array();
+
+	foreach ( velotok_localization_language_packs() as $pack ) {
+		if ( 'core' === $pack['type'] ) {
+			$command = sprintf( 'language core install %s', $pack['language'] );
+		} else {
+			$command = sprintf(
+				'language %s install %s %s',
+				$pack['type'],
+				$pack['slug'],
+				$pack['language']
+			);
+		}
+
+		if ( ! empty( $pack['activate'] ) ) {
+			$command .= ' --activate';
+		}
+
+		$commands[] = $command;
+	}
+
+	return $commands;
+}
+
+/**
+ * Устанавливает языковые пакеты через переданный исполнитель или WP-CLI.
+ *
+ * Именно эта функция ставит ru_RU, а не только форсирует локаль фильтром:
+ * без языкового пакета gettext-переводы WooCommerce остаются английскими.
+ *
+ * @param callable|null $runner Получает команду, возвращает успех установки.
+ * @return array<string,bool> Результат по каждой команде.
+ */
+function velotok_localization_install_language_packs( $runner = null ) {
+	$results = array();
+
+	foreach ( velotok_localization_language_pack_commands() as $command ) {
+		if ( null !== $runner ) {
+			$results[ $command ] = (bool) call_user_func( $runner, $command );
+			continue;
+		}
+
+		if ( ! class_exists( 'WP_CLI' ) ) {
+			$results[ $command ] = false;
+			continue;
+		}
+
+		try {
+			WP_CLI::runcommand( $command, array( 'exit_error' => false ) );
+			$results[ $command ] = true;
+		} catch ( \Throwable $error ) {
+			$results[ $command ] = false;
+		}
+	}
+
+	return $results;
+}
+
+/**
+ * Пути установленных файлов переводов ru_RU.
+ *
+ * @return array<string,string>
+ */
+function velotok_localization_language_pack_paths() {
+	$lang_dir = defined( 'WP_LANG_DIR' ) ? WP_LANG_DIR : '';
+
+	return array(
+		'core'        => $lang_dir . '/ru_RU.mo',
+		'woocommerce' => $lang_dir . '/plugins/woocommerce-ru_RU.mo',
+	);
+}
+
+/**
+ * Проверяет, что файлы языковых пакетов ru_RU действительно на месте.
+ *
+ * @return array<string,bool>
+ */
+function velotok_localization_language_packs_installed() {
+	$installed = array();
+
+	foreach ( velotok_localization_language_pack_paths() as $name => $path ) {
+		$installed[ $name ] = '' !== $path && file_exists( $path );
+	}
+
+	return $installed;
+}
+
+/**
  * Применяет русскую локаль, форматы цен и дат, названия страниц.
  *
  * Функция идемпотентна и вызывается из setup/CLI после установки WordPress.
+ * В окружении WP-CLI она также устанавливает языковые пакеты ru_RU.
  *
  * @return void
  */
 function velotok_localize_store() {
 	if ( ! function_exists( 'update_option' ) ) {
 		return;
+	}
+
+	if ( class_exists( 'WP_CLI' ) ) {
+		velotok_localization_install_language_packs();
 	}
 
 	$options = array(
