@@ -11,7 +11,7 @@
   --pad:clamp(20px,4.5vw,56px);
   --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --serif:Georgia,"Times New Roman",serif;
-  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --mono:var(--sans);
   --ink:#12211a;
   --ink-2:#1d3127;
   --paper:#f3f0e7;
@@ -91,8 +91,9 @@ h2{font-size:clamp(32px,4.7vw,58px);line-height:1.01;letter-spacing:-.035em;font
 .menu-btn[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
 
 .hero{position:relative;min-height:clamp(620px,86vh,820px);display:flex;align-items:stretch;color:#fbfaf4;overflow:hidden;background:var(--ink)}
-.hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:58% 55%}
-.hero-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,18,13,.94) 0%,rgba(8,18,13,.8) 34%,rgba(8,18,13,.28) 66%,rgba(8,18,13,.04) 100%),linear-gradient(0deg,rgba(8,18,13,.62) 0%,rgba(8,18,13,0) 42%)}
+.hero-art{position:absolute;inset:0;width:100%;height:100%;--frame:#e8f1c8;--frame-2:#d8f26a;--accent:#f2a45c;--tire:#0b130e;--rim:#d3ddd3;--seat:#0f1a13;--battery:#1d3127;--shadow:#000}
+.hero-art--mobile{display:none}
+.hero-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,18,13,.96) 0%,rgba(8,18,13,.88) 40%,rgba(8,18,13,.42) 70%,rgba(8,18,13,.08) 100%),linear-gradient(0deg,rgba(8,18,13,.66) 0%,rgba(8,18,13,0) 42%)}
 .hero-inner{position:relative;z-index:2;width:100%;max-width:1280px;margin:0 auto;padding:clamp(64px,9vw,110px) var(--pad);display:flex;flex-direction:column;justify-content:center}
 .eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--lime);margin-bottom:26px}
 .eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px rgba(216,242,106,.16)}
@@ -134,8 +135,20 @@ h2{font-size:clamp(32px,4.7vw,58px);line-height:1.01;letter-spacing:-.035em;font
 .model-card{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);background:var(--card);transition:transform .25s,box-shadow .25s}
 .model-card:hover{transform:translateY(-4px);box-shadow:0 24px 44px -30px rgba(18,33,26,.65)}
 .model-media{position:relative;aspect-ratio:4/3;overflow:hidden;background:#e5e0d3}
-.model-media img{width:100%;height:100%;object-fit:cover;transition:transform .45s}
-.model-card:hover .model-media img{transform:scale(1.035)}
+.bike-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transition:transform .45s ease;--frame:#4a5f4d;--frame-2:#25382b;--accent:#d8f26a;--tire:#18251d;--rim:#8b998f;--seat:#17241c;--battery:#1d3127;--shadow:#12211a}
+.model-card:hover .bike-art{transform:translateY(-4px)}
+.model-media--city{background:linear-gradient(155deg,#e9ecd9 0%,#f7f4ea 58%,#e7ddc7 100%)}
+.model-media--sport{background:linear-gradient(155deg,#dde8e4 0%,#f5f4ec 58%,#ddd6c4 100%)}
+.model-media--mountain{background:linear-gradient(155deg,#e3e7da 0%,#f6f3e9 55%,#ddd8c6 100%)}
+.model-media--cargo{background:linear-gradient(155deg,#efe5d3 0%,#f8f4ea 58%,#e5d8c0 100%)}
+.model-media--folding{background:linear-gradient(155deg,#e5e4dd 0%,#f6f4ed 58%,#dfd8c8 100%)}
+.bike--olive{--frame:#687b52;--frame-2:#33452f;--accent:#c9e45d;--rim:#c8c2ad}
+.bike--teal{--frame:#2f6360;--frame-2:#193d3a;--accent:#d8f26a;--rim:#b9c8bf}
+.bike--ember{--frame:#3b433a;--frame-2:#1c261e;--accent:#e06a2d;--rim:#c3b9aa}
+.bike--forest{--frame:#5d7143;--frame-2:#2d3d28;--accent:#d9531f;--rim:#c6c3b2}
+.bike--wood{--frame:#5b6249;--frame-2:#2e3729;--accent:#d9531f;--accent-2:#c99a5e;--rim:#c9bda7}
+.bike--slate{--frame:#4a5960;--frame-2:#263238;--accent:#d8f26a;--rim:#b9c2bd}
+.bike--graphite{--frame:#5b5750;--frame-2:#2d2b28;--accent:#d8f26a;--rim:#bfbcb0}
 .badge{position:absolute;top:14px;left:14px;z-index:2;padding:7px 11px;border-radius:999px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase}
 .badge--lime{background:var(--lime);color:var(--ink)}
 .model-body{display:flex;flex-direction:column;flex:1;padding:22px}
@@ -168,6 +181,11 @@ h2{font-size:clamp(32px,4.7vw,58px);line-height:1.01;letter-spacing:-.035em;font
 .adv-num{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--lime);padding-top:5px}
 .adv-item h3{font-size:21px;line-height:1.2;letter-spacing:-.02em}
 .adv-item p{margin-top:7px;font-size:14px;line-height:1.55;color:#a9b5ac;max-width:48ch}
+.guarantee-wrap{margin-top:clamp(34px,5vw,60px)}
+.guarantee-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;overflow:hidden;border:1px solid rgba(255,255,255,.16);border-radius:22px;background:rgba(255,255,255,.16)}
+.guarantee-strip div{padding:22px 24px;background:var(--ink)}
+.guarantee-strip strong{display:block;font-size:clamp(24px,2.4vw,31px);line-height:1;letter-spacing:-.03em;color:var(--lime)}
+.guarantee-strip span{display:block;margin-top:7px;font-size:13px;line-height:1.4;color:#a9b5ac}
 
 .section--picker{background:var(--lime-soft)}
 .picker-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:clamp(32px,5vw,72px);align-items:start}
@@ -206,7 +224,7 @@ h2{font-size:clamp(32px,4.7vw,58px);line-height:1.01;letter-spacing:-.035em;font
 .avatar{width:42px;height:42px;display:grid;place-items:center;flex:none;border-radius:50%;background:var(--lime);font-size:13px;font-weight:800;letter-spacing:.02em}
 .avatar--dark{background:var(--ink);color:var(--lime)}
 .review-author b{display:block;font-size:14px;font-weight:700}
-.review-author span{display:block;font-size:12px;color:var(--muted)}
+.review-author div span{display:block;font-size:12px;color:var(--muted)}
 
 .section--lead{background:linear-gradient(180deg,var(--paper) 0%,#ece7da 100%)}
 .lead-grid{display:grid;grid-template-columns:.9fr 1.1fr;border:1px solid var(--line);border-radius:32px;overflow:hidden;box-shadow:0 30px 60px -50px rgba(18,33,26,.6)}
@@ -279,6 +297,7 @@ h2{font-size:clamp(32px,4.7vw,58px);line-height:1.01;letter-spacing:-.035em;font
 .cart-total strong{font-size:24px;letter-spacing:-.03em}
 .cart-note{margin-top:10px;font-size:11px;line-height:1.45;color:var(--muted)}
 body.is-locked{overflow:hidden}
+.svg-defs{position:absolute;width:0;height:0;overflow:hidden}
 
 @media (max-width:1080px){
   .adv-grid,.picker-grid{grid-template-columns:1fr}
@@ -287,7 +306,7 @@ body.is-locked{overflow:hidden}
   .cat-grid{grid-template-columns:repeat(2,1fr)}
   .footer-top{grid-template-columns:1.3fr repeat(3,1fr)}
 }
-@media (max-width:980px){
+@media (max-width:1080px){
   .header-inner{min-height:66px;gap:12px}
   .nav{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:flex-start;gap:0;margin:0;padding:8px var(--pad) 22px;background:var(--paper);border-bottom:1px solid var(--line);box-shadow:0 18px 30px -24px rgba(18,33,26,.5)}
   .nav.is-open{display:flex}
@@ -302,8 +321,9 @@ body.is-locked{overflow:hidden}
 }
 @media (max-width:860px){
   .hero{min-height:clamp(590px,92svh,760px)}
-  .hero-bg{object-position:63% 50%}
-  .hero-shade{background:linear-gradient(180deg,rgba(8,18,13,.52) 0%,rgba(8,18,13,.76) 42%,rgba(8,18,13,.95) 100%),linear-gradient(90deg,rgba(8,18,13,.45) 0%,rgba(8,18,13,0) 75%)}
+  .hero-art--desktop{display:none}
+  .hero-art--mobile{display:block}
+  .hero-shade{background:linear-gradient(180deg,rgba(8,18,13,.4) 0%,rgba(8,18,13,.72) 44%,rgba(8,18,13,.96) 100%),linear-gradient(90deg,rgba(8,18,13,.4) 0%,rgba(8,18,13,0) 78%)}
   .hero-inner{justify-content:flex-end;padding-bottom:44px;padding-top:80px}
   .hero h1{max-width:15ch}
   .hero-offer{display:none}
@@ -311,6 +331,7 @@ body.is-locked{overflow:hidden}
   .hero-stats div:last-child{grid-column:1/-1}
   .footer-top{grid-template-columns:1fr 1fr}
   .footer-brand{grid-column:1/-1}
+  .guarantee-strip{grid-template-columns:1fr}
 }
 @media (max-width:720px){
   .topbar{display:none}
@@ -355,6 +376,215 @@ body.is-locked{overflow:hidden}
 </style>
 </head>
 <body>
+<svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <g id="wheel">
+    <circle r="62" fill="none" stroke="var(--tire,#18251d)" stroke-width="8"/>
+    <circle r="52" fill="none" stroke="var(--rim,#8b998f)" stroke-width="2.4" opacity=".8"/>
+    <g stroke="var(--rim,#8b998f)" stroke-width="1.5" opacity=".45">
+      <path d="M0-52V52M-52 0H52M-36.8-36.8 36.8 36.8M-36.8 36.8 36.8-36.8"/>
+    </g>
+    <circle r="6" fill="var(--rim,#8b998f)"/>
+  </g>
+  <g id="wheel-rough">
+    <circle r="62" fill="none" stroke="var(--tire,#18251d)" stroke-width="10"/>
+    <circle r="53" fill="none" stroke="var(--rim,#8b998f)" stroke-width="2.4" opacity=".8"/>
+    <g stroke="var(--rim,#8b998f)" stroke-width="1.5" opacity=".45">
+      <path d="M0-53V53M-53 0H53M-37.5-37.5 37.5 37.5M-37.5 37.5 37.5-37.5"/>
+    </g>
+    <circle r="67" fill="none" stroke="var(--tire,#18251d)" stroke-width="2.4" stroke-dasharray="2 9" opacity=".85"/>
+    <circle r="6" fill="var(--rim,#8b998f)"/>
+  </g>
+
+  <symbol id="bike-city" viewBox="0 0 400 300">
+    <ellipse cx="202" cy="279" rx="136" ry="9" fill="var(--shadow,#12211a)" opacity=".12"/>
+    <path d="M48 212A60 60 0 0 1 168 212M232 212A60 60 0 0 1 352 212" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="4" stroke-linecap="round" opacity=".5"/>
+    <use href="#wheel" transform="translate(108 212)"/>
+    <use href="#wheel" transform="translate(292 212)"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M292 212 256 154" stroke="var(--frame,#4a5f4d)" stroke-width="7"/>
+      <path d="M250 158C226 187 200 199 174 203" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M174 203 158 147" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M198 207 108 212M158 147 108 212" stroke="var(--frame-2,#25382b)" stroke-width="5"/>
+      <path d="M243 144 254 165" stroke="var(--frame-2,#25382b)" stroke-width="12"/>
+      <path d="M108 212 198 207" stroke="var(--frame-2,#25382b)" stroke-width="2.5" stroke-dasharray="3 4"/>
+    </g>
+    <path d="M239 166 205 194" stroke="var(--battery,#1d3127)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M237 168 226 177" stroke="var(--accent,#d8f26a)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="108" cy="212" r="13" fill="var(--battery,#1d3127)" stroke="var(--accent,#d8f26a)" stroke-width="2.5"/>
+    <circle cx="198" cy="207" r="12" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <path d="M198 207 186 219M198 207 211 196" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="132" y="133" width="47" height="12" rx="6" fill="var(--seat,#17241c)" transform="rotate(-7 155 139)"/>
+    <path d="M158 147 154 140" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    <path d="M250 158 246 132C246 125 238 122 230 125" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="230" cy="125" r="3.5" fill="var(--seat,#17241c)"/>
+    <circle cx="262" cy="159" r="6" fill="var(--accent,#d8f26a)"/>
+    <path d="M94 166h56v7H94zM102 173v31M142 173v31M94 166l8-8h40l8 8" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linejoin="round" opacity=".8"/>
+  </symbol>
+
+  <symbol id="bike-sport" viewBox="0 0 400 300">
+    <ellipse cx="202" cy="279" rx="136" ry="9" fill="var(--shadow,#12211a)" opacity=".12"/>
+    <path d="M48 212A60 60 0 0 1 168 212M232 212A60 60 0 0 1 352 212" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="4" stroke-linecap="round" opacity=".38"/>
+    <use href="#wheel" transform="translate(108 212)"/>
+    <use href="#wheel" transform="translate(292 212)"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M158 142 258 151" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M258 151 200 208" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M158 142 200 208" stroke="var(--frame,#4a5f4d)" stroke-width="8"/>
+      <path d="M200 208 108 212M158 142 108 212" stroke="var(--frame-2,#25382b)" stroke-width="5"/>
+      <path d="M258 148 292 212" stroke="var(--frame-2,#25382b)" stroke-width="7"/>
+      <path d="M108 212 200 208" stroke="var(--frame-2,#25382b)" stroke-width="2.5" stroke-dasharray="3 4"/>
+    </g>
+    <path d="M249 160 209 199" stroke="var(--battery,#1d3127)" stroke-width="16" stroke-linecap="round"/>
+    <path d="M248 162 237 172" stroke="var(--accent,#d8f26a)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="108" cy="212" r="13" fill="var(--battery,#1d3127)" stroke="var(--accent,#d8f26a)" stroke-width="2.5"/>
+    <circle cx="200" cy="208" r="12" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <path d="M200 208 188 220M200 208 212 196" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="136" y="128" width="46" height="12" rx="6" fill="var(--seat,#17241c)" transform="rotate(-5 159 134)"/>
+    <path d="M158 142 155 135" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    <path d="M258 151 257 129C257 124 249 121 241 124" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="5" stroke-linecap="round"/>
+    <path d="M238 124h24" stroke="var(--seat,#17241c)" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="264" cy="154" r="6" fill="var(--accent,#d8f26a)"/>
+    <path d="M96 176h50v6H96zM104 182v28M138 182v28M96 176l7-7h36l7 7" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linejoin="round" opacity=".7"/>
+  </symbol>
+
+  <symbol id="bike-mountain-fs" viewBox="0 0 400 300">
+    <ellipse cx="204" cy="280" rx="140" ry="9" fill="var(--shadow,#12211a)" opacity=".14"/>
+    <use href="#wheel-rough" transform="translate(104 214)"/>
+    <use href="#wheel-rough" transform="translate(296 214)"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M164 132 258 145" stroke="var(--frame,#4a5f4d)" stroke-width="11"/>
+      <path d="M258 149 200 210" stroke="var(--frame,#4a5f4d)" stroke-width="11"/>
+      <path d="M164 132 200 210" stroke="var(--frame,#4a5f4d)" stroke-width="9"/>
+      <path d="M200 210 104 214" stroke="var(--frame-2,#25382b)" stroke-width="7"/>
+      <path d="M200 210 150 166" stroke="var(--frame-2,#25382b)" stroke-width="6"/>
+      <path d="M150 166 104 214" stroke="var(--frame-2,#25382b)" stroke-width="6"/>
+      <path d="M258 142 296 214" stroke="var(--frame-2,#25382b)" stroke-width="8"/>
+      <path d="M266 170 296 214" stroke="var(--accent,#d9531f)" stroke-width="5" opacity=".9"/>
+      <path d="M258 142 252 118 226 113" stroke="var(--frame-2,#25382b)" stroke-width="5"/>
+    </g>
+    <path d="M152 174 188 162" stroke="var(--battery,#1d3127)" stroke-width="6"/>
+    <path d="M154 174 166 170 158 164 170 160 162 154 174 150" fill="none" stroke="var(--accent,#d9531f)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M246 158 207 199" stroke="var(--battery,#1d3127)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M245 160 234 170" stroke="var(--accent,#d9531f)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="104" cy="214" r="14" fill="var(--battery,#1d3127)" stroke="var(--accent,#d9531f)" stroke-width="2.5"/>
+    <circle cx="200" cy="210" r="12" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <path d="M200 210 187 222M200 210 213 198" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="140" y="120" width="48" height="12" rx="6" fill="var(--seat,#17241c)" transform="rotate(-7 164 126)"/>
+    <path d="M164 132 160 124" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    <path d="M226 113h25" stroke="var(--seat,#17241c)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="267" cy="148" r="6" fill="var(--accent,#d9531f)"/>
+  </symbol>
+
+  <symbol id="bike-mountain-hardtail" viewBox="0 0 400 300">
+    <ellipse cx="202" cy="280" rx="138" ry="9" fill="var(--shadow,#12211a)" opacity=".14"/>
+    <use href="#wheel-rough" transform="translate(106 214)"/>
+    <use href="#wheel-rough" transform="translate(294 214)"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M156 138 256 148" stroke="var(--frame,#4a5f4d)" stroke-width="11"/>
+      <path d="M256 152 198 210" stroke="var(--frame,#4a5f4d)" stroke-width="11"/>
+      <path d="M156 138 198 210" stroke="var(--frame,#4a5f4d)" stroke-width="9"/>
+      <path d="M198 210 106 214M156 138 106 214" stroke="var(--frame-2,#25382b)" stroke-width="6"/>
+      <path d="M256 145 294 214" stroke="var(--frame-2,#25382b)" stroke-width="8"/>
+      <path d="M264 172 294 214" stroke="var(--accent,#d9531f)" stroke-width="5" opacity=".9"/>
+      <path d="M256 145 250 121 224 116" stroke="var(--frame-2,#25382b)" stroke-width="5"/>
+      <path d="M106 214 198 210" stroke="var(--frame-2,#25382b)" stroke-width="2.5" stroke-dasharray="3 4"/>
+    </g>
+    <path d="M245 161 206 200" stroke="var(--battery,#1d3127)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M244 163 233 173" stroke="var(--accent,#d9531f)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="106" cy="214" r="14" fill="var(--battery,#1d3127)" stroke="var(--accent,#d9531f)" stroke-width="2.5"/>
+    <circle cx="198" cy="210" r="12" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <path d="M198 210 185 222M198 210 211 198" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="132" y="126" width="48" height="12" rx="6" fill="var(--seat,#17241c)" transform="rotate(-7 156 132)"/>
+    <path d="M156 138 152 130" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    <path d="M224 116h25" stroke="var(--seat,#17241c)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="265" cy="151" r="6" fill="var(--accent,#d9531f)"/>
+  </symbol>
+
+  <symbol id="bike-cargo-family" viewBox="0 0 400 300">
+    <ellipse cx="200" cy="280" rx="150" ry="10" fill="var(--shadow,#12211a)" opacity=".13"/>
+    <use href="#wheel-rough" transform="translate(92 216) scale(.92)"/>
+    <use href="#wheel-rough" transform="translate(308 216) scale(.92)"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M266 152C240 184 214 201 180 205" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M180 205 170 142" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M202 212 92 216M170 142 92 216" stroke="var(--frame-2,#25382b)" stroke-width="5"/>
+      <path d="M266 148 308 216" stroke="var(--frame-2,#25382b)" stroke-width="7"/>
+      <path d="M262 142 270 160" stroke="var(--frame-2,#25382b)" stroke-width="12"/>
+      <path d="M92 216 202 212" stroke="var(--frame-2,#25382b)" stroke-width="2.5" stroke-dasharray="3 4"/>
+      <path d="M78 196h98M84 196v20M170 196v20" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    </g>
+    <path d="M254 165 214 195" stroke="var(--battery,#1d3127)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M253 167 242 176" stroke="var(--accent,#d9531f)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="92" cy="216" r="14" fill="var(--battery,#1d3127)" stroke="var(--accent,#d9531f)" stroke-width="2.5"/>
+    <circle cx="202" cy="212" r="12" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <path d="M202 212 189 224M202 212 215 200" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="140" y="131" width="48" height="12" rx="6" fill="var(--seat,#17241c)" transform="rotate(-7 164 137)"/>
+    <path d="M170 142 166 134" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    <path d="M266 152 262 128C262 122 254 119 246 122" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="5" stroke-linecap="round"/>
+    <path d="M243 122h24" stroke="var(--seat,#17241c)" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="277" cy="156" r="6" fill="var(--accent,#d9531f)"/>
+    <rect x="62" y="146" width="96" height="50" rx="8" fill="var(--accent-2,#c99a5e)"/>
+    <path d="M62 161h96M62 177h96M94 146v50M126 146v50" stroke="rgba(29,49,39,.35)" stroke-width="2"/>
+    <rect x="62" y="146" width="96" height="50" rx="8" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <path d="M156 150c8 0 10 7 10 16s-3 16-10 16" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+  </symbol>
+
+  <symbol id="bike-cargo-courier" viewBox="0 0 400 300">
+    <ellipse cx="202" cy="280" rx="152" ry="10" fill="var(--shadow,#12211a)" opacity=".13"/>
+    <use href="#wheel-rough" transform="translate(86 216) scale(.9)"/>
+    <use href="#wheel-rough" transform="translate(312 216) scale(.9)"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M252 154C230 182 214 199 196 206" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M196 206 158 142" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M196 210 86 216M158 142 86 216" stroke="var(--frame-2,#25382b)" stroke-width="5"/>
+      <path d="M252 150 312 216" stroke="var(--frame-2,#25382b)" stroke-width="7"/>
+      <path d="M248 144 256 162" stroke="var(--frame-2,#25382b)" stroke-width="12"/>
+      <path d="M86 216 196 210" stroke="var(--frame-2,#25382b)" stroke-width="2.5" stroke-dasharray="3 4"/>
+      <path d="M262 192h92M268 192v22M348 192v22M258 192l8-8h92l8 8" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    </g>
+    <path d="M242 166 204 197" stroke="var(--battery,#1d3127)" stroke-width="17" stroke-linecap="round"/>
+    <path d="M241 168 230 177" stroke="var(--accent,#d9531f)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="86" cy="216" r="14" fill="var(--battery,#1d3127)" stroke="var(--accent,#d9531f)" stroke-width="2.5"/>
+    <circle cx="196" cy="210" r="12" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <path d="M196 210 183 222M196 210 209 198" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="148" y="130" width="46" height="12" rx="6" fill="var(--seat,#17241c)" transform="rotate(-5 171 136)"/>
+    <path d="M158 142 155 135" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    <path d="M252 154 248 128C248 122 240 119 232 122" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="5" stroke-linecap="round"/>
+    <path d="M229 122h24" stroke="var(--seat,#17241c)" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="263" cy="158" r="6" fill="var(--accent,#d9531f)"/>
+    <rect x="270" y="124" width="84" height="62" rx="7" fill="var(--accent-2,#c99a5e)"/>
+    <path d="M270 142h84M270 160h84M298 124v62M326 124v62" stroke="rgba(29,49,39,.35)" stroke-width="2"/>
+    <rect x="270" y="124" width="84" height="62" rx="7" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+  </symbol>
+
+  <symbol id="bike-folding" viewBox="0 0 400 300">
+    <ellipse cx="202" cy="279" rx="108" ry="9" fill="var(--shadow,#12211a)" opacity=".12"/>
+    <use href="#wheel" transform="translate(130 222) scale(.68)"/>
+    <use href="#wheel" transform="translate(272 222) scale(.68)"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M254 162 206 219" stroke="var(--frame,#4a5f4d)" stroke-width="10"/>
+      <path d="M254 162 248 206 206 219" stroke="var(--frame,#4a5f4d)" stroke-width="7" opacity=".8"/>
+      <path d="M206 219 174 166" stroke="var(--frame,#4a5f4d)" stroke-width="9"/>
+      <path d="M206 219 130 222M174 166 130 222" stroke="var(--frame-2,#25382b)" stroke-width="5"/>
+      <path d="M254 162 272 222" stroke="var(--frame-2,#25382b)" stroke-width="6"/>
+      <path d="M130 222 206 219" stroke="var(--frame-2,#25382b)" stroke-width="2.5" stroke-dasharray="3 4"/>
+      <path d="M254 162 250 120C250 113 242 110 234 113" stroke="var(--frame-2,#25382b)" stroke-width="5"/>
+    </g>
+    <path d="M246 171 214 200" stroke="var(--battery,#1d3127)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M245 173 236 181" stroke="var(--accent,#d8f26a)" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="130" cy="222" r="11" fill="var(--battery,#1d3127)" stroke="var(--accent,#d8f26a)" stroke-width="2.4"/>
+    <circle cx="206" cy="219" r="10" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <path d="M206 219 196 229M206 219 217 209" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="218" cy="191" r="6" fill="var(--card,#fbf9f3)" stroke="var(--frame-2,#25382b)" stroke-width="3"/>
+    <rect x="146" y="154" width="44" height="11" rx="5.5" fill="var(--seat,#17241c)" transform="rotate(-6 168 160)"/>
+    <path d="M174 166 170 159" stroke="var(--frame-2,#25382b)" stroke-width="4"/>
+    <path d="M234 113h22" stroke="var(--seat,#17241c)" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="265" cy="166" r="5.5" fill="var(--accent,#d8f26a)"/>
+    <path d="M116 190a44 44 0 0 1 28-18M258 190a44 44 0 0 1 28-18" fill="none" stroke="var(--frame-2,#25382b)" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+  </symbol>
+</defs>
+</svg>
 <a class="sr-only" href="#main">Перейти к основному содержанию</a>
 
 <div class="topbar">
@@ -402,7 +632,72 @@ body.is-locked{overflow:hidden}
 
 <main id="main">
   <section class="hero" id="top" aria-labelledby="hero-title">
-    <img class="hero-bg" src="assets/hero-city-1-web.jpg" width="1536" height="864" alt="Городской электровелосипед кремово-оливкового цвета на мощёной улице на закате" fetchpriority="high" decoding="async">
+    <svg class="hero-art hero-art--desktop" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="heroSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#12241b"/>
+          <stop offset=".46" stop-color="#294636"/>
+          <stop offset=".72" stop-color="#a66a3c"/>
+          <stop offset="1" stop-color="#e0b06a"/>
+        </linearGradient>
+        <radialGradient id="heroSun" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#ffe7a8"/>
+          <stop offset=".55" stop-color="#f4c274" stop-opacity=".9"/>
+          <stop offset="1" stop-color="#f4c274" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="heroRoad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#1b2d22"/>
+          <stop offset="1" stop-color="#0b150f"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="800" fill="url(#heroSky)"/>
+      <circle cx="924" cy="324" r="188" fill="url(#heroSun)"/>
+      <circle cx="924" cy="324" r="86" fill="#f7d99a" opacity=".55"/>
+      <path d="M0 526C145 468 263 500 390 474c131-26 245 16 366-4 143-24 283-6 444 26v304H0Z" fill="#1a2e23" opacity=".9"/>
+      <g fill="#0c1811" opacity=".86">
+        <path d="M0 566h82v-74h22v52h38v-92h58v114h44v-66h70v88h49v-118h34v94h64v-52h52v76h41v-104h28v56h63v-78h46v96h72v-44h61v82h54v-58h64v96H0Z"/>
+        <path d="M706 582h37v-132h41v132h22v-58h32v58h29v-96h39v96h26v-42h33v42h31v-74h35v74Z" opacity=".8"/>
+      </g>
+      <g fill="#d8f26a" opacity=".5">
+        <rect x="102" y="500" width="7" height="7"/><rect x="154" y="480" width="7" height="7"/><rect x="258" y="474" width="7" height="7"/><rect x="338" y="496" width="7" height="7"/><rect x="468" y="490" width="7" height="7"/><rect x="746" y="468" width="7" height="7"/><rect x="802" y="526" width="7" height="7"/>
+      </g>
+      <path d="M0 646c260-34 440-20 640-12 199 8 376 2 560-26v192H0Z" fill="url(#heroRoad)"/>
+      <path d="M0 682c250-26 444-15 646-8 192 6 357 1 554-21" fill="none" stroke="#d8f26a" stroke-width="3" stroke-dasharray="34 26" opacity=".26"/>
+      <path d="M0 752c286-14 510-10 720-4 177 5 325 3 480-11" fill="none" stroke="#f3f0e7" stroke-width="2" opacity=".1"/>
+      <g transform="translate(628 250) scale(1.2)">
+        <use href="#bike-city" width="400" height="300"/>
+      </g>
+      <g fill="#0b150f" opacity=".9">
+        <path d="M0 800v-88c22-10 38-24 48-46 8 22 22 34 40 42v92Z"/>
+        <path d="M1128 800v-72c24-8 40-24 50-46 10 24 22 38 44 48v70Z"/>
+      </g>
+    </svg>
+    <svg class="hero-art hero-art--mobile" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="heroSkyM" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#12241b"/>
+          <stop offset=".48" stop-color="#2b4737"/>
+          <stop offset=".76" stop-color="#a86c3d"/>
+          <stop offset="1" stop-color="#dcae69"/>
+        </linearGradient>
+        <radialGradient id="heroSunM" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#ffe7a8"/>
+          <stop offset=".6" stop-color="#f2c173" stop-opacity=".85"/>
+          <stop offset="1" stop-color="#f2c173" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="400" height="600" fill="url(#heroSkyM)"/>
+      <circle cx="300" cy="218" r="112" fill="url(#heroSunM)"/>
+      <path d="M0 386c64-38 116-30 172-46 58-16 108 8 154-2 28-6 52-2 74 8v254H0Z" fill="#1a2e23" opacity=".92"/>
+      <g fill="#0c1811" opacity=".82">
+        <path d="M0 424h58v-46h16v30h30v-58h38v74h30v-40h44v56h34v-72h24v58h44v-32h36v46h46v-64h28v42h48v-26h46v58H0Z"/>
+      </g>
+      <path d="M0 476c86-12 150-6 212-2 70 5 126 3 188-10v136H0Z" fill="#0b150f"/>
+      <path d="M0 512c76-8 132-4 196 0 66 4 120 2 204-8" fill="none" stroke="#d8f26a" stroke-width="2" stroke-dasharray="18 15" opacity=".26"/>
+      <g transform="translate(50 218) scale(.7)">
+        <use href="#bike-city" width="400" height="300"/>
+      </g>
+    </svg>
     <div class="hero-shade" aria-hidden="true"></div>
     <div class="hero-inner">
       <p class="eyebrow">Электровелосипеды с 2018 года</p>
@@ -528,9 +823,9 @@ body.is-locked{overflow:hidden}
 
       <div class="model-grid">
         <article class="model-card" id="model-riviera" data-category="city" data-note="Лёгкая низкая рама, 90 км запаса хода и спокойный характер — для ежедневных поездок по городу.">
-          <div class="model-media">
+          <div class="model-media model-media--city">
             <span class="badge badge--lime">Хит</span>
-            <img src="assets/model-city-classic-1-web.jpg" width="800" height="600" alt="Городской электровелосипед «Ривьера» кремово-оливкового цвета с низкой рамой и кожаным седлом" loading="lazy" decoding="async">
+            <svg class="bike-art bike--olive" viewBox="0 0 400 300" role="img" aria-label="Городской электровелосипед «Ривьера» — иллюстрация"><use href="#bike-city"/></svg>
           </div>
           <div class="model-body">
             <div class="model-top"><span>Городской</span><span>01</span></div>
@@ -549,9 +844,9 @@ body.is-locked{overflow:hidden}
         </article>
 
         <article class="model-card" id="model-street" data-category="city" data-note="Более быстрый и жёсткий вариант для асфальта: 110 км хода и посадка для активной езды.">
-          <div class="model-media">
+          <div class="model-media model-media--sport">
             <span class="badge">Новинка</span>
-            <img src="assets/model-city-sport-1-web.jpg" width="800" height="600" alt="Городской электровелосипед «Стрит 7» тёмно-бирюзового цвета с узкими шинами и багажником" loading="lazy" decoding="async">
+            <svg class="bike-art bike--teal" viewBox="0 0 400 300" role="img" aria-label="Городской электровелосипед «Стрит 7» — иллюстрация"><use href="#bike-sport"/></svg>
           </div>
           <div class="model-body">
             <div class="model-top"><span>Городской спорт</span><span>02</span></div>
@@ -570,9 +865,9 @@ body.is-locked{overflow:hidden}
         </article>
 
         <article class="model-card" id="model-hrebet-pro" data-category="mountain" data-note="Полная подвеска и мотор 750 Вт — если в маршруте есть серьёзные подъёмы и спуски.">
-          <div class="model-media">
+          <div class="model-media model-media--mountain">
             <span class="badge">Для гор</span>
-            <img src="assets/model-mountain-pro-1-web.jpg" width="800" height="600" alt="Горный электровелосипед «Хребет Pro» с полной подвеской, чёрной рамой и оранжевыми акцентами" loading="lazy" decoding="async">
+            <svg class="bike-art bike--ember" viewBox="0 0 400 300" role="img" aria-label="Горный электровелосипед «Хребет Pro» — иллюстрация"><use href="#bike-mountain-fs"/></svg>
           </div>
           <div class="model-body">
             <div class="model-top"><span>Горный</span><span>03</span></div>
@@ -591,9 +886,9 @@ body.is-locked{overflow:hidden}
         </article>
 
         <article class="model-card" id="model-hrebet-trail" data-category="mountain" data-note="Хардтейл для леса и грунта: меньше веса, простая обслуживаемость и уверенный ход.">
-          <div class="model-media">
+          <div class="model-media model-media--mountain">
             <span class="badge badge--lime">Выбор механиков</span>
-            <img src="assets/model-mountain-hardtail-1-web.jpg" width="800" height="600" alt="Горный электровелосипед «Хребет Trail» с зелёной рамой и широкими грунтовыми шинами" loading="lazy" decoding="async">
+            <svg class="bike-art bike--forest" viewBox="0 0 400 300" role="img" aria-label="Горный электровелосипед «Хребет Trail» — иллюстрация"><use href="#bike-mountain-hardtail"/></svg>
           </div>
           <div class="model-body">
             <div class="model-top"><span>Горный</span><span>04</span></div>
@@ -612,9 +907,9 @@ body.is-locked{overflow:hidden}
         </article>
 
         <article class="model-card" id="model-family" data-category="cargo" data-note="Удлинённая рама и бокс на 80 кг: дети, продукты и всё, что нужно на даче.">
-          <div class="model-media">
+          <div class="model-media model-media--cargo">
             <span class="badge">Для семьи</span>
-            <img src="assets/model-cargo-family-1-web.jpg" width="800" height="600" alt="Грузовой электровелосипед «Семейный» с деревянным боксом на удлинённой задней раме" loading="lazy" decoding="async">
+            <svg class="bike-art bike--wood" viewBox="0 0 400 300" role="img" aria-label="Грузовой электровелосипед «Семейный» — иллюстрация"><use href="#bike-cargo-family"/></svg>
           </div>
           <div class="model-body">
             <div class="model-top"><span>Грузовой</span><span>05</span></div>
@@ -633,9 +928,9 @@ body.is-locked{overflow:hidden}
         </article>
 
         <article class="model-card" id="model-courier" data-category="cargo" data-note="Рама под ежедневные нагрузки: передний и задний багажник, груз до 120 кг.">
-          <div class="model-media">
+          <div class="model-media model-media--cargo">
             <span class="badge">Для работы</span>
-            <img src="assets/model-cargo-courier-1-web.jpg" width="800" height="600" alt="Грузовой электровелосипед «Курьер» с передним багажником и широкими шинами" loading="lazy" decoding="async">
+            <svg class="bike-art bike--wood" viewBox="0 0 400 300" role="img" aria-label="Грузовой электровелосипед «Курьер» — иллюстрация"><use href="#bike-cargo-courier"/></svg>
           </div>
           <div class="model-body">
             <div class="model-top"><span>Грузовой</span><span>06</span></div>
@@ -654,9 +949,9 @@ body.is-locked{overflow:hidden}
         </article>
 
         <article class="model-card" id="model-sklad" data-category="folding" data-note="Складывается за полминуты и помещается в багажник — для поездов, офиса и лифта.">
-          <div class="model-media">
+          <div class="model-media model-media--folding">
             <span class="badge">В багажник</span>
-            <img src="assets/model-folding-compact-1-web.jpg" width="800" height="600" alt="Складной электровелосипед «Складень 20» с маленькими колёсами и графитовой рамой" loading="lazy" decoding="async">
+            <svg class="bike-art bike--graphite" viewBox="0 0 400 300" role="img" aria-label="Складной электровелосипед «Складень 20» — иллюстрация"><use href="#bike-folding"/></svg>
           </div>
           <div class="model-body">
             <div class="model-top"><span>Складной</span><span>07</span></div>
@@ -726,6 +1021,28 @@ body.is-locked{overflow:hidden}
             <p>Собранный велосипед едет в жёсткой коробке. В Москве и Петербурге — на следующий день.</p>
           </div>
         </div>
+        <div class="adv-item">
+          <span class="adv-num">05</span>
+          <div>
+            <h3>Гарантия 2 года</h3>
+            <p>Рама, мотор и батарея под защитой. Если что-то пойдёт не так — чиним по гарантии, без споров и поиска виноватых.</p>
+          </div>
+        </div>
+        <div class="adv-item">
+          <span class="adv-num">06</span>
+          <div>
+            <h3>Рассрочка 0%</h3>
+            <p>Делим платеж на 24 месяца без первого взноса и переплаты. Решение банка обычно приходит за пару минут.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="wrap guarantee-wrap">
+      <p class="label">Гарантии и возврат</p>
+      <div class="guarantee-strip">
+        <div><strong>2 года</strong><span>гарантия на раму, мотор и батарею</span></div>
+        <div><strong>14 дней</strong><span>на возврат без объяснения причин</span></div>
+        <div><strong>1 день</strong><span>на диагностику и мелкий ремонт</span></div>
       </div>
     </div>
   </section>
@@ -992,7 +1309,7 @@ body.is-locked{overflow:hidden}
       });
     });
     window.addEventListener("resize", function(){
-      if(window.innerWidth > 980){
+      if(window.innerWidth > 1080){
         menuBtn.setAttribute("aria-expanded", "false");
         nav.classList.remove("is-open");
       }
@@ -1140,7 +1457,6 @@ body.is-locked{overflow:hidden}
     mid: { min: 80000, max: 120000 },
     high: { min: 120000, max: null }
   };
-  var PRODUCT_DATA_URL = "content/products.json";
   var answers = {};
   var resultEl = document.getElementById("quiz-result");
   var resetBtn = document.getElementById("quiz-reset");
@@ -1156,35 +1472,6 @@ body.is-locked{overflow:hidden}
       .replace(",", ".");
     if(text === ""){ return NaN; }
     return Number(text);
-  }
-
-  function modelsFromProducts(products, baseModels){
-    var result = {};
-    var base = baseModels || {};
-    var byName = {};
-    if(!Array.isArray(products)){ return result; }
-    Object.keys(base).forEach(function(key){
-      byName[base[key].name] = key;
-    });
-    products.forEach(function(product){
-      if(!product || typeof product !== "object"){ return; }
-      var price = toNumber(product.price);
-      var slug = String(product.slug || "").trim();
-      if(slug === "" || !isFinite(price) || price < 0){ return; }
-      var key = Object.prototype.hasOwnProperty.call(base, slug) ? slug : byName[product.name];
-      if(!key){ key = slug; }
-      var existing = base[key] || {};
-      result[key] = {
-        slug: key,
-        name: product.name ? String(product.name) : (existing.name || ""),
-        price: money(price),
-        price_value: price,
-        href: existing.href || ("#model-" + key),
-        note: product.tagline || product.short_description || existing.note || "",
-        category: product.category ? String(product.category) : (existing.category || "")
-      };
-    });
-    return result;
   }
 
   function readModels(){
@@ -1346,20 +1633,6 @@ body.is-locked{overflow:hidden}
     document.querySelectorAll(".chip").forEach(function(chip){ chip.setAttribute("aria-pressed", "false"); });
     renderResult();
   });
-
-  function loadProductModels(){
-    if(typeof fetch !== "function"){ return; }
-    fetch(PRODUCT_DATA_URL, { cache: "no-store", credentials: "same-origin" })
-      .then(function(response){ return response && response.ok ? response.json() : null; })
-      .then(function(products){
-        var loaded = modelsFromProducts(products, models);
-        if(Object.keys(loaded).length === 0){ return; }
-        models = loaded;
-        if(answers.place && answers.need && answers.budget){ renderResult(); }
-      })
-      .catch(function(){});
-  }
-  loadProductModels();
 
   var form = document.getElementById("lead-form");
   var success = document.getElementById("form-success");
